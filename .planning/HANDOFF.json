@@ -1,0 +1,95 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-30T13:49:40+07:00",
+  "phase": "omniroute-live-integration",
+  "phase_name": "OmniRoute agent routing",
+  "phase_dir": ".superpowers/sdd/2026-08-30-omniroute-live-integration",
+  "plan": 1,
+  "task": 3,
+  "total_tasks": 5,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Patch and independently verify both official client protocols offline",
+      "status": "done",
+      "commit": "DeepSeek 3d767f42; Hermes e330e978"
+    },
+    {
+      "id": 2,
+      "name": "Pin v3.8.49 source and write failing controller tests",
+      "status": "done",
+      "commit": "2656a396e748b282f02d5ce07ca468774de7da2f"
+    },
+    {
+      "id": 3,
+      "name": "Implement the minimal controller, metadata schema, and no-log integration",
+      "status": "in_progress",
+      "progress": "Uncommitted partial implementation: scoped controller suite 28/28 PASS, migration numbering PASS, core typecheck PASS; chat.ts intentionally unchanged."
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 3,
+      "name": "Add missing chat-boundary RED contracts, independently review them, then complete Task 3 chat integration",
+      "status": "in_progress"
+    },
+    {
+      "id": 4,
+      "name": "Package, independently review, verify the offline image, and prepare reversible cutover",
+      "status": "not_started"
+    },
+    {
+      "id": 5,
+      "name": "Sole-owner live configuration, client integration, thirteen-test gate, and rollback",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Task 2 omitted secure chat-boundary RED tests for exact UUID headers, auth/latch rejection, handler placement, existing handleSingleModelChat binding, buffer-before-exposure, and sanitized response headers.",
+      "type": "technical",
+      "workaround": "Create the missing tests in a separate correction worktree from 2656a396, independently review the RED commit, then resume Task 3 using the existing handleSingleModelChat and parseSSEToOpenAIResponse seams."
+    },
+    {
+      "description": "Auth/authz Windows run had 227 passing tests and two unrelated temp-directory cleanup EPERM failures.",
+      "type": "technical",
+      "workaround": "Re-run the two failures in a clean isolated data directory before completion; do not relax assertions."
+    }
+  ],
+  "human_actions_pending": [
+    {
+      "action": "Authorize VM1205 Cloudflare service-token proxy and Bell OmniRoute endpoint change when requested in the Bell-PC repair lane.",
+      "context": "The Bell Cloudflare URL currently returns a Cloudflare Access 403 to unauthenticated OmniRoute traffic.",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Pause controller implementation and prioritize Bell-PC Cloudflare connectivity.",
+      "rationale": "Direct user instruction on 2026-08-30.",
+      "phase": "omniroute-live-integration"
+    },
+    {
+      "decision": "Treat the Task 3 stop as a missing-test correction, not a new transport design.",
+      "rationale": "Read-only source audit proved the existing handleSingleModelChat Response seam and parseSSEToOpenAIResponse reconstruction helper are sufficient.",
+      "phase": "omniroute-live-integration"
+    }
+  ],
+  "uncommitted_files": [
+    "open-sse/services/agentRoute.ts",
+    "open-sse/services/agentRouteObjectives.ts",
+    "open-sse/services/codexQuotaFetcher.ts",
+    "src/app/api/v1/agent-routes/events/route.ts",
+    "src/app/api/v1/models/catalog.ts",
+    "src/lib/db/agentRouteRuns.ts",
+    "src/lib/db/migrations/134_agent_route_runs.sql",
+    "src/lib/localDb.ts",
+    "tests/unit/api/agent-route-events.test.ts",
+    "tests/unit/api/models-agent-route-aliases.test.ts",
+    "tests/unit/db/agent-route-runs.test.ts",
+    "tests/unit/services/agent-route.test.ts"
+  ],
+  "next_action": "Create a separate Task 2 correction worktree at commit 2656a396, add the missing chat-boundary RED tests, and obtain independent approval before touching the preserved Task 3 partial files.",
+  "context_notes": "No live VM1205, Cloudflare, provider, key, service, Hermes, or DeepSeek mutation was made during Tasks 2-3. The current source worktree deliberately contains uncommitted Task 3 partial files; do not reset, clean, stash, or overwrite them."
+}

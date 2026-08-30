@@ -17,6 +17,10 @@ async function loadCatalog() {
   return import("../../../src/app/api/v1/models/catalog.ts");
 }
 
+async function loadRoute() {
+  return import("../../../src/app/api/v1/models/route.ts");
+}
+
 async function resetStorage() {
   core.resetDbInstance();
   apiKeysDb.resetApiKeyState();
@@ -26,8 +30,9 @@ async function resetStorage() {
 }
 
 async function modelIdsFor(key: string) {
-  const catalog = await loadCatalog();
-  const response = await catalog.getUnifiedModelsResponse(
+  const response = await (
+    await loadRoute()
+  ).GET(
     new Request("http://localhost/api/v1/models", { headers: { authorization: `Bearer ${key}` } })
   );
   assert.equal(response.status, 200);
@@ -89,10 +94,21 @@ test("existing hyphen aliases remain distinct and catalog lookup cannot dispatch
     allowedModels: ["agent/normal", "agent/high", "agent-normal", "agent-high"],
   });
 
-  const ids = await modelIdsFor(key.key);
-  assert.deepEqual(
-    ids.filter((id) => id.startsWith("agent")),
-    ["agent-normal", "agent-high", "agent/normal", "agent/high"]
-  );
-  assert.equal(ids.includes("agent/normal"), true, "catalog discovery must not dispatch the alias");
+  const originalFetch = globalThis.fetch;
+  let providerDispatches = 0;
+  globalThis.fetch = (async () => {
+    providerDispatches++;
+    throw new Error("/v1/models must not dispatch an agent provider");
+  }) as typeof globalThis.fetch;
+  try {
+    const ids = await modelIdsFor(key.key);
+    assert.deepEqual(
+      ids.filter((id) => id.startsWith("agent")),
+      ["agent-normal", "agent-high", "agent/normal", "agent/high"]
+    );
+    assert.equal(ids.includes("agent/normal"), true);
+    assert.equal(providerDispatches, 0, "/v1/models must not dispatch an agent provider");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

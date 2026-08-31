@@ -5,25 +5,27 @@
   "phase_name": "OmniRoute secure console transfer and standard team API continuation",
   "phase_dir": ".superpowers/sdd/2026-08-31-omniroute-secure-console-transfer",
   "plan": 1,
-  "task": 4,
-  "total_tasks": 6,
+  "task": 5,
+  "total_tasks": 8,
   "status": "paused_at_human_approval_gate",
   "completed_tasks": [
     {"id": 1, "name": "Design and independently approve the secure-console transfer contract", "status": "done", "commit": "d22c02505"},
     {"id": 2, "name": "Classify the rejected bridge, direct-v2 result, and retained-tab disposition without retry", "status": "done", "commit": "16e884393 bridge FAIL; cf5813b94 direct-v2 NOT PROVEN; d62ae9698 residual-only PASS"},
-    {"id": 3, "name": "Prepare and independently approve the replacement loopback non-secret clipboard preflight v3", "status": "done", "commit": "f7fd70cae brief; bdf427ad7 independent review PASS after pre-execution fix round 2"}
+    {"id": 3, "name": "Prepare and independently approve the replacement loopback non-secret clipboard preflight v3", "status": "done", "commit": "f7fd70cae brief; bdf427ad7 independent review PASS after pre-execution fix round 2"},
+    {"id": 4, "name": "Execute v3 once and independently classify it without retry", "status": "done_fail_closed", "commit": "ac4101401 execution report; 1749c51ad independent FAIL / BROWSER_UNCERTAIN / NOT PROVEN classification"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "After fresh exact user authority, execute v3 once and independently classify it", "status": "not_started"},
-    {"id": 5, "name": "Only after transport proof, prepare and independently approve the credential-owner live brief and request separate action-time credential authority", "status": "not_started"},
-    {"id": 6, "name": "Complete redacted evidence review, then resume standard-team API Tasks 2-5 through the final Sol High security audit", "status": "not_started"}
+    {"id": 5, "name": "After fresh exact authority, execute the independently approved residual tab/clipboard disposition contract once and classify it", "status": "not_started"},
+    {"id": 6, "name": "After residual disposition, prepare/review a non-secret replacement transport contract and obtain a new exact execution gate", "status": "not_started"},
+    {"id": 7, "name": "Only after transport proof, prepare and independently approve the credential-owner live brief and request separate action-time credential authority", "status": "not_started"},
+    {"id": 8, "name": "Complete redacted evidence review, then resume standard-team API Tasks 2-5 through the final Sol High security audit", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "Clipboard transport remains NOT PROVEN because v3 has passed static review but has not executed.", "type": "human_action", "workaround": "Obtain fresh exact one-shot user authority for the committed v3 bytes, then execute once and fail closed on the first mismatch or uncertainty."},
-    {"description": "The direct-v2 and retained-tab-close authorities are consumed and may not be retried.", "type": "human_action", "workaround": "Use only the separately reviewed v3 contract after its own exact approval."}
+    {"description": "The v3 one-shot authority is consumed: Call 1 passed, Call 2 timed out without a terminal result, and Call 3 did not run. Browser/tab/server/clipboard residual state and transport remain NOT PROVEN.", "type": "human_action", "workaround": "Never retry or continue v3. Use only the separately reviewed residual disposition contract after fresh exact pinned authority."},
+    {"description": "The cleanup-only residual disposition contract is independently PASS but not authorized for execution.", "type": "human_action", "workaround": "Obtain exact authority pinned to brief 0d8f888a3 and review ad5f35ede, then execute once and fail closed on the first mismatch or uncertainty."}
   ],
   "human_actions_pending": [
-    {"action": "Approve exactly one execution of the committed non-secret loopback clipboard preflight v3.", "context": "The earlier approval for 9057575ef/25bee5003 was not consumed and became invalid before Call 1 when an unsupported focus() operation was found. Fresh approval must cover only brief commit f7fd70cae, review commit bdf427ad7, brief SHA-256 AF8BAEFF29EE1DB77967798B39A6CAEFA3D18F5047FBE3F440B8F88CD0CBD214, review SHA-256 86BC5A9AACCC868E2D42F67012040E843243E8681F2C320C61C49B49AEA40C4A, and one three-call non-secret attempt. It does not authorize credentials or live routing changes.", "blocking": true},
+    {"action": "Approve exactly one execution of the committed v3 residual tab/clipboard disposition contract.", "context": "Approval must cover only brief commit 0d8f888a3, review commit ad5f35ede, brief SHA-256 7BA4B59F0B51A8F4F4E6AD527AFAA3748FAE0A6138440F5D9B3C433E31008349, and review SHA-256 81401F5BAD153F2B58CD9A2B5C2A4D39D5F52C058528EBC0649B17532144942A. It permits one count-only tab enumeration; no close for zero tabs; at most one close of the sole tab for exactly one tab; stop without close for more than one tab; and one clipboard clear/read only after proven zero tabs. It leaves listener/process residual NOT PROVEN and grants no preflight retry, credential, or routing authority.", "blocking": true},
     {"action": "Later approve each credential creation/transmission, permission change, or deletion at action time.", "context": "The unattended request does not replace mandatory security confirmations.", "blocking": true}
   ],
   "decisions": [
@@ -44,6 +46,6 @@
     "tests/unit/db/agent-route-runs.test.ts",
     "tests/unit/services/agent-route.test.ts"
   ],
-  "next_action": "Do not execute until the user gives exact fresh v3 approval pinned to brief f7fd70cae and review bdf427ad7. After approval, revalidate both committed hashes/sizes, empty index, preserved twelve-file dirty baseline, and Chrome tab count zero read-only; then execute the committed three-call v3 exactly once with no retry or fallback and obtain independent Sol High classification.",
-  "context_notes": "Current branch codex/omniroute-agent-routing at bdf427ad735c57ea1ea0ba7a74219a43ecbde7f7 before the handoff refresh commits. Brief is 27048 bytes SHA-256 AF8BAEFF29EE1DB77967798B39A6CAEFA3D18F5047FBE3F440B8F88CD0CBD214. Review is 10404 bytes SHA-256 86BC5A9AACCC868E2D42F67012040E843243E8681F2C320C61C49B49AEA40C4A. The prior approval was stopped before Call 1 and never consumed. Chrome tab count was revalidated read-only as zero after fix-round-2 review; no live action occurred. No v3 code, server, browser mutation, clipboard action, credential, permission, deletion, OmniRoute, Cloudflare, VM, provider, proxy, key, token, or routing mutation occurred."
+  "next_action": "Do not inspect or mutate residual state until the user gives exact fresh authority pinned to residual brief 0d8f888a3 and review ad5f35ede. After approval, revalidate committed hashes/sizes, empty index, and the preserved twelve-file dirty baseline; then execute the cleanup-only contract exactly once with no retry or fallback and obtain independent Sol High classification.",
+  "context_notes": "Current branch codex/omniroute-agent-routing at ad5f35edef45be17a4f00c03702931bc9cd2a5dc before this handoff refresh. V3 execution report ac4101401 and classification 1749c51ad establish Call 1 PASS, Call 2 control timeout/kernel reset, no Call 3, consumed authority, and browser/tab/server/clipboard/transport NOT PROVEN. Residual brief 0d8f888a3 is 10876 bytes SHA-256 7BA4B59F0B51A8F4F4E6AD527AFAA3748FAE0A6138440F5D9B3C433E31008349. Residual review ad5f35ede is 6634 bytes SHA-256 81401F5BAD153F2B58CD9A2B5C2A4D39D5F52C058528EBC0649B17532144942A and PASS with zero findings. No live action occurred after the Call 2 timeout. Credential, permission, deletion, provider, Cloudflare, VM, proxy, key, token, OmniRoute routing, and live routing mutations remain unattempted and unauthorized."
 }

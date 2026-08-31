@@ -67,3 +67,27 @@ The prior race is closed: listener cleanup can prove cleanup but cannot rehabili
 ## Scoped disposition
 
 **PASS for both prior HIGH findings; 0 new findings.** This is a static fix-round verdict only. `authorizes_live_execution=false`; any future one-shot execution still requires the coordinator's remaining review/approval gates and fresh exact user authority.
+
+---
+
+# Fix round 2 scoped Sol High re-review
+
+Observed at: `2026-08-31 19:24:58` (`Asia/Bangkok`)
+
+## Scope
+
+Static review only of fix range `d451d002d588f772795bed4e9991c890a57e1b36..f7fd70caeae9c0b0caa6b2f87d894efcb32f25f7`, limited to replacing the unsupported locator focus action and identifying new breakage introduced by that fix. Inputs were the requirements brief, appended implementer report, and supplied direct-byte fix-round-2 review package. No embedded or live code was executed; Chrome and the clipboard were not touched. The implementer's passing checks were not rerun because the one-line diff raised no concrete doubt about them.
+
+## Required-correction verdict — PASS
+
+The sole executable locator call changes from `await field.focus()` to the documented, directly awaited `await field.click()` at `task-3-v3-fix-round-2-review-package.md:23-28`. The fix package contains zero added executable `.focus(` calls and exactly one `field.click()` call. Clicking the same exact labelled readonly input is a direct browser mutation that focuses that selectable control without changing its challenge value.
+
+The surrounding load-bearing sequence is unchanged: `FOCUS_UNCERTAIN` and `browserFocusAttempted` are set before the awaited mutation, `browserFocusFulfilled` and `FOCUSED` are set only after fulfillment, then server state is revalidated before the serial `Control+A` and `Control+C` operations (`task-3-v3-fix-round-2-review-package.md:19-37`). A rejected or transport-uncertain click therefore remains fail-closed and forbids later browser/clipboard mutation under the existing catch path.
+
+## New-breakage review
+
+**No new breakage found; 0 findings.** The direct-byte package changes one line in the exact deliverable only (`task-3-v3-fix-round-2-review-package.md:1-14`). It does not alter counters, serial ordering, exact-tab ownership, sticky server uncertainty, one-shot Call 3 eligibility, challenge handling, redaction, server cleanup, child lifecycle, clipboard comparison/cleanup, retry/fallback boundaries, or authority scope.
+
+## Scoped disposition
+
+**PASS — fix round 2 satisfies the documented-locator correction with no new findings.** This static verdict authorizes no execution. `authorizes_live_execution=false`; any future one-shot run still requires every remaining coordinator review/approval gate and fresh exact user authority.

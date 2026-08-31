@@ -118,17 +118,19 @@ await (async () => {
   let challengeLength = 0;
   let tabState = "NOT_ATTEMPTED";
   let browserUncertain = false;
+  let sessionNameUncertain = false;
   try {
     if (typeof residualV5Chrome !== "object" || residualV5Chrome === null || typeof residualV5Chrome.nameSession !== "function" || typeof residualV5Chrome.tabs?.new !== "function") {
       throw new Error("ResidualChromeBindingError");
     }
     counters.sessionNameAttempted++;
+    sessionNameUncertain = true;
     result = "SESSION_NAME_UNCERTAIN";
     await residualV5Chrome.nameSession("omniroute-v6-native-clipboard");
     counters.sessionNameFulfilled++;
+    sessionNameUncertain = false;
     const { randomBytes } = await import("node:crypto");
     const challenge = `OMNI-PREFLIGHT-V6-${randomBytes(16).toString("hex").toUpperCase()}`;
-    nativeClipboardPreflightV6ExpectedChallenge = challenge;
     challengeShape = /^OMNI-PREFLIGHT-V6-[0-9A-F]{32}$/.test(challenge);
     challengeLength = challenge.length;
     tabState = "OPEN_UNCERTAIN";
@@ -152,7 +154,8 @@ await (async () => {
     counters.browserCloseFulfilled++;
     nativeClipboardPreflightV6RetainedTab = null;
     tabState = "CLOSED";
-    if (challengeShape && challengeLength === 50 && Object.values(counters).every((value) => value === 1)) {
+    if (challengeShape && challengeLength === 50 && Object.values(counters).every((value) => value === 1) && !sessionNameUncertain && !browserUncertain) {
+      nativeClipboardPreflightV6ExpectedChallenge = challenge;
       nativeClipboardPreflightV6Call3Eligible = true;
       result = "NATIVE_WRITE_SETTLED_TAB_CLOSED";
     } else {
@@ -160,18 +163,18 @@ await (async () => {
     }
   } catch (error) {
     errorClass = safeErrorClass(error, "BROWSER_ERROR");
-    browserUncertain = tabState.endsWith("_UNCERTAIN");
+    browserUncertain = sessionNameUncertain || tabState.endsWith("_UNCERTAIN");
     if (result !== "TAB_CLIPBOARD_API_INVALID") result = browserUncertain ? "BROWSER_UNCERTAIN" : "PRECONDITION_OR_RUNTIME_UNCERTAIN";
   } finally {
     if (result !== "NATIVE_WRITE_SETTLED_TAB_CLOSED") {
       nativeClipboardPreflightV6Call3Eligible = false;
-      nativeClipboardPreflightV6ExpectedChallenge = null;
     }
     nodeRepl.write({
       result, errorClass, challengeShape, challengeLength, counters, tabState,
       exactTabClosed: tabState === "CLOSED" && nativeClipboardPreflightV6RetainedTab === null,
       retainedTabBinding: nativeClipboardPreflightV6RetainedTab !== null,
-      browserUncertain
+      browserUncertain,
+      sessionNameUncertain
     });
   }
 })();
@@ -179,29 +182,34 @@ await (async () => {
 
 Success requires result `NATIVE_WRITE_SETTLED_TAB_CLOSED`, error `NONE`,
 shape true, length 50, all eight counters 1, tab `CLOSED`, exact-tab-closed
-true, retained binding false, and uncertainty false. Only it enables Call 3.
+true, retained binding false, browser uncertainty false, and session-name
+uncertainty false. Only it publishes the lexical challenge to the persistent
+binding and then enables Call 3.
 
 Any uncertain browser call stops. If tab creation fulfilled, its exact binding
 remains non-null unless close fulfilled. No cleanup close follows uncertainty.
-Failure clears stale challenge/eligibility; later cleanup requires a new
+On failure the challenge remains lexical and is never published to the
+persistent binding; eligibility remains false. Later cleanup requires a new
 reviewed contract.
 
 ## Call 3 — consume eligibility, compare once, then clear and prove empty
 
 Run this exact JavaScript cell once only after exact Call 2 success. Eligibility
-is consumed before the sole child attempt. The persistent challenge is passed
-only through child stdin and nulled after that synchronous child returns or
-throws. It is never disk, environment, argument, network, or output data.
+is consumed before the sole child attempt, so retained failure evidence cannot
+authorize retry. The persistent challenge is passed only through child stdin,
+retained on every terminal failure, and nulled only after fully validated exact
+child success. It is never disk, environment, argument, network, or output
+data.
 
 ```javascript
 await (async () => {
-  const result = { result: "HANDOFF_UNCERTAIN", errorClass: "NONE", childStartAttempted: 0, childExitFulfilled: 0, childExitCode: null, stdoutSchemaValid: false, comparison: null };
+  const result = { result: "HANDOFF_UNCERTAIN_RETAINED_BINDING", errorClass: "NONE", childStartAttempted: 0, childExitFulfilled: 0, childExitCode: null, stdoutSchemaValid: false, comparison: null, challengeBindingRetained: nativeClipboardPreflightV6ExpectedChallenge !== null };
   const safeClass = (value, fallback) => /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(value) ? value : fallback;
   const consumedEligibility = nativeClipboardPreflightV6Call3Eligible === true;
   nativeClipboardPreflightV6Call3Eligible = false;
   if (!consumedEligibility || typeof nativeClipboardPreflightV6ExpectedChallenge !== "string" || !/^OMNI-PREFLIGHT-V6-[0-9A-F]{32}$/.test(nativeClipboardPreflightV6ExpectedChallenge)) {
-    nativeClipboardPreflightV6ExpectedChallenge = null;
-    result.result = "HANDOFF_BINDING_INVALID";
+    result.result = "HANDOFF_BINDING_INVALID_RETAINED_AS_FOUND";
+    result.challengeBindingRetained = nativeClipboardPreflightV6ExpectedChallenge !== null;
     nodeRepl.write(result);
     return;
   }
@@ -209,9 +217,9 @@ await (async () => {
   try {
     ({ spawnSync } = await import("node:child_process"));
   } catch (error) {
-    nativeClipboardPreflightV6ExpectedChallenge = null;
     result.errorClass = safeClass(typeof error?.name === "string" ? error.name : "", "IMPORT_ERROR");
-    result.result = "CHILD_IMPORT_UNCERTAIN";
+    result.result = "CHILD_IMPORT_UNCERTAIN_RETAINED_BINDING";
+    result.challengeBindingRetained = true;
     nodeRepl.write(result);
     return;
   }
@@ -264,11 +272,10 @@ if($pass){exit 0}; exit 2`;
     });
   } catch (error) {
     result.errorClass = safeClass(typeof error?.name === "string" ? error.name : "", "CHILD_ERROR");
-    result.result = "CHILD_SPAWN_UNCERTAIN";
+    result.result = "CHILD_SPAWN_UNCERTAIN_RETAINED_BINDING";
+    result.challengeBindingRetained = true;
     nodeRepl.write(result);
     return;
-  } finally {
-    nativeClipboardPreflightV6ExpectedChallenge = null;
   }
   const childError = typeof child.error?.code === "string" ? child.error.code : (typeof child.error?.name === "string" ? child.error.name : "NONE");
   result.errorClass = safeClass(childError, "CHILD_ERROR");
@@ -288,7 +295,14 @@ if($pass){exit 0}; exit 2`;
   if (schema) result.comparison = { handoffReads:Number(parsed.PREFLIGHT_V6_HANDOFF_READS), comparisonReads:Number(parsed.PREFLIGHT_V6_COMPARISON_READS), comparisonMatch:parsed.PREFLIGHT_V6_COMPARISON_MATCH, observedShape:parsed.PREFLIGHT_V6_OBSERVED_SHAPE, observedLength:Number(parsed.PREFLIGHT_V6_OBSERVED_LENGTH), comparisonError:parsed.PREFLIGHT_V6_COMPARISON_ERROR, finalClearAttempted:Number(parsed.PREFLIGHT_V6_FINAL_CLEAR_ATTEMPTED), finalClearFulfilled:Number(parsed.PREFLIGHT_V6_FINAL_CLEAR_FULFILLED), finalReadAttempted:Number(parsed.PREFLIGHT_V6_FINAL_READ_ATTEMPTED), finalReadFulfilled:Number(parsed.PREFLIGHT_V6_FINAL_READ_FULFILLED), finalEmpty:parsed.PREFLIGHT_V6_FINAL_EMPTY, cleanupError:parsed.PREFLIGHT_V6_CLEANUP_ERROR, powerShellResult:parsed.PREFLIGHT_V6_RESULT };
   const c = result.comparison;
   const exact = result.errorClass === "NONE" && result.childExitFulfilled === 1 && result.childExitCode === 0 && schema && c.handoffReads === 1 && c.comparisonReads === 1 && c.comparisonMatch === "TRUE" && c.observedShape === "TRUE" && c.observedLength === 50 && c.comparisonError === "NONE" && c.finalClearAttempted === 1 && c.finalClearFulfilled === 1 && c.finalReadAttempted === 1 && c.finalReadFulfilled === 1 && c.finalEmpty === "TRUE" && c.cleanupError === "NONE" && c.powerShellResult === "PASS";
-  result.result = exact ? "EXACT_MATCH_AND_FINAL_EMPTY" : "HANDOFF_OR_COMPARISON_UNCERTAIN";
+  if (exact) {
+    nativeClipboardPreflightV6ExpectedChallenge = null;
+    result.challengeBindingRetained = false;
+    result.result = "EXACT_MATCH_AND_FINAL_EMPTY";
+  } else {
+    result.challengeBindingRetained = true;
+    result.result = "HANDOFF_OR_COMPARISON_UNCERTAIN_RETAINED_BINDING";
+  }
   nodeRepl.write(result);
 })();
 ```
@@ -297,15 +311,20 @@ Exact Call 3 success requires the named success result, error `NONE`, child
 counters 1/1, exit 0, exact bounded ordered stdout schema, one handoff read,
 one comparison read, exact equality, observed shape true and length 50, one
 fulfilled final clear, one fulfilled final empty read, final empty true, and
-both PowerShell error labels `NONE`. Every failure, timeout, signal, stderr,
-parse/output uncertainty, or counter mismatch is terminal and permits no
-second child or later browser/clipboard mutation.
+both PowerShell error labels `NONE`, with `challengeBindingRetained=false`.
+Every failure, timeout, signal, stderr,
+parse/output uncertainty, or counter mismatch is terminal, retains the
+non-secret challenge binding as redacted failure evidence, and permits no
+second child or later browser/clipboard mutation. Only exact fully validated
+success clears that binding.
 
 ## Static and acceptance boundary
 
 Review must prove UTF-8/LF bytes, PowerShell parsing, non-evaluating JavaScript
-syntax, fresh v6 bindings, eligibility consumption before the sole child and
-challenge nulling after it, and exact
+syntax, fresh v6 bindings, lexical-only Call 2 challenge until exact browser
+success, session-name uncertainty tracking, eligibility consumption before the
+sole child, exactly one persistent challenge publication, failure retention,
+success-only challenge nulling, and exact
 cardinality for `nameSession`, `tabs.new`,
 `tab.clipboard.writeText`, exact-tab close, `spawnSync`, one comparison
 read, one final clear, and one final empty read. It must prove the 30000 ms

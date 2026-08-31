@@ -32,8 +32,8 @@ control and authorizes no token, credential, or other live action.
   `powershell` block below, beginning with `param(` and ending with the LF after
   `exit $exitCode`; the fence markers and surrounding Markdown are excluded.
 - Encoding is strict UTF-8 without BOM, LF-only, with exactly one trailing LF.
-- Exact extracted byte size: `12,839`.
-- Exact extracted SHA-256: `2DC4024A95E916FFA1DE38DBD31F878F4593AEFFF50B393AD02E4177C6FEF1B6`.
+- Exact extracted byte size: `23,823`.
+- Exact extracted SHA-256: `4972F7C274E18A90E70DF35DCD2BBADC583A708E9B183B7C3F21627CE7522E04`.
 - The challenge is exactly 128 bits (`16` bytes), freshly filled at runtime by
   the .NET `RandomNumberGenerator`; no static or reused challenge is permitted.
 - The script is credential-free and emits only fixed non-secret labels,
@@ -87,6 +87,9 @@ $controlCts = $null
 $readTask = $null
 $controlClock = $null
 $controlLine = $null
+$scriptLifetimeHandle = $null
+$scriptDeleteHandle = $null
+$rootCheckHandle = $null
 $baselineWrites = 0
 $baselineReads = 0
 $comparisonReads = 0
@@ -100,16 +103,25 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
-public static class OmniRoutePreflightFileIdentity
+public static class OmniRoutePreflightFileHandle
 {
+    private const uint GenericRead = 0x80000000;
+    private const uint GenericWrite = 0x40000000;
+    private const uint DeleteAccess = 0x00010000;
+    private const uint FileReadAttributes = 0x00000080;
     private const uint ShareRead = 0x00000001;
     private const uint ShareWrite = 0x00000002;
     private const uint ShareDelete = 0x00000004;
+    private const uint CreateNew = 1;
     private const uint OpenExisting = 3;
+    private const uint FileAttributeNormal = 0x00000080;
     private const uint BackupSemantics = 0x02000000;
     private const uint OpenReparsePoint = 0x00200000;
     private const uint DirectoryAttribute = 0x00000010;
     private const uint ReparseAttribute = 0x00000400;
+    private const uint FileBegin = 0;
+    private const int FileDispositionInfo = 4;
+    private const int MaximumReviewedBytes = 1048576;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation
@@ -126,6 +138,16 @@ public static class OmniRoutePreflightFileIdentity
         public uint FileIndexLow;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileDispositionInformation
+    {
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool DeleteFile;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateDirectoryW(string path, IntPtr securityAttributes);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFileW(
         string fileName,
@@ -137,40 +159,272 @@ public static class OmniRoutePreflightFileIdentity
         IntPtr templateFile);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern SafeFileHandle ReOpenFile(
+        SafeFileHandle originalFile,
+        uint desiredAccess,
+        uint shareMode,
+        uint flagsAndAttributes);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetFileInformationByHandle(
         SafeFileHandle file,
         out ByHandleFileInformation information);
 
-    public static string GetOrdinaryIdentity(string path, bool requireDirectory)
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetFilePointerEx(
+        SafeFileHandle file,
+        long distance,
+        out long newPosition,
+        uint moveMethod);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetEndOfFile(SafeFileHandle file);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileSizeEx(SafeFileHandle file, out long fileSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool ReadFile(
+        SafeFileHandle file,
+        IntPtr buffer,
+        uint bytesToRead,
+        out uint bytesRead,
+        IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool WriteFile(
+        SafeFileHandle file,
+        IntPtr buffer,
+        uint bytesToWrite,
+        out uint bytesWritten,
+        IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool FlushFileBuffers(SafeFileHandle file);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetFileInformationByHandle(
+        SafeFileHandle file,
+        int informationClass,
+        ref FileDispositionInformation information,
+        uint bufferSize);
+
+    public static void CreateDirectoryNew(string path)
     {
-        using (SafeFileHandle handle = CreateFileW(
+        if (!CreateDirectoryW(path, IntPtr.Zero))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+
+    public static SafeFileHandle OpenRootForLifetime(string path)
+    {
+        SafeFileHandle handle = CreateFileW(
             path,
-            0,
+            FileReadAttributes | DeleteAccess,
+            ShareRead | ShareWrite,
+            IntPtr.Zero,
+            OpenExisting,
+            BackupSemantics | OpenReparsePoint,
+            IntPtr.Zero);
+        try { ValidateOrdinary(handle, true); return handle; }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static SafeFileHandle OpenRootForCheck(string path)
+    {
+        SafeFileHandle handle = CreateFileW(
+            path,
+            FileReadAttributes,
             ShareRead | ShareWrite | ShareDelete,
             IntPtr.Zero,
             OpenExisting,
             BackupSemantics | OpenReparsePoint,
-            IntPtr.Zero))
+            IntPtr.Zero);
+        try { ValidateOrdinary(handle, true); return handle; }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static SafeFileHandle CreateScriptNew(string path)
+    {
+        SafeFileHandle handle = CreateFileW(
+            path,
+            GenericRead | GenericWrite | FileReadAttributes | DeleteAccess,
+            ShareRead | ShareWrite,
+            IntPtr.Zero,
+            CreateNew,
+            FileAttributeNormal | OpenReparsePoint,
+            IntPtr.Zero);
+        try { ValidateOrdinary(handle, false); return handle; }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static SafeFileHandle OpenScriptForLifetime(string path)
+    {
+        SafeFileHandle handle = CreateFileW(
+            path,
+            GenericRead | FileReadAttributes,
+            ShareRead | ShareWrite | ShareDelete,
+            IntPtr.Zero,
+            OpenExisting,
+            FileAttributeNormal | OpenReparsePoint,
+            IntPtr.Zero);
+        try { ValidateOrdinary(handle, false); return handle; }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static SafeFileHandle OpenScriptGuard(string path)
+    {
+        SafeFileHandle handle = CreateFileW(
+            path,
+            GenericRead | FileReadAttributes,
+            ShareRead | ShareWrite,
+            IntPtr.Zero,
+            OpenExisting,
+            FileAttributeNormal | OpenReparsePoint,
+            IntPtr.Zero);
+        try { ValidateOrdinary(handle, false); return handle; }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static SafeFileHandle OpenScriptForDelete(string path)
+    {
+        SafeFileHandle handle = CreateFileW(
+            path,
+            GenericRead | FileReadAttributes | DeleteAccess,
+            ShareRead | ShareWrite | ShareDelete,
+            IntPtr.Zero,
+            OpenExisting,
+            FileAttributeNormal | OpenReparsePoint,
+            IntPtr.Zero);
+        try { ValidateOrdinary(handle, false); return handle; }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static SafeFileHandle ReopenScriptForDelete(SafeFileHandle originalFile)
+    {
+        ValidateOrdinary(originalFile, false);
+        SafeFileHandle handle = ReOpenFile(
+            originalFile,
+            GenericRead | FileReadAttributes | DeleteAccess,
+            ShareRead | ShareWrite | ShareDelete,
+            OpenReparsePoint);
+        try { ValidateOrdinary(handle, false); return handle; }
+        catch { handle.Dispose(); throw; }
+    }
+
+    public static string GetIdentity(SafeFileHandle handle, bool requireDirectory)
+    {
+        ByHandleFileInformation information = ValidateOrdinary(handle, requireDirectory);
+        return string.Format(
+            "{0:X8}:{1:X8}:{2:X8}",
+            information.VolumeSerialNumber,
+            information.FileIndexHigh,
+            information.FileIndexLow);
+    }
+
+    public static void WriteExact(SafeFileHandle handle, byte[] bytes)
+    {
+        ValidateOrdinary(handle, false);
+        if (bytes == null || bytes.Length < 1 || bytes.Length > MaximumReviewedBytes)
+            throw new InvalidOperationException("WRITE_SIZE_REJECTED");
+
+        long position;
+        if (!SetFilePointerEx(handle, 0, out position, FileBegin))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+
+        IntPtr buffer = Marshal.AllocHGlobal(bytes.Length);
+        try
         {
-            if (handle.IsInvalid)
+            Marshal.Copy(bytes, 0, buffer, bytes.Length);
+            int offset = 0;
+            while (offset < bytes.Length)
+            {
+                uint written;
+                if (!WriteFile(handle, IntPtr.Add(buffer, offset), (uint)(bytes.Length - offset), out written, IntPtr.Zero))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (written == 0)
+                    throw new InvalidOperationException("ZERO_BYTE_WRITE");
+                offset += checked((int)written);
+            }
+            if (!SetEndOfFile(handle))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
-
-            ByHandleFileInformation information;
-            if (!GetFileInformationByHandle(handle, out information))
+            if (!FlushFileBuffers(handle))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
-            if ((information.FileAttributes & ReparseAttribute) != 0)
-                throw new InvalidOperationException("REPARSE_POINT_REJECTED");
-
-            bool isDirectory = (information.FileAttributes & DirectoryAttribute) != 0;
-            if (isDirectory != requireDirectory)
-                throw new InvalidOperationException("OBJECT_KIND_REJECTED");
-
-            return string.Format(
-                "{0:X8}:{1:X8}:{2:X8}",
-                information.VolumeSerialNumber,
-                information.FileIndexHigh,
-                information.FileIndexLow);
+            if (!SetFilePointerEx(handle, 0, out position, FileBegin))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
         }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    public static byte[] ReadExact(SafeFileHandle handle)
+    {
+        ValidateOrdinary(handle, false);
+        long length;
+        if (!GetFileSizeEx(handle, out length))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (length < 1 || length > MaximumReviewedBytes)
+            throw new InvalidOperationException("READ_SIZE_REJECTED");
+
+        long position;
+        if (!SetFilePointerEx(handle, 0, out position, FileBegin))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+
+        byte[] bytes = new byte[checked((int)length)];
+        IntPtr buffer = Marshal.AllocHGlobal(bytes.Length);
+        try
+        {
+            int offset = 0;
+            while (offset < bytes.Length)
+            {
+                uint read;
+                if (!ReadFile(handle, IntPtr.Add(buffer, offset), (uint)(bytes.Length - offset), out read, IntPtr.Zero))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (read == 0)
+                    throw new InvalidOperationException("UNEXPECTED_EOF");
+                offset += checked((int)read);
+            }
+            Marshal.Copy(buffer, bytes, 0, bytes.Length);
+            if (!SetFilePointerEx(handle, 0, out position, FileBegin))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            return bytes;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    public static void MarkDelete(SafeFileHandle handle, bool requireDirectory)
+    {
+        ValidateOrdinary(handle, requireDirectory);
+        FileDispositionInformation information = new FileDispositionInformation { DeleteFile = true };
+        if (!SetFileInformationByHandle(
+            handle,
+            FileDispositionInfo,
+            ref information,
+            (uint)Marshal.SizeOf<FileDispositionInformation>()))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+
+    private static ByHandleFileInformation ValidateOrdinary(
+        SafeFileHandle handle,
+        bool requireDirectory)
+    {
+        if (handle == null || handle.IsInvalid || handle.IsClosed)
+            throw new InvalidOperationException("HANDLE_REJECTED");
+
+        ByHandleFileInformation information;
+        if (!GetFileInformationByHandle(handle, out information))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        if ((information.FileAttributes & ReparseAttribute) != 0)
+            throw new InvalidOperationException("REPARSE_POINT_REJECTED");
+
+        bool isDirectory = (information.FileAttributes & DirectoryAttribute) != 0;
+        if (isDirectory != requireDirectory)
+            throw new InvalidOperationException("OBJECT_KIND_REJECTED");
+        return information;
     }
 }
 '@ -ErrorAction Stop
@@ -187,9 +441,6 @@ public static class OmniRoutePreflightFileIdentity
     if ([IO.Path]::GetFileName($tempRoot) -cnotmatch '^omniroute-transport-preflight-[0-9a-f]{32}$') {
         throw 'TEMP_ROOT_NAME_REJECTED'
     }
-    if (-not [IO.Directory]::Exists($tempRoot)) {
-        throw 'TEMP_ROOT_ABSENT'
-    }
     if (-not $pathComparer.Equals([IO.Path]::GetDirectoryName($scriptPath), $tempRoot)) {
         throw 'SCRIPT_NOT_DIRECT_CHILD'
     }
@@ -199,14 +450,22 @@ public static class OmniRoutePreflightFileIdentity
     if (-not $pathComparer.Equals($actualCommandPath, $scriptPath)) {
         throw 'COMMAND_PATH_MISMATCH'
     }
-    if (-not [IO.File]::Exists($scriptPath)) {
-        throw 'SCRIPT_ABSENT'
-    }
-    $actualTempRootIdentity = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($tempRoot, $true)
-    $actualScriptIdentity = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($scriptPath, $false)
+    $rootCheckHandle = [OmniRoutePreflightFileHandle]::OpenRootForCheck($tempRoot)
+    $actualTempRootIdentity = [OmniRoutePreflightFileHandle]::GetIdentity($rootCheckHandle, $true)
+    $rootCheckHandle.Dispose()
+    $rootCheckHandle = $null
+    $scriptLifetimeHandle = [OmniRoutePreflightFileHandle]::OpenScriptForLifetime($scriptPath)
+    $actualScriptIdentity = [OmniRoutePreflightFileHandle]::GetIdentity($scriptLifetimeHandle, $false)
     if ($actualTempRootIdentity -cne $ExpectedTempRootIdentity -or $actualScriptIdentity -cne $ExpectedScriptIdentity) {
         throw 'START_IDENTITY_DRIFT'
     }
+    $startScriptBytes = [OmniRoutePreflightFileHandle]::ReadExact($scriptLifetimeHandle)
+    $startScriptSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($startScriptBytes))
+    if ($startScriptBytes.LongLength -ne $ExpectedScriptBytes -or $startScriptSha256 -cne $ExpectedScriptSha256) {
+        throw 'START_HASH_OR_SIZE_MISMATCH'
+    }
+    [Array]::Clear($startScriptBytes, 0, $startScriptBytes.Length)
+    $startScriptBytes = $null
 
     "OWNER_PID=$PID"
 
@@ -350,12 +609,19 @@ public static class OmniRoutePreflightFileIdentity
         if (-not $pathComparerForDelete.Equals([IO.Path]::GetFullPath($PSCommandPath), $scriptPathForDelete)) {
             throw 'DELETE_COMMAND_PATH_MISMATCH'
         }
-        $rootIdentityBeforeHash = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($tempRootForDelete, $true)
-        $scriptIdentityBeforeHash = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($scriptPathForDelete, $false)
+        $rootCheckHandle = [OmniRoutePreflightFileHandle]::OpenRootForCheck($tempRootForDelete)
+        $rootIdentityBeforeHash = [OmniRoutePreflightFileHandle]::GetIdentity($rootCheckHandle, $true)
+        $rootCheckHandle.Dispose()
+        $rootCheckHandle = $null
+        if ($null -eq $scriptLifetimeHandle -or $scriptLifetimeHandle.IsInvalid -or $scriptLifetimeHandle.IsClosed) {
+            throw 'DELETE_SCRIPT_HANDLE_UNAVAILABLE'
+        }
+        $scriptDeleteHandle = [OmniRoutePreflightFileHandle]::ReopenScriptForDelete($scriptLifetimeHandle)
+        $scriptIdentityBeforeHash = [OmniRoutePreflightFileHandle]::GetIdentity($scriptDeleteHandle, $false)
         if ($rootIdentityBeforeHash -cne $ExpectedTempRootIdentity -or $scriptIdentityBeforeHash -cne $ExpectedScriptIdentity) {
             throw 'DELETE_IDENTITY_DRIFT_BEFORE_HASH'
         }
-        $scriptBytes = [IO.File]::ReadAllBytes($scriptPathForDelete)
+        $scriptBytes = [OmniRoutePreflightFileHandle]::ReadExact($scriptDeleteHandle)
         $actualScriptBytes = [long]$scriptBytes.LongLength
         $actualScriptSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($scriptBytes))
         [Array]::Clear($scriptBytes, 0, $scriptBytes.Length)
@@ -363,17 +629,37 @@ public static class OmniRoutePreflightFileIdentity
         if ($actualScriptBytes -ne $ExpectedScriptBytes -or $actualScriptSha256 -cne $ExpectedScriptSha256) {
             throw 'DELETE_HASH_OR_SIZE_MISMATCH'
         }
-        $rootIdentityImmediatelyBeforeDelete = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($tempRootForDelete, $true)
-        $scriptIdentityImmediatelyBeforeDelete = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($scriptPathForDelete, $false)
+        $rootCheckHandle = [OmniRoutePreflightFileHandle]::OpenRootForCheck($tempRootForDelete)
+        $rootIdentityImmediatelyBeforeDelete = [OmniRoutePreflightFileHandle]::GetIdentity($rootCheckHandle, $true)
+        $rootCheckHandle.Dispose()
+        $rootCheckHandle = $null
+        $scriptIdentityImmediatelyBeforeDelete = [OmniRoutePreflightFileHandle]::GetIdentity($scriptDeleteHandle, $false)
         if ($rootIdentityImmediatelyBeforeDelete -cne $ExpectedTempRootIdentity -or $scriptIdentityImmediatelyBeforeDelete -cne $ExpectedScriptIdentity) {
             throw 'DELETE_IDENTITY_DRIFT'
         }
         $deleteGuard = $true
-        Remove-Item -LiteralPath $scriptPathForDelete -Force -ErrorAction Stop
+        [OmniRoutePreflightFileHandle]::MarkDelete($scriptDeleteHandle, $false)
+        $scriptDeleteHandle.Dispose()
+        $scriptDeleteHandle = $null
+        $scriptLifetimeHandle.Dispose()
+        $scriptLifetimeHandle = $null
         $deleteSucceeded = -not [IO.File]::Exists($scriptPathForDelete)
     } catch {
         $cleanupOk = $false
         $exitCode = 1
+    } finally {
+        if ($null -ne $rootCheckHandle) {
+            $rootCheckHandle.Dispose()
+            $rootCheckHandle = $null
+        }
+        if ($null -ne $scriptLifetimeHandle) {
+            $scriptLifetimeHandle.Dispose()
+            $scriptLifetimeHandle = $null
+        }
+        if ($null -ne $scriptDeleteHandle) {
+            $scriptDeleteHandle.Dispose()
+            $scriptDeleteHandle = $null
+        }
     }
 
     if ($deleteGuard) { 'SCRIPT_DELETE_GUARD=PASS' } else { 'SCRIPT_DELETE_GUARD=FAIL' }
@@ -472,87 +758,6 @@ function Read-ChildLineBeforeDeadline {
     }
 }
 
-Add-Type -TypeDefinition @'
-using System;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
-using Microsoft.Win32.SafeHandles;
-
-public static class OmniRoutePreflightFileIdentity
-{
-    private const uint ShareRead = 0x00000001;
-    private const uint ShareWrite = 0x00000002;
-    private const uint ShareDelete = 0x00000004;
-    private const uint OpenExisting = 3;
-    private const uint BackupSemantics = 0x02000000;
-    private const uint OpenReparsePoint = 0x00200000;
-    private const uint DirectoryAttribute = 0x00000010;
-    private const uint ReparseAttribute = 0x00000400;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct ByHandleFileInformation
-    {
-        public uint FileAttributes;
-        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
-        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
-        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
-        public uint VolumeSerialNumber;
-        public uint FileSizeHigh;
-        public uint FileSizeLow;
-        public uint NumberOfLinks;
-        public uint FileIndexHigh;
-        public uint FileIndexLow;
-    }
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFileW(
-        string fileName,
-        uint desiredAccess,
-        uint shareMode,
-        IntPtr securityAttributes,
-        uint creationDisposition,
-        uint flagsAndAttributes,
-        IntPtr templateFile);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetFileInformationByHandle(
-        SafeFileHandle file,
-        out ByHandleFileInformation information);
-
-    public static string GetOrdinaryIdentity(string path, bool requireDirectory)
-    {
-        using (SafeFileHandle handle = CreateFileW(
-            path,
-            0,
-            ShareRead | ShareWrite | ShareDelete,
-            IntPtr.Zero,
-            OpenExisting,
-            BackupSemantics | OpenReparsePoint,
-            IntPtr.Zero))
-        {
-            if (handle.IsInvalid)
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-
-            ByHandleFileInformation information;
-            if (!GetFileInformationByHandle(handle, out information))
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-            if ((information.FileAttributes & ReparseAttribute) != 0)
-                throw new InvalidOperationException("REPARSE_POINT_REJECTED");
-
-            bool isDirectory = (information.FileAttributes & DirectoryAttribute) != 0;
-            if (isDirectory != requireDirectory)
-                throw new InvalidOperationException("OBJECT_KIND_REJECTED");
-
-            return string.Format(
-                "{0:X8}:{1:X8}:{2:X8}",
-                information.VolumeSerialNumber,
-                information.FileIndexHigh,
-                information.FileIndexLow);
-        }
-    }
-}
-'@ -ErrorAction Stop
-
 $cancelableReadLineOverloads = @([Console]::In.GetType().GetMethods() | Where-Object {
     $_.Name -eq 'ReadLineAsync' -and
     $_.GetParameters().Count -eq 1 -and
@@ -563,8 +768,8 @@ if ($PSVersionTable.PSVersion.Major -ne 7 -or $cancelableReadLineOverloads.Count
 $briefRelativePath = '.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-anydesk-clipboard-preflight-live-brief.md'
 $briefPath = 'C:\ChatGPT Projects\SW-Selfhosted-Network\.worktrees\omniroute-agent-routing-source\.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-anydesk-clipboard-preflight-live-brief.md'
 $repoRoot = 'C:\ChatGPT Projects\SW-Selfhosted-Network\.worktrees\omniroute-agent-routing-source'
-$reviewedScriptBytes = 12839
-$reviewedScriptSha256 = '2DC4024A95E916FFA1DE38DBD31F878F4593AEFFF50B393AD02E4177C6FEF1B6'
+$reviewedScriptBytes = 23823
+$reviewedScriptSha256 = '4972F7C274E18A90E70DF35DCD2BBADC583A708E9B183B7C3F21627CE7522E04'
 $reviewedScriptLeaf = 'omniroute-transport-preflight.ps1'
 $controlTimeoutSeconds = 120
 $startupTimeoutSeconds = 15
@@ -589,32 +794,119 @@ $scriptBytes = $utf8NoBom.GetBytes($scriptText)
 $scriptSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($scriptBytes))
 if ($scriptBytes.LongLength -ne $reviewedScriptBytes -or $scriptSha256 -cne $reviewedScriptSha256) { throw 'REVIEWED_SCRIPT_BYTES_FAIL' }
 
+$handleSourceMatches = [regex]::Matches($scriptText, "(?ms)Add-Type -TypeDefinition @'\n(?<source>using System;.*?^}\n)'@ -ErrorAction Stop")
+if ($handleSourceMatches.Count -ne 1) { throw 'HANDLE_SOURCE_EXTRACTION_FAIL' }
+$handleSource = $handleSourceMatches[0].Groups['source'].Value
+
 $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 $tempRoot = [IO.Path]::GetFullPath((Join-Path $tempBase ('omniroute-transport-preflight-' + [Guid]::NewGuid().ToString('N'))))
 if (-not [StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetDirectoryName($tempRoot), $tempBase)) { throw 'TEMP_ROOT_VALIDATION_FAIL' }
 if ([IO.Path]::GetFileName($tempRoot) -cnotmatch '^omniroute-transport-preflight-[0-9a-f]{32}$') { throw 'TEMP_ROOT_NAME_FAIL' }
-$null = [IO.Directory]::CreateDirectory($tempRoot)
 $scriptPath = [IO.Path]::GetFullPath((Join-Path $tempRoot $reviewedScriptLeaf))
 if (-not [StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetDirectoryName($scriptPath), $tempRoot)) { throw 'SCRIPT_DIRECT_CHILD_FAIL' }
 if ([IO.Path]::GetFileName($scriptPath) -cne $reviewedScriptLeaf) { throw 'SCRIPT_LEAF_FAIL' }
-[IO.File]::WriteAllBytes($scriptPath, $scriptBytes)
 
-$recordedRootIdentity = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($tempRoot, $true)
-$recordedScriptIdentity = [OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($scriptPath, $false)
-$recordedScriptBytes = [IO.File]::ReadAllBytes($scriptPath)
-$recordedScriptSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($recordedScriptBytes))
-if ($recordedScriptBytes.LongLength -ne $reviewedScriptBytes -or $recordedScriptSha256 -cne $reviewedScriptSha256) { throw 'RECORDED_SCRIPT_BYTES_FAIL' }
-[Array]::Clear($recordedScriptBytes, 0, $recordedScriptBytes.Length)
-$recordedScriptBytes = $null
-[Array]::Clear($scriptBytes, 0, $scriptBytes.Length)
-$scriptBytes = $null
-$scriptText = $null
-$briefText = $null
-[Array]::Clear($briefRaw, 0, $briefRaw.Length)
-$briefRaw = $null
+function Assert-ReviewedScriptHandle {
+    param(
+        [Parameter(Mandatory)] [Microsoft.Win32.SafeHandles.SafeFileHandle]$Handle,
+        [Parameter(Mandatory)] [string]$ExpectedIdentity,
+        [Parameter(Mandatory)] [long]$ExpectedBytes,
+        [Parameter(Mandatory)] [string]$ExpectedSha256
+    )
+    if ([OmniRoutePreflightFileHandle]::GetIdentity($Handle, $false) -cne $ExpectedIdentity) { throw 'CLEANUP_SCRIPT_IDENTITY_FAIL' }
+    $cleanupBytes = [OmniRoutePreflightFileHandle]::ReadExact($Handle)
+    try {
+        $cleanupSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($cleanupBytes))
+        if ($cleanupBytes.LongLength -ne $ExpectedBytes -or $cleanupSha256 -cne $ExpectedSha256) { throw 'CLEANUP_SCRIPT_HASH_FAIL' }
+    } finally {
+        [Array]::Clear($cleanupBytes, 0, $cleanupBytes.Length)
+    }
+    if ([OmniRoutePreflightFileHandle]::GetIdentity($Handle, $false) -cne $ExpectedIdentity) { throw 'CLEANUP_SCRIPT_IDENTITY_DRIFT' }
+}
 
-if ([OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($tempRoot, $true) -cne $recordedRootIdentity) { throw 'ROOT_IDENTITY_DRIFT_BEFORE_START' }
-if ([OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($scriptPath, $false) -cne $recordedScriptIdentity) { throw 'SCRIPT_IDENTITY_DRIFT_BEFORE_START' }
+function Set-ReviewedScriptDeleteDisposition {
+    param(
+        [Parameter(Mandatory)] [Microsoft.Win32.SafeHandles.SafeFileHandle]$Handle,
+        [Parameter(Mandatory)] [string]$ExpectedIdentity,
+        [Parameter(Mandatory)] [long]$ExpectedBytes,
+        [Parameter(Mandatory)] [string]$ExpectedSha256
+    )
+    Assert-ReviewedScriptHandle -Handle $Handle -ExpectedIdentity $ExpectedIdentity -ExpectedBytes $ExpectedBytes -ExpectedSha256 $ExpectedSha256
+    [OmniRoutePreflightFileHandle]::MarkDelete($Handle, $false)
+}
+
+function Set-ReviewedRootDeleteDisposition {
+    param(
+        [Parameter(Mandatory)] [Microsoft.Win32.SafeHandles.SafeFileHandle]$Handle,
+        [Parameter(Mandatory)] [string]$Path,
+        [Parameter(Mandatory)] [string]$ExpectedIdentity
+    )
+    if ([OmniRoutePreflightFileHandle]::GetIdentity($Handle, $true) -cne $ExpectedIdentity) { throw 'CLEANUP_ROOT_IDENTITY_FAIL' }
+    $materializedEntries = @([IO.Directory]::GetFileSystemEntries($Path))
+    if ($materializedEntries.Count -ne 0) { throw 'CLEANUP_ROOT_NOT_EMPTY' }
+    if ([OmniRoutePreflightFileHandle]::GetIdentity($Handle, $true) -cne $ExpectedIdentity) { throw 'CLEANUP_ROOT_IDENTITY_DRIFT' }
+    [OmniRoutePreflightFileHandle]::MarkDelete($Handle, $true)
+}
+
+$rootCreated = $false
+$scriptCreated = $false
+$spawnAttempted = $false
+$spawnConfirmed = $false
+$spawnOutcomeUncertain = $false
+$residualProcess = $false
+$rootLifetimeHandle = $null
+$scriptCreationHandle = $null
+$scriptGuardHandle = $null
+$scriptCleanupHandle = $null
+$preflightHandle = $null
+$recordedRootIdentity = $null
+$recordedScriptIdentity = $null
+$expectedPid = $null
+$startupLines = [Collections.Generic.List[string]]::new()
+$controlSent = $false
+$controlValue = $null
+$pageCreated = $false
+$exactPageClose = 'FAIL'
+$exitConfirmed = $false
+$observedExitCode = $null
+$remainingStdout = $null
+$remainingStderr = $null
+$externalScriptAbsence = 'FAIL'
+$externalRootAbsence = 'FAIL'
+$coordinatorFailure = $null
+$residualPid = $null
+
+try {
+    Add-Type -TypeDefinition $handleSource -ErrorAction Stop
+    [OmniRoutePreflightFileHandle]::CreateDirectoryNew($tempRoot)
+    $rootCreated = $true
+    $rootLifetimeHandle = [OmniRoutePreflightFileHandle]::OpenRootForLifetime($tempRoot)
+    $recordedRootIdentity = [OmniRoutePreflightFileHandle]::GetIdentity($rootLifetimeHandle, $true)
+    if (@([IO.Directory]::GetFileSystemEntries($tempRoot)).Count -ne 0) { throw 'NEW_ROOT_NOT_EMPTY' }
+
+    $scriptCreationHandle = [OmniRoutePreflightFileHandle]::CreateScriptNew($scriptPath)
+    $scriptCreated = $true
+    [OmniRoutePreflightFileHandle]::WriteExact($scriptCreationHandle, $scriptBytes)
+    $recordedScriptIdentity = [OmniRoutePreflightFileHandle]::GetIdentity($scriptCreationHandle, $false)
+    $recordedScriptBytes = [OmniRoutePreflightFileHandle]::ReadExact($scriptCreationHandle)
+    $recordedScriptSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($recordedScriptBytes))
+    if ($recordedScriptBytes.LongLength -ne $reviewedScriptBytes -or $recordedScriptSha256 -cne $reviewedScriptSha256) { throw 'RECORDED_SCRIPT_BYTES_FAIL' }
+    [Array]::Clear($recordedScriptBytes, 0, $recordedScriptBytes.Length)
+    $recordedScriptBytes = $null
+
+    $scriptCreationHandle.Dispose()
+    $scriptCreationHandle = $null
+    $scriptGuardHandle = [OmniRoutePreflightFileHandle]::OpenScriptGuard($scriptPath)
+    Assert-ReviewedScriptHandle -Handle $scriptGuardHandle -ExpectedIdentity $recordedScriptIdentity -ExpectedBytes $reviewedScriptBytes -ExpectedSha256 $reviewedScriptSha256
+    if ([OmniRoutePreflightFileHandle]::GetIdentity($rootLifetimeHandle, $true) -cne $recordedRootIdentity) { throw 'ROOT_IDENTITY_DRIFT_BEFORE_START' }
+    if ([OmniRoutePreflightFileHandle]::GetIdentity($scriptGuardHandle, $false) -cne $recordedScriptIdentity) { throw 'SCRIPT_IDENTITY_DRIFT_BEFORE_START' }
+
+    [Array]::Clear($scriptBytes, 0, $scriptBytes.Length)
+    $scriptBytes = $null
+    $scriptText = $null
+    $briefText = $null
+    [Array]::Clear($briefRaw, 0, $briefRaw.Length)
+    $briefRaw = $null
 
 $startInfo = [Diagnostics.ProcessStartInfo]::new()
 $startInfo.FileName = (Get-Command pwsh -ErrorAction Stop).Source
@@ -656,8 +948,23 @@ $coordinatorFailure = $null
 $residualPid = $null
 
 try {
-    if (-not $preflightHandle.Start()) { throw 'PREFLIGHT_SPAWN_FAIL' }
+    $spawnAttempted = $true
+    try {
+        $startConfirmed = $preflightHandle.Start()
+    } catch {
+        $spawnOutcomeUncertain = $true
+        $residualProcess = $true
+        try {
+            if ($preflightHandle.Id -gt 0) {
+                $expectedPid = $preflightHandle.Id
+                $residualPid = $expectedPid
+            }
+        } catch {}
+        throw 'PREFLIGHT_SPAWN_OUTCOME_UNCERTAIN'
+    }
+    if (-not $startConfirmed) { throw 'PREFLIGHT_NO_CHILD_SPAWNED' }
     $spawned = $true
+    $spawnConfirmed = $true
     $expectedPid = $preflightHandle.Id
 
     $startupClock = [Diagnostics.Stopwatch]::StartNew()
@@ -675,6 +982,8 @@ try {
     if ($startupLines[3] -cnotmatch '^CHALLENGE=([0-9A-F]{32})$') { throw 'CHALLENGE_LABEL_FAIL' }
     $challenge = $Matches[1]
     if ($startupLines[4] -cne 'OWNER_READY=PASS') { throw 'OWNER_READY_LABEL_FAIL' }
+    $scriptGuardHandle.Dispose()
+    $scriptGuardHandle = $null
 
     $pageHtml = '<!doctype html><meta charset="utf-8"><title>OmniRoute transport preflight</title><label for="c">Challenge</label><input id="c" aria-label="OmniRoute transport preflight challenge" readonly value="' + $challenge + '">'
     $pageUrl = 'data:text/html;charset=utf-8,' + [Uri]::EscapeDataString($pageHtml)
@@ -742,24 +1051,73 @@ try {
         }
     }
 
-    if ($exitConfirmed) {
+}
+} catch {
+    if ($null -eq $coordinatorFailure) { $coordinatorFailure = 'COORDINATOR_RESOURCE_TRY_FAIL' }
+} finally {
+    if ($spawnOutcomeUncertain -or ($spawnConfirmed -and -not $exitConfirmed)) {
+        $residualProcess = $true
+    }
+
+    if ($residualProcess) {
+        if ($null -eq $residualPid) {
+            if ($null -ne $expectedPid) { $residualPid = $expectedPid } else { $residualPid = 'UNKNOWN' }
+        }
+        "RETAINED_PID=$residualPid"
+        "RETAINED_SCRIPT_PATH=$scriptPath"
+        "RETAINED_ROOT_PATH=$tempRoot"
+    } else {
         try {
-            if ([IO.File]::Exists($scriptPath)) { throw 'EXTERNAL_SCRIPT_ABSENCE_FAIL' }
+            if ($scriptCreated) {
+                if ($null -ne $scriptCreationHandle) {
+                    Set-ReviewedScriptDeleteDisposition -Handle $scriptCreationHandle -ExpectedIdentity $recordedScriptIdentity -ExpectedBytes $reviewedScriptBytes -ExpectedSha256 $reviewedScriptSha256
+                    $scriptCreationHandle.Dispose()
+                    $scriptCreationHandle = $null
+                } elseif ($null -ne $scriptGuardHandle) {
+                    Assert-ReviewedScriptHandle -Handle $scriptGuardHandle -ExpectedIdentity $recordedScriptIdentity -ExpectedBytes $reviewedScriptBytes -ExpectedSha256 $reviewedScriptSha256
+                    $scriptGuardHandle.Dispose()
+                    $scriptGuardHandle = $null
+                    $scriptCleanupHandle = [OmniRoutePreflightFileHandle]::OpenScriptForDelete($scriptPath)
+                    Set-ReviewedScriptDeleteDisposition -Handle $scriptCleanupHandle -ExpectedIdentity $recordedScriptIdentity -ExpectedBytes $reviewedScriptBytes -ExpectedSha256 $reviewedScriptSha256
+                    $scriptCleanupHandle.Dispose()
+                    $scriptCleanupHandle = $null
+                } elseif ([IO.File]::Exists($scriptPath)) {
+                    $scriptCleanupHandle = [OmniRoutePreflightFileHandle]::OpenScriptForDelete($scriptPath)
+                    Set-ReviewedScriptDeleteDisposition -Handle $scriptCleanupHandle -ExpectedIdentity $recordedScriptIdentity -ExpectedBytes $reviewedScriptBytes -ExpectedSha256 $reviewedScriptSha256
+                    $scriptCleanupHandle.Dispose()
+                    $scriptCleanupHandle = $null
+                }
+                if ([IO.File]::Exists($scriptPath)) { throw 'CLEANUP_SCRIPT_ABSENCE_FAIL' }
+            } elseif ([IO.File]::Exists($scriptPath)) {
+                throw 'UNCREATED_SCRIPT_PATH_PRESENT'
+            }
             $externalScriptAbsence = 'PASS'
-            if (-not [IO.Directory]::Exists($tempRoot)) { throw 'EXTERNAL_ROOT_UNEXPECTEDLY_ABSENT' }
-            if ([OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($tempRoot, $true) -cne $recordedRootIdentity) { throw 'EXTERNAL_ROOT_IDENTITY_DRIFT' }
-            $materializedEntries = @([IO.Directory]::GetFileSystemEntries($tempRoot))
-            if ($materializedEntries.Count -ne 0) { throw 'EXTERNAL_ROOT_NOT_EMPTY' }
-            if ([OmniRoutePreflightFileIdentity]::GetOrdinaryIdentity($tempRoot, $true) -cne $recordedRootIdentity) { throw 'EXTERNAL_ROOT_IDENTITY_DRIFT_BEFORE_DELETE' }
-            [IO.Directory]::Delete($tempRoot, $false)
-            if ([IO.Directory]::Exists($tempRoot)) { throw 'EXTERNAL_ROOT_DELETE_FAIL' }
+
+            if ($rootCreated) {
+                if ($null -eq $rootLifetimeHandle) { throw 'CLEANUP_ROOT_HANDLE_UNAVAILABLE' }
+                Set-ReviewedRootDeleteDisposition -Handle $rootLifetimeHandle -Path $tempRoot -ExpectedIdentity $recordedRootIdentity
+                $rootLifetimeHandle.Dispose()
+                $rootLifetimeHandle = $null
+                if ([IO.Directory]::Exists($tempRoot)) { throw 'CLEANUP_ROOT_ABSENCE_FAIL' }
+            } elseif ([IO.Directory]::Exists($tempRoot)) {
+                throw 'UNCREATED_ROOT_PATH_PRESENT'
+            }
             $externalRootAbsence = 'PASS'
         } catch {
-            $coordinatorFailure = 'COORDINATOR_EXTERNAL_ABSENCE_FAIL'
+            $coordinatorFailure = 'COORDINATOR_HANDLE_CLEANUP_FAIL'
+            if ($spawnConfirmed -and $null -ne $expectedPid) { "RETAINED_PID=$expectedPid" } else { 'RETAINED_PID=NONE' }
+            "RETAINED_SCRIPT_PATH=$scriptPath"
+            "RETAINED_ROOT_PATH=$tempRoot"
         }
     }
 
-    try { $preflightHandle.Dispose() } catch { $coordinatorFailure = 'COORDINATOR_HANDLE_DISPOSE_FAIL' }
+    if ($null -ne $scriptCreationHandle) { try { $scriptCreationHandle.Dispose() } catch {}; $scriptCreationHandle = $null }
+    if ($null -ne $scriptGuardHandle) { try { $scriptGuardHandle.Dispose() } catch {}; $scriptGuardHandle = $null }
+    if ($null -ne $scriptCleanupHandle) { try { $scriptCleanupHandle.Dispose() } catch {}; $scriptCleanupHandle = $null }
+    if ($null -ne $rootLifetimeHandle) { try { $rootLifetimeHandle.Dispose() } catch {}; $rootLifetimeHandle = $null }
+    if ($null -ne $preflightHandle) {
+        try { $preflightHandle.Dispose() } catch { $coordinatorFailure = 'COORDINATOR_HANDLE_DISPOSE_FAIL' }
+    }
 }
 
 $machineOutputValid = $false
@@ -841,10 +1199,14 @@ The coordinator program's three browser adapters are part of the same one-shot
 orchestration call: any adapter exception reaches the coordinator `catch`,
 which attempts exact `ABORT` only when no control was attempted, the retained
 child is alive, and stdin is still open. It never retries an uncertain write.
-The `finally` closes stdin, calls `WaitForExit(15000)` before either
-`ReadToEnd`, closes only the retained page handle, skips all destructive root
-cleanup if exit is unconfirmed, records the exact residual PID without killing
-it, and always disposes the retained process handle.
+The outer resource `try/finally` begins before `CreateDirectoryNew` and tracks
+root/script creation, spawn attempt/confirmation, uncertain outcome, and a
+residual process. The inner process `finally` closes stdin, calls
+`WaitForExit(15000)` before either `ReadToEnd`, and closes only the retained
+page handle. The outer `finally` performs handle-bound cleanup when no child
+spawned or confirmed exit occurred. An uncertain spawn or unconfirmed exit
+performs no disposition, records exact retained paths plus PID or `UNKNOWN`,
+and always disposes every created safe/process handle without killing.
 
 The exact output sequence comparison rejects every duplicate, unknown,
 missing, blank, or out-of-order line. PASS requires baseline/comparison/final
@@ -863,15 +1225,30 @@ permitted.
 | EOF | `0` | `PREFLIGHT=EOF` |
 | monotonic timeout, including every deadline tie | `0` | `PREFLIGHT=TIMEOUT` |
 
-Every terminal state converges on the fixed script's one `finally`. Immediately
-before internal deletion it reopens both root and script with
-`FILE_FLAG_OPEN_REPARSE_POINT`, rejects reparse objects or kind mismatch,
-requires stable volume/file identities, rechecks exact bytes/hash, rechecks
-identities again, and deletes only the reviewed script path. External root
-deletion occurs only after retained exit, script absence, ordinary stable root
-identity, an exact materialized empty entry array, and one immediate identity
-recheck; deletion is non-recursive. Reparse, identity drift, residual PID, or
-nonempty root stops without deletion.
+The coordinator creates the script with Win32 `CREATE_NEW`; any existing file,
+hard link, symlink, or reparse leaf fails before bytes are written. Writing,
+flush, identity, size, and hash checks use the returned safe handle. It denies
+delete sharing. After write/hash, the coordinator closes it and immediately
+opens an ordinary read-only guard that rechecks the recorded identity/hash and
+also denies delete sharing. Any substitution in that transition is rejected;
+the guard then remains open across process spawn until the child has opened and
+validated its own ordinary read handle and emitted `OWNER_READY=PASS`, so the
+path cannot be renamed or replaced during `pwsh -File` and child validation.
+The child retains its object handle, verifies exact identity/hash at entry,
+obtains final delete access from that object via `ReOpenFile`, then verifies
+exact identity/hash on the reopened handle in its one `finally` and applies
+`FileDispositionInfo` through
+`SetFileInformationByHandle`; no path delete is used.
+
+The coordinator retains one ordinary root handle opened without delete sharing
+from creation through cleanup. Pre-spawn failure with no child uses the retained
+exact script handle for the same identity/hash/disposition guard, then checks a
+materialized empty root and applies root disposition through the still-open
+root handle. Confirmed child exit uses the same outer cleanup. An uncertain
+spawn, residual process, absent handle, reparse, identity/hash mismatch,
+nonempty root, or disposition failure stops without deleting any path-resolved
+substitute. All path calls after handle close are absence proofs only; there is
+no `Remove-Item`, `WriteAllBytes`, or path-based directory deletion.
 
 ## Structural counters and non-overlap
 

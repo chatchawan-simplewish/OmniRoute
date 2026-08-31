@@ -386,3 +386,70 @@ IMPORTANT finding remains and one new IMPORTANT governance contradiction must
 be corrected. After those two narrow documentation corrections are committed,
 a fresh scoped direct-byte review may decide PASS FOR DESIGN/LIVE-BRIEF
 PREPARATION ONLY. Such a PASS still cannot authorize any live action.
+
+## Fix round 2 scoped re-review
+
+Reviewed fixed commit:
+`4cd480bcdd85f6d5bdee5645b0f16e6a870177e3` with exact parent
+`90526368d22359a2312c3722d461040f4b368d7b` and exactly two changed paths. The
+working files equal their exact committed blobs.
+
+| Input | Direct-byte result |
+| --- | --- |
+| Revised design | `19,055` bytes; SHA-256 `39254F4AE68A9AC9F856BEB4E8C2CE0CCE771263E5496A5E23A90B6BD6C4901F`; blob `ab65c462549b10d505c12f8183f243d4bcc1c322` |
+| Revised plan | `15,118` bytes; SHA-256 `774A47ADB0407300B57C3D0CB82E5819E0018A4B3DF2C71F31C6E972CB76AC36`; blob `507f5d5367650824247d15146edec56ec96a31ce` |
+| Fix report | SHA-256 `236B35AB6832C040121F6458F55B8ACF5289EF4790CF53A352DD9468183C1E31` |
+| Fix diff package | SHA-256 `5A5E1F5B622C41596C1E5419A02DDA905BE323BC81F6080BEE5C0E9739998B28` |
+
+### Scoped verdict
+
+**PASS FOR DESIGN AND EXACT LIVE-BRIEF PREPARATION ONLY.**
+
+The review is deliberately limited to the two items left open by fix round 1.
+Both are **ADDRESSED** in the fixed committed bytes. Direct review of the fix
+diff found no new Critical, HIGH, or IMPORTANT breakage. The prior round's
+F1-F5 and F7 dispositions were not reopened.
+
+This PASS authorizes only preparation and independent direct-byte review of the
+exact preflight and credential live briefs. It authorizes no preflight, token,
+browser, clipboard, Cloudflare, VM1205, proxy/proof/R5, Rulesets, evidence
+mutation, revocation, deletion, permission change, or other live execution.
+
+### Open item 1 — F6: ADDRESSED
+
+`design:120-152` now declares `$key`, `$keyChar`, and `$ctrl`; reads the managed
+`ConsoleKeyInfo` and its plaintext `KeyChar` only inside a per-iteration
+`try/finally`; and clears all three named references after every handled key,
+including `break` and `continue`. `design:229-251` explicitly inventories
+`$key`, `ConsoleKeyInfo.KeyChar`, `$keyChar`, every other derived character
+variable, and every additional input-host/console buffer introduced by the
+exact live implementation. It requires current-iteration lifetime, repeated
+outer-finally clearing, and rejection of any unenumerated input-host buffer.
+
+`design:253-259` keeps the evidence claim correctly bounded to named references
+cleared and owning processes exited, never managed-memory byte zeroization.
+`plan:177-191` carries the same exhaustive inventory, inner/outer clearing, and
+bounded-claim requirements into the exact future live brief.
+
+This resolves the prior F6 omission. The live-brief reviewer must still reject
+any new host/binder/character buffer introduced by implementation bytes; this is
+a future conformance gate, not a remaining design defect.
+
+### Open item 2 — single authoritative review artifact: ADDRESSED
+
+`plan:83-96` now names only
+`.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-sol-review.md`,
+requires each fix round to append one clearly titled scoped section there, and
+forbids a second current verdict file. The competing
+`task-2-secure-console-transfer-fix1-sol-review.md` path is removed from the fix
+diff and does not remain in the plan.
+
+This section is appended to that exact authoritative artifact, so declared and
+actual review ownership now agree.
+
+### Fix-round-2 conclusion
+
+The two previously open documentation findings are closed. The revised design
+may proceed only to exact live-brief preparation and independent review. Every
+action-time authority, no-retry counter, sole-owner constraint, and explicit
+live-execution prohibition remains intact and unconsumed.

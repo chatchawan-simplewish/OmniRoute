@@ -9,8 +9,14 @@ transfer.
 
 ## Scope and pins
 
-- Authoritative source/worktree base:
+- Original Task 20 source/worktree base:
   `3f871b2d583ea1b04673ecbe7ca3e2362a9bbead`.
+- Fix-round-1 base and FAIL-review commit:
+  `edd80f8752ade996a5cf68cff64e048b66f76027`.
+- Reviewed brief commit:
+  `1c45e8e5deb19e2f1bbd5ef6dbabfbf532424a32`.
+- FAIL review direct bytes: `10111` bytes, SHA-256
+  `DACE74BC7E62916AB0F7F6BB9C610E3ACE874F955082525067355A0EB617165D`.
 - Owned future live report:
   `.superpowers/sdd/2026-08-31-omniroute-secure-console-transfer/task-20-windows-clipboard-policy-live-report.md`.
 - Owned future independent classification:
@@ -34,11 +40,16 @@ repeat it:
 | Fact | Pinned state |
 | --- | --- |
 | Operating system | Windows 11 Pro |
+| CIM `Caption` | `Microsoft Windows 11 Pro` |
+| CIM `Version` | `10.0.26200` |
+| CIM `BuildNumber` | `26200` |
+| CIM `OSArchitecture` | `64-bit` |
 | Registry `ProductName` | `Windows 10 Pro` |
 | Version/build | `10.0.26200` / build `26200` |
 | DisplayVersion | `25H2` |
 | UBR | `9278` |
 | Architecture | `x64` |
+| `HKLM ...\Windows\System` policy key exists | `True` |
 | `HKLM ...\System\AllowClipboardHistory` | `ABSENT` |
 | `HKLM ...\System\AllowCrossDeviceClipboard` | `ABSENT` |
 | `HKCU ...\Clipboard\EnableClipboardHistory` | DWORD `1` |
@@ -150,8 +161,13 @@ try {
 
     $osVersion = [Environment]::OSVersion.Version
     $os = Get-ItemProperty -LiteralPath $currentVersionPath -ErrorAction Stop
+    $cimOs = Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption,Version,BuildNumber,OSArchitecture -ErrorAction Stop
     if ($osVersion.Major -ne 10 -or $osVersion.Minor -ne 0 -or
         $osVersion.Build -ne 26200 -or
+        [string]$cimOs.Caption -ne 'Microsoft Windows 11 Pro' -or
+        [string]$cimOs.Version -ne '10.0.26200' -or
+        [string]$cimOs.BuildNumber -ne '26200' -or
+        [string]$cimOs.OSArchitecture -ne '64-bit' -or
         [string]$os.ProductName -ne 'Windows 10 Pro' -or
         [string]$os.EditionID -ne 'Professional' -or
         [string]$os.DisplayVersion -ne '25H2' -or
@@ -159,6 +175,9 @@ try {
         throw 'PRECONDITION_OS_DRIFT'
     }
 
+    if (-not (Test-Path -LiteralPath $policyPath)) {
+        throw 'PRECONDITION_POLICY_KEY_ABSENT'
+    }
     $historyBefore = Get-RegistryValueState -Path $policyPath -Name $historyName
     $crossDeviceBefore = Get-RegistryValueState -Path $policyPath -Name $crossDeviceName
     $userHistoryBefore = Get-RegistryValueState -Path $userClipboardPath -Name 'EnableClipboardHistory'
@@ -171,18 +190,17 @@ try {
     [Console]::Out.WriteLine('PRECONDITIONS=PASS')
     [Console]::Out.WriteLine('ORIGINAL_POLICY_STATE=ABSENT_ABSENT')
 
-    if (-not (Test-Path -LiteralPath $policyPath)) {
-        $null = New-Item -Path $policyPath -Force -ErrorAction Stop
-    }
-    $writeAttempted = 2
+    $writeAttempted++
     $null = New-ItemProperty -LiteralPath $policyPath -Name $historyName -PropertyType DWord -Value 0 -Force -ErrorAction Stop
     $writeFulfilled++
+    $writeAttempted++
     $null = New-ItemProperty -LiteralPath $policyPath -Name $crossDeviceName -PropertyType DWord -Value 0 -Force -ErrorAction Stop
     $writeFulfilled++
 
-    $readbackAttempted = 2
+    $readbackAttempted++
     $historyAfter = Get-RegistryValueState -Path $policyPath -Name $historyName
     $readbackFulfilled++
+    $readbackAttempted++
     $crossDeviceAfter = Get-RegistryValueState -Path $policyPath -Name $crossDeviceName
     $readbackFulfilled++
     if (-not $historyAfter.Present -or $historyAfter.Kind -ne 'DWord' -or
@@ -214,6 +232,7 @@ finally {
     $principal = $null
     $osVersion = $null
     $os = $null
+    $cimOs = $null
     $historyBefore = $null
     $crossDeviceBefore = $null
     $userHistoryBefore = $null
@@ -232,8 +251,11 @@ be `EXACT_CLIPBOARD_POLICIES_DISABLED`.
 
 Any other exit, counter, label, type, value, missing output, duplicated output,
 extra output, partial write, parser uncertainty, or terminal/tool uncertainty
-is `FAIL / NOT PROVEN`. It authorizes no retry. In particular, a partial write
-is not repaired in the same gate and rollback is not inferred.
+is `FAIL / NOT PROVEN`. It authorizes no retry. The attempted counter increments
+immediately before each individual write or readback, and its paired fulfilled
+counter increments only after that call returns. In particular, `1 / 0`,
+`2 / 1`, or any other partial tuple is not repaired in the same gate and
+rollback is not inferred.
 
 The output contains only fixed safe labels and small counters. The catch block
 does not emit exception text, registry content beyond the two intended safe
@@ -270,11 +292,16 @@ Static preparation/review may only:
    `[System.Management.Automation.Language.Parser]::ParseInput`, without
    invoking the block;
 3. assert exact cardinality of the two `New-ItemProperty` calls and exact names,
-   `DWord` types, and zero values;
-4. assert zero `Remove-Item`, `Remove-ItemProperty`, `Set-Clipboard`, browser,
+   `DWord` types, and zero values; assert exactly two individual
+   `$writeAttempted++` and two individual `$readbackAttempted++` operations,
+   each immediately before its corresponding call;
+4. assert exactly one read-only `Get-CimInstance Win32_OperatingSystem` call,
+   all four exact CIM comparisons, exact policy-key-exists precondition, and
+   zero bare `New-Item` key-creation calls;
+5. assert zero `Remove-Item`, `Remove-ItemProperty`, `Set-Clipboard`, browser,
    credential, Cloudflare, VM, proxy, routing, process-spawn, UAC-automation,
    scheduled-task, service, remoting, or retry operations in executable code;
-5. assert the base remains exact, Git index count is `0`, the unrelated dirty
+6. assert the fix base remains exact, Git index count is `0`, the unrelated dirty
    baseline remains `12`, and the only new path is this ignored brief.
 
 These checks do not execute the embedded block and do not authorize its later

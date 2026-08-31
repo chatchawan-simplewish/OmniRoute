@@ -340,3 +340,93 @@ with atomic create-new and retained-handle disposition. A fresh scoped
 direct-byte review is required afterward. Any eventual PASS must still require
 separate exact action-time preflight authority and authorize no credential or
 other live action.
+
+## Fix round 2 scoped re-review
+
+Reviewed fixed commit:
+`016e4c97c00afcd9206b4e1d54591149509cd730` with exact parent
+`499ce07ca160e963ac5c9196173d3e243b8ede9e` and exactly one changed path: the
+preflight brief. The working brief equals its exact committed blob.
+
+| Input | Direct-byte result |
+| --- | --- |
+| Revised brief | `58,187` bytes; SHA-256 `E2CC2303E3028D9D1E3DAE244F00B05CC3658C59E435F2365BF35F76900CCAC8`; blob `6ca618fb2b8dbd591d99c33cde7b41fca58f1859` |
+| Revised child script | `23,823` bytes; SHA-256 `4972F7C274E18A90E70DF35DCD2BBADC583A708E9B183B7C3F21627CE7522E04` |
+| Revised coordinator | `23,958` bytes; SHA-256 `EB9812BF3DA8A42011C27D83F05A4A1879CE9F1ADF8E5912F4E93AB749BE5569` |
+| Fix report | SHA-256 `013F41053E5F1451081E39B00DE41D7E34F4D8374E8472C5DDC3EA325D59777F` |
+| Fix diff package | SHA-256 `5142449E9868465C18089BB3A8C4A5E98B6D926111A335B7AA70EF6B21CBE9F2` |
+
+The fixed brief is strict UTF-8 without BOM, LF-only, and has exactly one
+trailing LF. This review was direct-byte/static only. It did not compile or run
+the child, helper, coordinator, browser adapter, clipboard operation, process,
+or deletion.
+
+### Scoped verdict
+
+**FAIL / REVISE BEFORE EXECUTION / NOT AUTHORIZED.** F3 is **ADDRESSED**. F5 is
+**NOT ADDRESSED** because the new handle implementation leaves one HIGH script
+integrity break. No Critical or additional IMPORTANT/HIGH breakage was found in
+the fix diff.
+
+### F3 — ADDRESSED
+
+The outer resource `try` now starts at `brief:879`, before the first filesystem
+mutation at `brief:881`, and the state declared at `brief:851-877` tracks root
+and script creation, spawn attempt/confirmation/uncertainty, residual process,
+PID, and every safe/process handle. Setup and all later throws remain inside
+that resource scope (`brief:879-1007`). The inner `catch/finally` attempts the
+single ABORT only for a confirmed live child, closes stdin, waits for exit,
+captures bounded output only after confirmed exit, and closes the exact page
+(`brief:1007-1054`).
+
+The outer `finally` treats a thrown `Start()` as uncertain and retains exact
+paths/PID without disposition, treats an explicit no-child result as eligible
+for cleanup, performs no-child/confirmed-exit cleanup, reports any retained
+artifacts, and disposes all handles without killing (`brief:1055-1121`). This
+closes the original missing pre-mutation and failed-spawn state-machine scope.
+The handle integrity issue below is classified under F5 rather than reopening
+F3's control-flow finding.
+
+### F5 — NOT ADDRESSED; new HIGH script-integrity break
+
+The intended TOCTOU corrections are otherwise present: script creation is
+Win32 `CREATE_NEW`, and write/flush/identity/read/hash all use the returned
+handle (`brief:246-258,887-895`); the child derives delete access from its
+already retained object with `ReOpenFile`, revalidates identity/hash, and calls
+`SetFileInformationByHandle` on that object (`brief:619-646`); coordinator
+fallback opens an ordinary non-reparse handle and validates identity/hash on
+that same handle before disposition (`brief:288-312,1070-1090`); and the exact
+ordinary root handle is retained from `brief:883` through materialized
+emptiness and handle disposition at `brief:1096-1101`. The destructive
+disposition calls themselves are handle-based; no `Remove-Item`, path-based
+`Directory.Delete`, or recursive deletion was introduced.
+
+However, both `CreateScriptNew` and the coordinator's supposed lifetime guard
+grant `FILE_SHARE_WRITE` (`brief:246-255,274-283`). After the exact guard hash at
+`brief:899-900`, that guard remains write-shareable while `pwsh -File` opens and
+loads the script (`brief:919-985`). A same-user writer can therefore mutate the
+reviewed file after validation and while PowerShell is parsing it. The child's
+own validation cannot make this safe: it occurs only after the potentially
+modified script has already been loaded and begun executing. Moreover, the
+child lifetime handle also grants `FILE_SHARE_WRITE` (`brief:260-269`), allowing
+post-ownership mutation that can defeat deterministic final hash/deletion.
+This is a new **HIGH** issue in the fix diff because unreviewed script bytes can
+execute under the preflight owner process.
+
+Minimum correction: make `OpenScriptGuard` share read only (no write or delete),
+then revalidate identity/size/hash after that guard is successfully acquired
+and retain it through exact `OWNER_READY=PASS`. Make the child's lifetime handle
+share read plus delete, but not write, so the coordinator-to-child handoff
+preserves immutability and the child can still derive delete access with
+`ReOpenFile`. Any incompatible outstanding writer, acquisition failure, or hash
+drift must stop before spawn or before acceptance with no retry. A fresh scoped
+direct-byte review is required.
+
+### Fix-round-2 conclusion and authority boundary
+
+This revision does not earn **PASS FOR ONE NON-SECRET PREFLIGHT EXECUTION
+ONLY**. It authorizes no preflight, script/helper/coordinator execution,
+browser, clipboard, token, credential, Cloudflare, VM1205, OmniRoute,
+proxy/proof/R5, Rulesets, evidence mutation, revocation, deletion, permission
+change, or other live action. Any later corrected PASS would still require a
+separate exact action-time authorization for one non-secret preflight only.

@@ -32,8 +32,8 @@ control and authorizes no token, credential, or other live action.
   `powershell` block below, beginning with `param(` and ending with the LF after
   `exit $exitCode`; the fence markers and surrounding Markdown are excluded.
 - Encoding is strict UTF-8 without BOM, LF-only, with exactly one trailing LF.
-- Exact extracted byte size: `23,823`.
-- Exact extracted SHA-256: `4972F7C274E18A90E70DF35DCD2BBADC583A708E9B183B7C3F21627CE7522E04`.
+- Exact extracted byte size: `23,758`.
+- Exact extracted SHA-256: `16470D5E7F68773B259B49C7EC24D46B3A2D4B5238DCB71986990D6B73C5C367`.
 - The challenge is exactly 128 bits (`16` bytes), freshly filled at runtime by
   the .NET `RandomNumberGenerator`; no static or reused challenge is permitted.
 - The script is credential-free and emits only fixed non-secret labels,
@@ -248,7 +248,7 @@ public static class OmniRoutePreflightFileHandle
         SafeFileHandle handle = CreateFileW(
             path,
             GenericRead | GenericWrite | FileReadAttributes | DeleteAccess,
-            ShareRead | ShareWrite,
+            ShareRead,
             IntPtr.Zero,
             CreateNew,
             FileAttributeNormal | OpenReparsePoint,
@@ -262,7 +262,7 @@ public static class OmniRoutePreflightFileHandle
         SafeFileHandle handle = CreateFileW(
             path,
             GenericRead | FileReadAttributes,
-            ShareRead | ShareWrite | ShareDelete,
+            ShareRead | ShareDelete,
             IntPtr.Zero,
             OpenExisting,
             FileAttributeNormal | OpenReparsePoint,
@@ -276,7 +276,7 @@ public static class OmniRoutePreflightFileHandle
         SafeFileHandle handle = CreateFileW(
             path,
             GenericRead | FileReadAttributes,
-            ShareRead | ShareWrite,
+            ShareRead,
             IntPtr.Zero,
             OpenExisting,
             FileAttributeNormal | OpenReparsePoint,
@@ -290,7 +290,7 @@ public static class OmniRoutePreflightFileHandle
         SafeFileHandle handle = CreateFileW(
             path,
             GenericRead | FileReadAttributes | DeleteAccess,
-            ShareRead | ShareWrite | ShareDelete,
+            ShareRead | ShareDelete,
             IntPtr.Zero,
             OpenExisting,
             FileAttributeNormal | OpenReparsePoint,
@@ -305,7 +305,7 @@ public static class OmniRoutePreflightFileHandle
         SafeFileHandle handle = ReOpenFile(
             originalFile,
             GenericRead | FileReadAttributes | DeleteAccess,
-            ShareRead | ShareWrite | ShareDelete,
+            ShareRead | ShareDelete,
             OpenReparsePoint);
         try { ValidateOrdinary(handle, false); return handle; }
         catch { handle.Dispose(); throw; }
@@ -768,8 +768,8 @@ if ($PSVersionTable.PSVersion.Major -ne 7 -or $cancelableReadLineOverloads.Count
 $briefRelativePath = '.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-anydesk-clipboard-preflight-live-brief.md'
 $briefPath = 'C:\ChatGPT Projects\SW-Selfhosted-Network\.worktrees\omniroute-agent-routing-source\.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-anydesk-clipboard-preflight-live-brief.md'
 $repoRoot = 'C:\ChatGPT Projects\SW-Selfhosted-Network\.worktrees\omniroute-agent-routing-source'
-$reviewedScriptBytes = 23823
-$reviewedScriptSha256 = '4972F7C274E18A90E70DF35DCD2BBADC583A708E9B183B7C3F21627CE7522E04'
+$reviewedScriptBytes = 23758
+$reviewedScriptSha256 = '16470D5E7F68773B259B49C7EC24D46B3A2D4B5238DCB71986990D6B73C5C367'
 $reviewedScriptLeaf = 'omniroute-transport-preflight.ps1'
 $controlTimeoutSeconds = 120
 $startupTimeoutSeconds = 15
@@ -1227,14 +1227,17 @@ permitted.
 
 The coordinator creates the script with Win32 `CREATE_NEW`; any existing file,
 hard link, symlink, or reparse leaf fails before bytes are written. Writing,
-flush, identity, size, and hash checks use the returned safe handle. It denies
-delete sharing. After write/hash, the coordinator closes it and immediately
-opens an ordinary read-only guard that rechecks the recorded identity/hash and
-also denies delete sharing. Any substitution in that transition is rejected;
-the guard then remains open across process spawn until the child has opened and
-validated its own ordinary read handle and emitted `OWNER_READY=PASS`, so the
-path cannot be renamed or replaced during `pwsh -File` and child validation.
-The child retains its object handle, verifies exact identity/hash at entry,
+flush, identity, size, and hash checks use the returned safe handle. It shares
+read only, so no outstanding writer or delete/rename can coexist. After
+write/hash, the coordinator closes it and immediately opens an ordinary
+read-only guard that also shares read only, then rechecks the recorded
+identity/size/hash. An incompatible writer, guard acquisition failure,
+substitution, or hash drift stops before spawn with no retry. The guard remains
+open across process spawn until the child has opened and validated its own
+ordinary read handle and emitted exact `OWNER_READY=PASS`, so the path and
+reviewed bytes remain immutable during `pwsh -File` load and child validation.
+The child's lifetime handle shares read plus delete but not write, preserving
+immutability after the guard closes. It verifies exact identity/hash at entry,
 obtains final delete access from that object via `ReOpenFile`, then verifies
 exact identity/hash on the reopened handle in its one `finally` and applies
 `FileDispositionInfo` through

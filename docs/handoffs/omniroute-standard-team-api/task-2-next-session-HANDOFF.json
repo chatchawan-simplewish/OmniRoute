@@ -1,0 +1,123 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-31T11:24:06+07:00",
+  "phase": "omniroute-standard-team-api",
+  "phase_name": "Task 2 secure team API live integration",
+  "phase_dir": "C:\\ChatGPT Projects\\SW-Selfhosted-Network\\.worktrees\\omniroute-agent-routing-source\\.superpowers\\sdd\\2026-08-30-omniroute-standard-team-api",
+  "plan": 2,
+  "task": 6,
+  "total_tasks": 10,
+  "status": "paused_review_blocked",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Offline team API proxy and verifier package",
+      "status": "done",
+      "commit": "d62d3207848810c3626a050193ae703d2f8369fe"
+    },
+    {
+      "id": 2,
+      "name": "Prior Task 2 attempts, bounded rollback, and incident evidence",
+      "status": "done",
+      "commit": "bdfe1e39bcf6ba8dce090dcf0e33fb73f9135e2d"
+    },
+    {
+      "id": 3,
+      "name": "Labeled proxy-proof correction contract review",
+      "status": "done",
+      "review_sha256": "75582F1B296F8183FD1B4EBEF3DC24A4476925D766D6F9DC754F17B9C807AC5F"
+    },
+    {
+      "id": 4,
+      "name": "Labeled gate failed closed before proxy or Rulesets",
+      "status": "done",
+      "commit": "80adaa7d5d63d1d2c7bfa63b236c6bee93b3b1d8"
+    },
+    {
+      "id": 5,
+      "name": "Independent labeled-capture incident review and retention decision",
+      "status": "done",
+      "review_sha256": "A2558F9FBEC57A7FED2D0CA2DF2B3C9864716E23C0E07CC8F4DFD5851BEB93C4"
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 6,
+      "name": "Replace the rejected canary design and obtain clean independent review",
+      "status": "not_started"
+    },
+    {
+      "id": 7,
+      "name": "Execute one corrected token, proxy, and deterministic Rulesets gate",
+      "status": "not_started"
+    },
+    {
+      "id": 8,
+      "name": "Complete Cloudflare Tunnel, public hostname, rate rule, temporary rollout key, and bounded verification",
+      "status": "not_started"
+    },
+    {
+      "id": 9,
+      "name": "Configure and verify Hermes and DeepSeek Harness routing",
+      "status": "not_started"
+    },
+    {
+      "id": 10,
+      "name": "Final broad Sol High completion and security audit",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "The proposed local data-page native-copy canary is rejected: stale clipboard state can false-pass, and it does not prove the Cloudflare copy-control path.",
+      "type": "technical",
+      "workaround": "Design a faithful pre-token transfer proof or a separately reviewed secure input channel, then obtain a fresh independent Sol High contract PASS before execution."
+    },
+    {
+      "description": "Invalid-token HTTP 401 remains NOT PROVEN because the revoked token never reached the fixed process.",
+      "type": "technical",
+      "workaround": "Do not substitute other evidence or relax the verdict."
+    },
+    {
+      "description": "The revoked token remains in one private worker rollout; no supported targeted-delete tool exists.",
+      "type": "external",
+      "workaround": "Retain the rollout unchanged and use the prepared redacted OpenAI Support request."
+    }
+  ],
+  "human_actions_pending": [
+    {
+      "action": "Explicitly request creation of the fresh Codex continuation task.",
+      "context": "Codex task creation requires a direct user instruction. The old task must be archived before the new task writes or consumes a gate.",
+      "blocking": true
+    },
+    {
+      "action": "Provide action-time confirmation for any future API-token creation, token revocation, credential transmission, permission change, or destructive retention action.",
+      "context": "The user's broad unattended preapproval does not waive mandatory action-time confirmation for these supercritical browser actions.",
+      "blocking": false
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Continue unattended for recommended bounded work.",
+      "rationale": "Owner explicitly preapproved future recommendations until setup is complete; mandatory action-time confirmations remain exceptions.",
+      "phase": "omniroute-standard-team-api"
+    },
+    {
+      "decision": "Retain the credential-bearing private rollout unchanged and prepare a redacted support request.",
+      "rationale": "Manual deletion would orphan task history; archive and ACL quarantine do not remove same-user access.",
+      "phase": "omniroute-standard-team-api"
+    },
+    {
+      "decision": "Do not execute the Chrome-native local-data-page canary.",
+      "rationale": "Independent review returned FAIL/REVISE/NOT AUTHORIZED.",
+      "phase": "omniroute-standard-team-api"
+    }
+  ],
+  "uncommitted_files": [
+    "The routing source worktree contains pre-existing user changes and untracked files; preserve them exactly and never stage broadly.",
+    "The SDD handoff/review/support-request artifacts are coordinator-owned and may be outside normal Git tracking."
+  ],
+  "background_processes": [],
+  "next_action": "Open task-2-next-session-continue-here.md, acknowledge every blocking constraint, revalidate the evidence worktree at 80adaa7d5d63d1d2c7bfa63b236c6bee93b3b1d8 and current VM1205/Cloudflare safe state read-only, then design a faithful pre-token transfer proof or secure input channel. Do not execute task-2-chrome-native-canary-live-brief.md.",
+  "context_notes": "This handoff is lane-specific and must not overwrite the existing project-level .planning/HANDOFF.json. No canary, token, proxy, Rulesets, Tunnel, DNS, rollout-key, or model action is active at pause."
+}

@@ -11,7 +11,7 @@
   "completed_tasks": [
     {"id": 1, "name": "Design and independently approve the secure-console transfer contract", "status": "done", "commit": "d22c02505"},
     {"id": 2, "name": "Classify the rejected bridge, direct-v2 result, and retained-tab disposition without retry", "status": "done", "commit": "16e884393 bridge FAIL; cf5813b94 direct-v2 NOT PROVEN; d62ae9698 residual-only PASS"},
-    {"id": 3, "name": "Prepare and independently approve the replacement loopback non-secret clipboard preflight v3", "status": "done", "commit": "9057575ef brief; 25bee5003 independent review PASS after fix round 1"}
+    {"id": 3, "name": "Prepare and independently approve the replacement loopback non-secret clipboard preflight v3", "status": "done", "commit": "f7fd70cae brief; bdf427ad7 independent review PASS after pre-execution fix round 2"}
   ],
   "remaining_tasks": [
     {"id": 4, "name": "After fresh exact user authority, execute v3 once and independently classify it", "status": "not_started"},
@@ -23,7 +23,7 @@
     {"description": "The direct-v2 and retained-tab-close authorities are consumed and may not be retried.", "type": "human_action", "workaround": "Use only the separately reviewed v3 contract after its own exact approval."}
   ],
   "human_actions_pending": [
-    {"action": "Approve exactly one execution of the committed non-secret loopback clipboard preflight v3.", "context": "The approval covers only commits 9057575ef and 25bee5003, brief SHA-256 59C1106988038C7AE89EE4A07BE54E693756566C8459BA510F34A506F0C70AFC, and one three-call non-secret attempt. It does not authorize credentials or live routing changes.", "blocking": true},
+    {"action": "Approve exactly one execution of the committed non-secret loopback clipboard preflight v3.", "context": "The earlier approval for 9057575ef/25bee5003 was not consumed and became invalid before Call 1 when an unsupported focus() operation was found. Fresh approval must cover only brief commit f7fd70cae, review commit bdf427ad7, brief SHA-256 AF8BAEFF29EE1DB77967798B39A6CAEFA3D18F5047FBE3F440B8F88CD0CBD214, review SHA-256 86BC5A9AACCC868E2D42F67012040E843243E8681F2C320C61C49B49AEA40C4A, and one three-call non-secret attempt. It does not authorize credentials or live routing changes.", "blocking": true},
     {"action": "Later approve each credential creation/transmission, permission change, or deletion at action time.", "context": "The unattended request does not replace mandatory security confirmations.", "blocking": true}
   ],
   "decisions": [
@@ -44,6 +44,6 @@
     "tests/unit/db/agent-route-runs.test.ts",
     "tests/unit/services/agent-route.test.ts"
   ],
-  "next_action": "Do not execute until the user gives the exact fresh v3 approval. After approval, revalidate HEAD 25bee5003, committed brief hash/size, review hash, empty index, preserved twelve-file dirty baseline, and Chrome tab count zero read-only; then execute the committed three-call v3 exactly once with no retry or fallback and obtain independent Sol High classification.",
-  "context_notes": "Current branch codex/omniroute-agent-routing at 25bee500382695bfb2950c170e7cba02250aac70. Brief is 27048 bytes SHA-256 59C1106988038C7AE89EE4A07BE54E693756566C8459BA510F34A506F0C70AFC. Review is 8025 bytes SHA-256 D7F1DD994F26A87CB8F366121C2DCE22C37DF588EECF07220017CC883C2D90F4. Chrome tab count was revalidated as zero before static work. No v3 code, server, browser mutation, clipboard action, credential, permission, deletion, OmniRoute, Cloudflare, VM, provider, proxy, key, token, or routing mutation occurred."
+  "next_action": "Do not execute until the user gives exact fresh v3 approval pinned to brief f7fd70cae and review bdf427ad7. After approval, revalidate both committed hashes/sizes, empty index, preserved twelve-file dirty baseline, and Chrome tab count zero read-only; then execute the committed three-call v3 exactly once with no retry or fallback and obtain independent Sol High classification.",
+  "context_notes": "Current branch codex/omniroute-agent-routing at bdf427ad735c57ea1ea0ba7a74219a43ecbde7f7 before this handoff refresh. Brief is 27048 bytes SHA-256 AF8BAEFF29EE1DB77967798B39A6CAEFA3D18F5047FBE3F440B8F88CD0CBD214. Review is 10404 bytes SHA-256 86BC5A9AACCC868E2D42F67012040E843243E8681F2C320C61C49B49AEA40C4A. The prior approval was stopped before Call 1 and never consumed. Chrome tab count was last revalidated as zero before the static correction; no later live action occurred. No v3 code, server, browser mutation, clipboard action, credential, permission, deletion, OmniRoute, Cloudflare, VM, provider, proxy, key, token, or routing mutation occurred."
 }

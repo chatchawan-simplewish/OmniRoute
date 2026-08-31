@@ -678,9 +678,12 @@ exit $exitCode
 ## Exact coordinator state machine
 
 The following is one complete PowerShell 7 coordinator program. It is invoked
-only by the later sole-owner execution task with the exact full commit and
-SHA-256 copied from the fresh PASS review plus three host-provided browser
-adapters. The adapters are authority-constrained: `OpenExactPage` opens only
+only by the later sole-owner execution task through the exact host-rendezvous
+bridge runner below, with the exact full commit and SHA-256 copied from the
+fresh PASS review. The coordinator block remains exactly `23,958` bytes with
+SHA-256
+`A42E058813231AF53D6502A2FB3341641E32040E22DBC130E62C6453F3A871AE`.
+The runner supplies three authority-constrained adapters: `OpenExactPage` opens only
 the supplied local `data:` URL and returns its opaque page handle;
 `PerformExactCopy` uses that handle for one semantic focus by the exact
 accessible name, one `Control+A`, and one `Control+C`, then returns only
@@ -1253,13 +1256,584 @@ nonempty root, or disposition failure stops without deleting any path-resolved
 substitute. All path calls after handle close are absence proofs only; there is
 no `Remove-Item`, `WriteAllBytes`, or path-based directory deletion.
 
+## Exact host-rendezvous bridge runner
+
+The coordinator cannot call the selected persistent `chrome` Node binding
+directly. The following exact PowerShell 7 bridge runner supplies its three
+scriptblock adapters through a bounded stdin/stdout rendezvous with the sole
+owner. This is host orchestration, not a browser clipboard API: PowerShell
+never receives a browser `Tab` object, and Chrome never reads or writes the
+clipboard through an API. The bridge adds no credential or live-resource
+authority.
+
+The exact bridge-runner bytes are the complete contents of the single fenced
+`powershell` block below, beginning with `param(` and ending with the LF after
+`exit $bridgeExitCode`; the fence and surrounding Markdown are excluded. The
+exact extracted byte size is `19,375` and its SHA-256 is
+`2EBD922B5156CFCE9E643E39DE3C5F7CB6987002E592D2F2A3CEF940B6872C77`.
+The fresh independent review must reproduce both values. At action
+time the sole owner must provide all eight pins: reviewed brief commit and
+SHA-256, coordinator byte size and SHA-256, bridge-runner byte size and
+SHA-256, and the already-reviewed child byte size and SHA-256. The runner
+rejects any working/commit drift or extracted-block mismatch before it starts
+the nested coordinator.
+
+```powershell
+param(
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9a-f]{40}$')]
+    [string]$ReviewedBriefCommit,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9A-F]{64}$')]
+    [string]$ReviewedBriefSha256,
+
+    [Parameter(Mandatory)]
+    [ValidateRange(1, 1048576)]
+    [long]$ReviewedCoordinatorBytes,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9A-F]{64}$')]
+    [string]$ReviewedCoordinatorSha256,
+
+    [Parameter(Mandatory)]
+    [ValidateRange(1, 1048576)]
+    [long]$ReviewedBridgeRunnerBytes,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9A-F]{64}$')]
+    [string]$ReviewedBridgeRunnerSha256,
+
+    [Parameter(Mandatory)]
+    [ValidateRange(1, 1048576)]
+    [long]$ReviewedChildBytes,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9A-F]{64}$')]
+    [string]$ReviewedChildSha256
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$cancelableReadLineOverloads = @([Console]::In.GetType().GetMethods() | Where-Object {
+    $_.Name -eq 'ReadLineAsync' -and
+    $_.GetParameters().Count -eq 1 -and
+    $_.GetParameters()[0].ParameterType -eq [Threading.CancellationToken]
+})
+if ($PSVersionTable.PSVersion.Major -ne 7 -or $cancelableReadLineOverloads.Count -ne 1) { throw 'BRIDGE_POWERSHELL_RUNTIME_CAPABILITY_FAIL' }
+
+function ConvertTo-Base64Url {
+    param([Parameter(Mandatory)] [string]$Value)
+    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Value)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+function Read-LineBeforeDeadline {
+    param(
+        [Parameter(Mandatory)] [IO.TextReader]$Reader,
+        [Parameter(Mandatory)] [Diagnostics.Stopwatch]$Clock,
+        [Parameter(Mandatory)] [TimeSpan]$Deadline,
+        [Parameter(Mandatory)] [string]$TimeoutCode,
+        [Parameter(Mandatory)] [string]$EofCode
+    )
+
+    $readCts = [Threading.CancellationTokenSource]::new()
+    $lineTask = $null
+    try {
+        $lineTask = $Reader.ReadLineAsync($readCts.Token)
+        while (-not $lineTask.IsCompleted -and $Clock.Elapsed -lt $Deadline) {
+            [Threading.Thread]::Sleep(25)
+        }
+        $deadlineReached = $Clock.Elapsed -ge $Deadline
+        if ($deadlineReached) {
+            $readCts.Cancel()
+            try { $null = $lineTask.GetAwaiter().GetResult() } catch {}
+            throw $TimeoutCode
+        }
+        if (-not $lineTask.IsCompleted) {
+            $readCts.Cancel()
+            try { $null = $lineTask.GetAwaiter().GetResult() } catch {}
+            throw $TimeoutCode
+        }
+        $line = $lineTask.GetAwaiter().GetResult()
+        if ($null -eq $line) { throw $EofCode }
+        return $line
+    } finally {
+        if ($null -ne $lineTask -and -not $lineTask.IsCompleted) {
+            $readCts.Cancel()
+            try { $null = $lineTask.GetAwaiter().GetResult() } catch {}
+        }
+        $readCts.Dispose()
+    }
+}
+
+$briefRelativePath = '.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-anydesk-clipboard-preflight-live-brief.md'
+$briefPath = 'C:\ChatGPT Projects\SW-Selfhosted-Network\.worktrees\omniroute-agent-routing-source\.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-anydesk-clipboard-preflight-live-brief.md'
+$repoRoot = 'C:\ChatGPT Projects\SW-Selfhosted-Network\.worktrees\omniroute-agent-routing-source'
+$expectedCoordinatorBytes = 23958
+$expectedCoordinatorSha256 = 'A42E058813231AF53D6502A2FB3341641E32040E22DBC130E62C6453F3A871AE'
+$expectedChildBytes = 23758
+$expectedChildSha256 = '16470D5E7F68773B259B49C7EC24D46B3A2D4B5238DCB71986990D6B73C5C367'
+$bridgeResponseTimeoutSeconds = 45
+$coordinatorTimeoutSeconds = 180
+$coordinatorExitTimeoutMilliseconds = 15000
+$utf8NoBom = [Text.UTF8Encoding]::new($false, $true)
+
+if ($ReviewedCoordinatorBytes -ne $expectedCoordinatorBytes -or $ReviewedCoordinatorSha256 -cne $expectedCoordinatorSha256) {
+    throw 'ACTION_COORDINATOR_PIN_FAIL'
+}
+if ($ReviewedChildBytes -ne $expectedChildBytes -or $ReviewedChildSha256 -cne $expectedChildSha256) {
+    throw 'ACTION_CHILD_PIN_FAIL'
+}
+
+$briefRaw = [IO.File]::ReadAllBytes($briefPath)
+$observedBriefSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($briefRaw))
+if ($observedBriefSha256 -cne $ReviewedBriefSha256) { throw 'ACTION_BRIEF_SHA256_FAIL' }
+$workingBriefBlob = (& git -C $repoRoot hash-object --no-filters -- $briefRelativePath).Trim()
+if ($LASTEXITCODE -ne 0 -or $workingBriefBlob -cnotmatch '^[0-9a-f]{40}$') { throw 'ACTION_WORKING_BRIEF_BLOB_FAIL' }
+$reviewedBriefBlob = (& git -C $repoRoot rev-parse ($ReviewedBriefCommit + ':' + $briefRelativePath)).Trim()
+if ($LASTEXITCODE -ne 0 -or $reviewedBriefBlob -cnotmatch '^[0-9a-f]{40}$') { throw 'ACTION_REVIEWED_BRIEF_COMMIT_FAIL' }
+if ($workingBriefBlob -cne $reviewedBriefBlob) { throw 'ACTION_BRIEF_COMMIT_WORKING_DRIFT' }
+
+$briefText = $utf8NoBom.GetString($briefRaw)
+if ($briefText.Contains("`r") -or -not $briefText.EndsWith("`n") -or $briefText.EndsWith("`n`n")) { throw 'ACTION_BRIEF_ENCODING_FAIL' }
+$childMatch = [regex]::Match($briefText, '(?ms)^## Exact script-byte contract.*?^```powershell\n(?<block>param\(.*?^exit \$exitCode\n)```\n')
+$coordinatorMatch = [regex]::Match($briefText, '(?ms)^## Exact coordinator state machine.*?^```powershell\n(?<block>param\(.*?^exit 1\n)```\n')
+$runnerMatch = [regex]::Match($briefText, '(?ms)^## Exact host-rendezvous bridge runner.*?^```powershell\n(?<block>param\(.*?^exit \$bridgeExitCode\n)```\n')
+if (-not $childMatch.Success -or -not $coordinatorMatch.Success -or -not $runnerMatch.Success) { throw 'ACTION_BLOCK_EXTRACTION_FAIL' }
+
+$childBytes = $utf8NoBom.GetBytes($childMatch.Groups['block'].Value)
+$coordinatorBytes = $utf8NoBom.GetBytes($coordinatorMatch.Groups['block'].Value)
+$runnerBytes = $utf8NoBom.GetBytes($runnerMatch.Groups['block'].Value)
+$childSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($childBytes))
+$coordinatorSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($coordinatorBytes))
+$runnerSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($runnerBytes))
+if ($childBytes.LongLength -ne $ReviewedChildBytes -or $childSha256 -cne $ReviewedChildSha256) { throw 'ACTION_CHILD_BYTES_FAIL' }
+if ($coordinatorBytes.LongLength -ne $ReviewedCoordinatorBytes -or $coordinatorSha256 -cne $ReviewedCoordinatorSha256) { throw 'ACTION_COORDINATOR_BYTES_FAIL' }
+if ($runnerBytes.LongLength -ne $ReviewedBridgeRunnerBytes -or $runnerSha256 -cne $ReviewedBridgeRunnerSha256) { throw 'ACTION_BRIDGE_RUNNER_BYTES_FAIL' }
+
+$bridgeNonceBytes = [byte[]]::new(16)
+[Security.Cryptography.RandomNumberGenerator]::Fill($bridgeNonceBytes)
+$bridgeNonce = [Convert]::ToHexString($bridgeNonceBytes)
+[Array]::Clear($bridgeNonceBytes, 0, $bridgeNonceBytes.Length)
+$bridgeHandle = 'H-' + $bridgeNonce
+$bridgeState = 'EXPECT_OPEN'
+$bridgeProtocolError = $false
+$openRequests = 0
+$openResponses = 0
+$copyRequests = 0
+$copyResponses = 0
+$closeRequests = 0
+$closeResponses = 0
+$coordinatorLines = [Collections.Generic.List[string]]::new()
+$coordinatorProcess = $null
+$coordinatorExited = $false
+$coordinatorExitCode = $null
+$coordinatorStderr = $null
+$bridgeExitCode = 1
+
+$coordinatorBase64 = [Convert]::ToBase64String($coordinatorBytes)
+$commitBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($ReviewedBriefCommit))
+$briefShaBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($ReviewedBriefSha256))
+$nonceBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($bridgeNonce))
+$handleBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($bridgeHandle))
+
+$wrapperText = @'
+$ErrorActionPreference = 'Stop'
+$coordinatorText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__COORDINATOR__'))
+$reviewedCommit = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__COMMIT__'))
+$reviewedBriefSha = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__BRIEF_SHA__'))
+$bridgeNonce = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__NONCE__'))
+$bridgeHandle = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__HANDLE__'))
+
+function ConvertTo-Base64Url {
+    param([Parameter(Mandatory)] [string]$Value)
+    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Value)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+$openAdapter = {
+    param([string]$DataUrl)
+    [Console]::Out.WriteLine('BRIDGE_OPEN_REQUEST|' + $bridgeNonce + '|' + (ConvertTo-Base64Url $DataUrl))
+    [Console]::Out.Flush()
+    $response = [Console]::In.ReadLine()
+    if ($response -cne ('BRIDGE_OPEN_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle)) { throw 'BRIDGE_OPEN_ABORT' }
+    return $bridgeHandle
+}
+$copyAdapter = {
+    param([string]$OpaqueHandle, [string]$AccessibleName)
+    if ($OpaqueHandle -cne $bridgeHandle) { throw 'BRIDGE_COPY_HANDLE_FAIL' }
+    [Console]::Out.WriteLine('BRIDGE_COPY_REQUEST|' + $bridgeNonce + '|' + $bridgeHandle + '|' + (ConvertTo-Base64Url $AccessibleName))
+    [Console]::Out.Flush()
+    $response = [Console]::In.ReadLine()
+    if ($response -cne ('BRIDGE_COPY_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle + '|COPY_DONE')) { throw 'BRIDGE_COPY_ABORT' }
+    return 'COPY_DONE'
+}
+$closeAdapter = {
+    param([string]$OpaqueHandle)
+    if ($OpaqueHandle -cne $bridgeHandle) { throw 'BRIDGE_CLOSE_HANDLE_FAIL' }
+    [Console]::Out.WriteLine('BRIDGE_CLOSE_REQUEST|' + $bridgeNonce + '|' + $bridgeHandle)
+    [Console]::Out.Flush()
+    $response = [Console]::In.ReadLine()
+    if ($response -cne ('BRIDGE_CLOSE_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle + '|PASS')) { throw 'BRIDGE_CLOSE_ABORT' }
+    return 'PASS'
+}
+
+& ([ScriptBlock]::Create($coordinatorText)) -ReviewedBriefCommit $reviewedCommit -ReviewedBriefSha256 $reviewedBriefSha -OpenExactPage $openAdapter -PerformExactCopy $copyAdapter -CloseExactPage $closeAdapter
+'@
+$wrapperText = $wrapperText.Replace('__COORDINATOR__', $coordinatorBase64).Replace('__COMMIT__', $commitBase64).Replace('__BRIEF_SHA__', $briefShaBase64).Replace('__NONCE__', $nonceBase64).Replace('__HANDLE__', $handleBase64)
+$wrapperEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($wrapperText))
+
+$startInfo = [Diagnostics.ProcessStartInfo]::new()
+$startInfo.FileName = (Get-Command pwsh -ErrorAction Stop).Source
+$startInfo.UseShellExecute = $false
+$startInfo.CreateNoWindow = $true
+$startInfo.RedirectStandardInput = $true
+$startInfo.RedirectStandardOutput = $true
+$startInfo.RedirectStandardError = $true
+foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $wrapperEncoded)) {
+    $startInfo.ArgumentList.Add($argument)
+}
+
+try {
+    $coordinatorProcess = [Diagnostics.Process]::new()
+    $coordinatorProcess.StartInfo = $startInfo
+    if (-not $coordinatorProcess.Start()) { throw 'BRIDGE_COORDINATOR_START_FAIL' }
+    $stderrTask = $coordinatorProcess.StandardError.ReadToEndAsync()
+    $coordinatorClock = [Diagnostics.Stopwatch]::StartNew()
+    $coordinatorDeadline = [TimeSpan]::FromSeconds($coordinatorTimeoutSeconds)
+
+    while ($true) {
+        try {
+            $line = Read-LineBeforeDeadline -Reader $coordinatorProcess.StandardOutput -Clock $coordinatorClock -Deadline $coordinatorDeadline -TimeoutCode 'BRIDGE_COORDINATOR_OUTPUT_TIMEOUT' -EofCode 'BRIDGE_COORDINATOR_OUTPUT_EOF'
+        } catch {
+            if ($_.Exception.Message -ceq 'BRIDGE_COORDINATOR_OUTPUT_EOF') { break }
+            throw
+        }
+        if ($line.StartsWith('BRIDGE_OPEN_REQUEST|', [StringComparison]::Ordinal)) {
+            $openRequests++
+            if ($bridgeState -cne 'EXPECT_OPEN' -or $openRequests -ne 1 -or $line -cnotmatch ('^BRIDGE_OPEN_REQUEST\|' + $bridgeNonce + '\|[A-Za-z0-9_-]+$')) {
+                $bridgeProtocolError = $true
+                $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|OPEN'
+            } else {
+                $bridgeState = 'WAIT_OPEN_RESPONSE'
+                [Console]::Out.WriteLine($line)
+                [Console]::Out.Flush()
+                $responseClock = [Diagnostics.Stopwatch]::StartNew()
+                $responseDeadline = [TimeSpan]::FromSeconds($bridgeResponseTimeoutSeconds)
+                try {
+                    $response = Read-LineBeforeDeadline -Reader ([Console]::In) -Clock $responseClock -Deadline $responseDeadline -TimeoutCode 'BRIDGE_OPEN_RESPONSE_TIMEOUT' -EofCode 'BRIDGE_OPEN_RESPONSE_EOF'
+                } catch {
+                    $bridgeProtocolError = $true
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|OPEN'
+                } finally {
+                    $responseClock.Stop()
+                }
+                $openResponses++
+                if ($response -ceq ('BRIDGE_OPEN_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle)) {
+                    $bridgeState = 'OPENED'
+                } else {
+                    $bridgeProtocolError = $true
+                    $bridgeState = 'OPEN_ABORTED'
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|OPEN'
+                }
+            }
+            $coordinatorProcess.StandardInput.WriteLine($response)
+            $coordinatorProcess.StandardInput.Flush()
+        } elseif ($line.StartsWith('BRIDGE_COPY_REQUEST|', [StringComparison]::Ordinal)) {
+            $copyRequests++
+            $exactName = ConvertTo-Base64Url 'OmniRoute transport preflight challenge'
+            if ($bridgeState -cne 'OPENED' -or $copyRequests -ne 1 -or $line -cne ('BRIDGE_COPY_REQUEST|' + $bridgeNonce + '|' + $bridgeHandle + '|' + $exactName)) {
+                $bridgeProtocolError = $true
+                $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|COPY'
+            } else {
+                $bridgeState = 'WAIT_COPY_RESPONSE'
+                [Console]::Out.WriteLine($line)
+                [Console]::Out.Flush()
+                $responseClock = [Diagnostics.Stopwatch]::StartNew()
+                $responseDeadline = [TimeSpan]::FromSeconds($bridgeResponseTimeoutSeconds)
+                try {
+                    $response = Read-LineBeforeDeadline -Reader ([Console]::In) -Clock $responseClock -Deadline $responseDeadline -TimeoutCode 'BRIDGE_COPY_RESPONSE_TIMEOUT' -EofCode 'BRIDGE_COPY_RESPONSE_EOF'
+                } catch {
+                    $bridgeProtocolError = $true
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|COPY'
+                } finally {
+                    $responseClock.Stop()
+                }
+                $copyResponses++
+                if ($response -ceq ('BRIDGE_COPY_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle + '|COPY_DONE')) {
+                    $bridgeState = 'COPIED'
+                } else {
+                    $bridgeProtocolError = $true
+                    $bridgeState = 'COPY_ABORTED'
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|COPY'
+                }
+            }
+            $coordinatorProcess.StandardInput.WriteLine($response)
+            $coordinatorProcess.StandardInput.Flush()
+        } elseif ($line.StartsWith('BRIDGE_CLOSE_REQUEST|', [StringComparison]::Ordinal)) {
+            $closeRequests++
+            if ($bridgeState -cnotin @('COPIED', 'COPY_ABORTED') -or $closeRequests -ne 1 -or $line -cne ('BRIDGE_CLOSE_REQUEST|' + $bridgeNonce + '|' + $bridgeHandle)) {
+                $bridgeProtocolError = $true
+                $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|CLOSE'
+            } else {
+                $bridgeState = 'WAIT_CLOSE_RESPONSE'
+                [Console]::Out.WriteLine($line)
+                [Console]::Out.Flush()
+                $responseClock = [Diagnostics.Stopwatch]::StartNew()
+                $responseDeadline = [TimeSpan]::FromSeconds($bridgeResponseTimeoutSeconds)
+                try {
+                    $response = Read-LineBeforeDeadline -Reader ([Console]::In) -Clock $responseClock -Deadline $responseDeadline -TimeoutCode 'BRIDGE_CLOSE_RESPONSE_TIMEOUT' -EofCode 'BRIDGE_CLOSE_RESPONSE_EOF'
+                } catch {
+                    $bridgeProtocolError = $true
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|CLOSE'
+                } finally {
+                    $responseClock.Stop()
+                }
+                $closeResponses++
+                if ($response -ceq ('BRIDGE_CLOSE_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle + '|PASS')) {
+                    $bridgeState = 'CLOSED'
+                } else {
+                    $bridgeProtocolError = $true
+                    $bridgeState = 'CLOSE_ABORTED'
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|CLOSE'
+                }
+            }
+            $coordinatorProcess.StandardInput.WriteLine($response)
+            $coordinatorProcess.StandardInput.Flush()
+        } elseif ($line.StartsWith('BRIDGE_', [StringComparison]::Ordinal)) {
+            $bridgeProtocolError = $true
+            throw 'BRIDGE_UNKNOWN_OR_OUT_OF_ORDER_REQUEST'
+        } else {
+            $coordinatorLines.Add($line)
+        }
+    }
+
+    $coordinatorClock.Stop()
+    $coordinatorProcess.StandardInput.Close()
+    $coordinatorExited = $coordinatorProcess.WaitForExit($coordinatorExitTimeoutMilliseconds)
+    if (-not $coordinatorExited) { throw 'BRIDGE_COORDINATOR_EXIT_TIMEOUT' }
+    $coordinatorExitCode = $coordinatorProcess.ExitCode
+    $coordinatorStderr = $stderrTask.GetAwaiter().GetResult()
+
+    $expectedCoordinatorPass = @(
+        'MACHINE_OUTPUT_VALID=PASS',
+        'RETAINED_HANDLE_EXIT=PASS',
+        'EXACT_PREFLIGHT_PAGE_CLOSE=PASS',
+        'EXTERNAL_SCRIPT_ABSENCE=PASS',
+        'EXTERNAL_TEMP_ROOT_ABSENCE=PASS',
+        'PREFLIGHT_ACCEPTANCE=PASS'
+    )
+    $coordinatorPass = $coordinatorLines.Count -eq $expectedCoordinatorPass.Count
+    for ($index = 0; $coordinatorPass -and $index -lt $expectedCoordinatorPass.Count; $index++) {
+        if ($coordinatorLines[$index] -cne $expectedCoordinatorPass[$index]) { $coordinatorPass = $false }
+    }
+    $bridgeCountsPass = $openRequests -eq 1 -and $openResponses -eq 1 -and
+        $copyRequests -eq 1 -and $copyResponses -eq 1 -and
+        $closeRequests -eq 1 -and $closeResponses -eq 1
+    $bridgePass = $coordinatorPass -and $coordinatorExitCode -eq 0 -and
+        $coordinatorStderr.Length -eq 0 -and $bridgeState -ceq 'CLOSED' -and
+        $bridgeCountsPass -and -not $bridgeProtocolError
+
+    foreach ($coordinatorLine in $coordinatorLines) { $coordinatorLine }
+    if ($bridgePass) { 'BRIDGE_PROTOCOL=PASS' } else { 'BRIDGE_PROTOCOL=FAIL' }
+    if ($bridgePass) { $bridgeExitCode = 0 }
+} catch {
+    $bridgeProtocolError = $true
+    'BRIDGE_PROTOCOL=FAIL'
+} finally {
+    if ($null -ne $coordinatorProcess) {
+        if (-not $coordinatorExited) {
+            try { $coordinatorProcess.StandardInput.Close() } catch {}
+        }
+        try { $coordinatorProcess.Dispose() } catch {}
+    }
+    [Array]::Clear($childBytes, 0, $childBytes.Length)
+    [Array]::Clear($coordinatorBytes, 0, $coordinatorBytes.Length)
+    [Array]::Clear($runnerBytes, 0, $runnerBytes.Length)
+    [Array]::Clear($briefRaw, 0, $briefRaw.Length)
+}
+
+"BRIDGE_COUNTER_OPEN_REQUESTS=$openRequests"
+"BRIDGE_COUNTER_OPEN_RESPONSES=$openResponses"
+"BRIDGE_COUNTER_COPY_REQUESTS=$copyRequests"
+"BRIDGE_COUNTER_COPY_RESPONSES=$copyResponses"
+"BRIDGE_COUNTER_CLOSE_REQUESTS=$closeRequests"
+"BRIDGE_COUNTER_CLOSE_RESPONSES=$closeResponses"
+if ($bridgeExitCode -eq 0) { 'BRIDGE_ACCEPTANCE=PASS' } else { 'BRIDGE_ACCEPTANCE=FAIL' }
+exit $bridgeExitCode
+```
+
+The runner's response reader starts one cancellable `ReadLineAsync` per
+request, uses a monotonic 45-second deadline, and gives timeout/tie precedence
+before inspecting a completed line. EOF, timeout, malformed, duplicate,
+unknown, or out-of-order input becomes one canonical `BRIDGE_ABORT` response
+to the waiting adapter and then follows the coordinator's existing
+`catch`/`finally`; there is no retry. Each request permits at most one host
+response line. The nested coordinator is extracted from the committed brief,
+passed to a new PowerShell 7 process as an in-memory encoded command, and never
+written to another file. That isolation lets its reviewed `exit` execute
+without terminating the parent bridge parser.
+
+Exact success protocol:
+
+1. `EXPECT_OPEN` emits
+   `BRIDGE_OPEN_REQUEST|<NONCE>|<BASE64URL_DATA_URL>`. The response must be
+   exactly `BRIDGE_OPEN_RESPONSE|<NONCE>|H-<NONCE>`.
+2. `OPENED` emits
+   `BRIDGE_COPY_REQUEST|<NONCE>|H-<NONCE>|<BASE64URL_ACCESSIBLE_NAME>`.
+   The response must be exactly
+   `BRIDGE_COPY_RESPONSE|<NONCE>|H-<NONCE>|COPY_DONE`.
+3. `COPIED` emits `BRIDGE_CLOSE_REQUEST|<NONCE>|H-<NONCE>`. The response
+   must be exactly `BRIDGE_CLOSE_RESPONSE|<NONCE>|H-<NONCE>|PASS`.
+4. `CLOSED` can produce `BRIDGE_ACCEPTANCE=PASS` only when coordinator
+   acceptance is its exact ordered six-line PASS output, coordinator stderr is
+   empty, its exit is `0`, all six bridge counters are exactly `1`, and no
+   unknown, duplicate, malformed, or out-of-order message occurred.
+
+`H-<NONCE>` is the only PowerShell-visible handle. It is bound to the runtime
+CSPRNG nonce and has no browser meaning outside this one rendezvous. The actual
+`Tab` object remains only in the persistent Node binding.
+
+## Exact sole-owner Chrome action sequence
+
+The action owner must already have the selected persistent `chrome` binding
+required by the Chrome-control skill. The owner starts the exact reviewed
+bridge runner in one live PTY with the eight fresh-review pins above. For each
+request, the owner reads exactly one complete request line from that PTY,
+performs only the corresponding Node block below, and writes the block's one
+exact returned response line plus LF through the same PTY. Every Node call has
+a 12-second deadline, below both the 45-second bridge-response deadline and the
+child's 120-second control deadline.
+
+The execution order is fixed: encode the exact extracted bridge-runner block
+plus its literal eight-pin invocation in memory; start it once as
+`pwsh -NoLogo -NoProfile -NonInteractive -EncodedCommand <REVIEWED_BASE64>` in
+one live PTY; initialize the Node state once; service OPEN, then COPY, then
+CLOSE from that PTY; wait for bridge exit; and accept only its exact parser
+output. `<REVIEWED_BASE64>` is produced from the fresh reviewed runner bytes
+and action-time pins, never from an unreviewed copy. Neither the bridge runner
+nor the extracted coordinator is written to a new file.
+
+Initialize once before the first request:
+
+```javascript
+let bridgeTab = null;
+let bridgeNonce = null;
+let bridgeHandle = null;
+let bridgeState = 'IDLE';
+const bridgeNodeDeadlineMs = 12000;
+const bridgeWithinDeadline = async (operation, code) => {
+  let timer;
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(code)), bridgeNodeDeadlineMs); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+```
+
+For the single open request, substitute the two exact observed request fields
+as JSON string literals. Decode only the supplied non-secret data URL. There
+is exactly one `chrome.tabs.new()` and one `goto(dataUrl)`. If either operation
+fails, close the exact created tab once when it exists, retain no replacement,
+and return exact `BRIDGE_ABORT|<NONCE>|OPEN` only after that close attempt has
+settled; there is no alternate tab or retry.
+
+```javascript
+bridgeNonce = <OPEN_NONCE_JSON>;
+const bridgeDataUrlBase64 = <OPEN_DATA_URL_BASE64URL_JSON>;
+bridgeHandle = `H-${bridgeNonce}`;
+try {
+  if (!/^[0-9A-F]{32}$/.test(bridgeNonce) || bridgeState !== 'IDLE') throw new Error('OPEN_REQUEST_REJECTED');
+  const bridgeDataUrl = Buffer.from(bridgeDataUrlBase64, 'base64url').toString('utf8');
+  if (!bridgeDataUrl.startsWith('data:text/html;charset=utf-8,')) throw new Error('OPEN_DATA_URL_REJECTED');
+  bridgeState = 'OPENING';
+  bridgeTab = await bridgeWithinDeadline(() => chrome.tabs.new(), 'OPEN_NEW_TIMEOUT');
+  await bridgeWithinDeadline(() => bridgeTab.goto(bridgeDataUrl), 'OPEN_GOTO_TIMEOUT');
+  bridgeState = 'OPENED';
+  `BRIDGE_OPEN_RESPONSE|${bridgeNonce}|${bridgeHandle}`;
+} catch (error) {
+  bridgeState = 'OPEN_ABORTED';
+  if (bridgeTab !== null) {
+    try {
+      await bridgeWithinDeadline(() => bridgeTab.close(), 'OPEN_CLOSE_TIMEOUT');
+      bridgeTab = null;
+    } catch (closeError) {
+      bridgeState = 'OPEN_ABORT_RETAINED';
+    }
+  }
+  `BRIDGE_ABORT|${bridgeNonce}|OPEN`;
+}
+```
+
+For the single copy request, substitute its exact nonce and opaque-handle
+fields as JSON string literals and require equality with the retained values.
+The accessible-name field must decode to the one literal below. Focus is one
+semantic-locator click, never coordinates. Perform one `Control+A` and one
+`Control+C`. On any failure, keep the retained tab, return exact
+`BRIDGE_ABORT|<NONCE>|COPY`, and wait for the coordinator's later close request.
+
+```javascript
+const copyNonce = <COPY_NONCE_JSON>;
+const copyHandle = <COPY_HANDLE_JSON>;
+const copyAccessibleNameBase64 = <COPY_ACCESSIBLE_NAME_BASE64URL_JSON>;
+const copyAccessibleName = Buffer.from(copyAccessibleNameBase64, 'base64url').toString('utf8');
+try {
+  if (bridgeState !== 'OPENED' || copyNonce !== bridgeNonce || copyHandle !== bridgeHandle || copyAccessibleName !== 'OmniRoute transport preflight challenge') throw new Error('COPY_REQUEST_REJECTED');
+  bridgeState = 'COPYING';
+  const challengeField = bridgeTab.playwright.getByLabel('OmniRoute transport preflight challenge',{exact:true});
+  await bridgeWithinDeadline(() => challengeField.click(), 'COPY_FOCUS_TIMEOUT');
+  await bridgeWithinDeadline(() => challengeField.press('Control+A'), 'COPY_SELECT_TIMEOUT');
+  await bridgeWithinDeadline(() => challengeField.press('Control+C'), 'COPY_COPY_TIMEOUT');
+  bridgeState = 'COPIED';
+  `BRIDGE_COPY_RESPONSE|${bridgeNonce}|${bridgeHandle}|COPY_DONE`;
+} catch (error) {
+  bridgeState = 'COPY_ABORTED';
+  `BRIDGE_ABORT|${bridgeNonce}|COPY`;
+}
+```
+
+For the single close request, substitute its exact fields as JSON string
+literals. It is valid after copy success or copy abort only, and it closes only
+the retained tab with exactly one `tab.close()`. Only exact `PASS` is accepted.
+
+```javascript
+const closeNonce = <CLOSE_NONCE_JSON>;
+const closeHandle = <CLOSE_HANDLE_JSON>;
+try {
+  if (!['COPIED', 'COPY_ABORTED'].includes(bridgeState) || closeNonce !== bridgeNonce || closeHandle !== bridgeHandle || bridgeTab === null) throw new Error('CLOSE_REQUEST_REJECTED');
+  bridgeState = 'CLOSING';
+  await bridgeWithinDeadline(() => bridgeTab.close(), 'CLOSE_TIMEOUT');
+  bridgeTab = null;
+  bridgeState = 'CLOSED';
+  `BRIDGE_CLOSE_RESPONSE|${bridgeNonce}|${bridgeHandle}|PASS`;
+} catch (error) {
+  bridgeState = 'CLOSE_ABORTED';
+  `BRIDGE_ABORT|${bridgeNonce}|CLOSE`;
+}
+```
+
+The host performs no DOM snapshot, screenshot, content extraction, title or
+URL lookup, browser clipboard API call, coordinate action, reload, alternate
+tab, fallback, or retry. On open failure it attempts closure of the exact
+created tab before responding ABORT. On copy failure it responds ABORT without
+closing, then closes only the retained tab when the coordinator requests it.
+Any Node deadline, ABORT, EOF, invalid response, or tool error is terminal and
+converges through the bridge and coordinator cleanup states; the owner does
+not improvise another response or action.
+
 ## Structural counters and non-overlap
 
 | Counter | Preflight maximum | Later credential stage |
 | --- | ---: | ---: |
 | fixed processes | `1` | credential-owner process exactly `1` only under a later gate |
 | simultaneous preflight/credential processes | preflight must exit first | never overlap |
-| local pages | `1` | separately reviewed later page only |
+| local pages / bridge handles | `1 / 1` | separately reviewed later page only |
+| bridge open/copy/close requests | `1 / 1 / 1` on PASS | separately counted |
+| bridge open/copy/close responses | `1 / 1 / 1` on PASS | separately counted |
 | transfer attempts / child control lines | `1 / 0..1` | separately counted |
 | semantic focuses / `Control+A` / `Control+C` | `1 / 1 / 1` | separately counted |
 | baseline / comparison / post-clear reads | `1 / 0..1 / 1` | not shared |
@@ -1302,10 +1876,11 @@ No evidence file is read or mutated under this brief-preparation authority.
 
 ## Independent-review stop
 
-Stop after committing this one ignored brief and its ignored preparation
+Stop after committing this one ignored brief and writing its ignored fix-round-4
 report. A fresh independent Sol High reviewer must verify the direct committed
-bytes, extracted-script equality, strict encoding, exact two-path preparation
-scope, no unresolved marker, no secret, executable syntax, control-read cancellation,
-four-state counters, cleanup/deletion guards, prohibited-action scan, and every
-authority boundary above. `FAIL / REVISE` authorizes nothing. Even a future
-PASS authorizes only a later explicit preflight action-time decision.
+bytes; exact child, coordinator, and bridge-runner extraction; strict encoding;
+single committed-path scope; no unresolved marker or secret; static syntax and
+structure; both bounded async-read tie rules; exact bridge state/counter parser;
+cleanup/deletion guards; prohibited-action scan; and every authority boundary
+above. `FAIL / REVISE` authorizes nothing. Even a future PASS authorizes only a
+later explicit preflight action-time decision.

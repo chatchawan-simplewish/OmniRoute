@@ -208,3 +208,88 @@ action. A corrected committed candidate requires another fresh scoped
 independent review. Even a future PASS is limited to the one already
 user-approved non-secret preflight and authorizes no credential or routing
 action.
+
+## Fix round 2 scoped re-review
+
+### Scoped verdict
+
+**PASS FOR ONE NON-SECRET PREFLIGHT EXECUTION ONLY.**
+
+The committed candidate at
+`c2e2ac2bdd1ffa9437773e97cbc2fe49afba62af` addresses both remaining
+IMPORTANT findings. All original F1-F4 findings are now closed, and this
+direct-byte re-review found no new Critical, HIGH, or IMPORTANT defect.
+
+No browser, clipboard, PowerShell block, credential, network, or live-resource
+action was executed during this static re-review.
+
+### Fix-round inputs and static proof
+
+- Fix range: `5398cebe423f422d657e33887f4011f2274ebf05..c2e2ac2bdd1ffa9437773e97cbc2fe49afba62af`
+- Fix commit scope: exactly the candidate brief
+- Candidate SHA-256: `A4693C150C9A4DD137D71BE3DE1C7A4BE297F5822A219C5D95F1E2CDD3612D57`
+- Candidate size: `11317` bytes
+- Encoding shape: no BOM, zero CR bytes, one trailing LF
+- Static parse: both PowerShell blocks have zero parser errors; the JavaScript
+  module parse exits `0`
+- Exact JavaScript structure: zero `globalThis` references, exactly one
+  top-level `let directPreflightV2RetainedTab = null`, one assignment of the
+  fulfilled tab handle, six awaited browser calls, and one explicit
+  `nodeRepl.write(...)`
+- Prohibited-action scan: no timer, `Promise.race`, process, bridge, helper,
+  background task, retry, fallback, snapshot, screenshot, content extraction,
+  coordinate action, browser clipboard API, alternate tab, or network URL
+- Existing unrelated modified and untracked implementation files remain
+  unchanged and unstaged.
+
+### Remaining-finding disposition
+
+- **R1-F1 — ADDRESSED.** The exact cell no longer uses `globalThis`. It declares
+  the uniquely named changing handle once at top level with `let`, then only
+  reassigns it inside the IIFE. This conforms to the Chrome skill's persistent
+  binding rule. A fulfilled `tabs.new()` stores the exact handle before any
+  later browser call; mutation uncertainty retains it; fulfilled exact close
+  clears it. The cell is one-shot and must never be redeclared or retried.
+- **R1-F2 — ADDRESSED.** Expected-challenge shape validation now occurs inside
+  the protected `try`. Invalid shape records
+  `EXPECTED_CHALLENGE_SHAPE_FAIL`, performs zero comparison reads, and still
+  reaches exactly one final clear attempt and exactly one final empty-read
+  attempt in `finally`. PASS remains impossible on invalid shape or any cleanup
+  error.
+
+### Earlier-finding reconfirmation
+
+- **F1 — CLOSED.** Every rejection from create, navigation, focus, either key
+  action, or close is terminal `BROWSER_UNCERTAIN`. After a rejected mutation
+  the cell makes no later browser call, and every uncertain/missing result
+  forbids Call 3 and all later clipboard mutation.
+- **F2 — CLOSED.** Rejected create remains `CREATE_UNCERTAIN` with
+  `exactTabClosed=false`. A successful handle is retained immediately. Only the
+  exact retained handle can be closed, and closure is claimed only after that
+  close fulfills and the retained binding is null.
+- **F3 — CLOSED.** One IIFE contains all local declarations; the sole top-level
+  retained binding is intentionally one-shot; one explicit
+  `nodeRepl.write(...)` emits the bounded result object. No implicit display
+  result is relied upon.
+- **F4 — CLOSED.** Exact-success Call 3 attempts one comparison read. Comparison
+  failure, invalid expected shape, clear failure, and empty-read failure all
+  remain bounded and cannot PASS; every path after Call 3 initialization reaches
+  the same one clear and one empty-read attempts.
+
+Closing the exact tab after fulfilled `Control+C` is review-clean: the copy
+promise has settled, close is the next serial browser call, and a rejected
+close is terminal uncertainty with no Call 3. Normal PASS requires all six
+browser promises to fulfill and counters
+`open/goto/focus/selectAll/copy/close = 1/1/1/1/1/1`, exact result
+`COPY_SETTLED_AND_CLOSED`, error class `NONE`, tab state `CLOSED`, exact closure
+true, exact clipboard equality, and successful final cleanup.
+
+### Fix-round-2 authority boundary
+
+This PASS authorizes only one execution of the exact committed non-secret
+preflight under the user's existing action-time statement. It authorizes no
+retry, fallback, alternate tab, second challenge, credential, token,
+Cloudflare, OmniRoute, VM1205, proxy/proof/R5, Rulesets, evidence-worktree
+mutation, revocation, permission change, deletion, or routing action. Any hash,
+size, commit, binding, session, precondition, tool result, counter, or live-state
+mismatch stops before the next mutation and makes the result FAIL / NOT PROVEN.

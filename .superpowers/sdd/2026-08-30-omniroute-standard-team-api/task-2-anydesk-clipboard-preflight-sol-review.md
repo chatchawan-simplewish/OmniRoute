@@ -197,3 +197,146 @@ ONLY** after a fresh direct-byte reviewer confirms:
 Even that future PASS must require a separate exact action-time preflight
 decision and must authorize no token/credential, Cloudflare, VM1205, OmniRoute,
 proxy/proof/R5, Rulesets, evidence mutation, revocation, or other live action.
+
+## Fix round 1 scoped re-review
+
+Reviewed fixed commit:
+`c4cdbed6ce3356c6764d00e9c49aa1256e504844` with exact parent
+`3766434cc21aed398c1789c0aa71f5adef0c59f7` and exactly one changed path: the
+preflight brief. The working brief equals its exact committed blob.
+
+| Input | Direct-byte result |
+| --- | --- |
+| Revised brief | `41,311` bytes; SHA-256 `267744B2428AD23FB096F364686BD894D283323096A52FD15CAAA43E20DE28B1`; blob `39fc31e00188408cd6b716133f220381c29222ae` |
+| Revised fenced script | `12,839` bytes; SHA-256 `2DC4024A95E916FFA1DE38DBD31F878F4593AEFFF50B393AD02E4177C6FEF1B6` |
+| Fix report | SHA-256 `B27C8F6F5508A53E3B6A7EA6C2EB7585A0CE25C04E11F3760828606C72EF4EE8` |
+| Fix diff package | SHA-256 `55F46FBF8BA9CB597A06439835DFAE83B93D140F17D36C7CC614211ED3ED3D24` |
+
+### Scoped verdict
+
+**FAIL / REVISE BEFORE EXECUTION / NOT AUTHORIZED.**
+
+F1, F2, and F4 are **ADDRESSED**. F3 and F5 are **NOT ADDRESSED**. The fix
+adds no new Critical, HIGH, or IMPORTANT defect outside those two residual
+original findings. The remaining gaps are still IMPORTANT: resource cleanup
+does not cover temp creation or a failed spawn, and the Win32 identity helper
+closes each handle before the path-based write/delete that it is meant to
+protect.
+
+No preflight execution is authorized. This scoped review also authorizes no
+token, credential, browser, clipboard, Cloudflare, VM1205, OmniRoute,
+proxy/proof/R5, Rulesets, evidence mutation, revocation, deletion, permission
+change, or other live action.
+
+### F1 — ADDRESSED
+
+`brief:231-250` polls the cancellable read under a monotonic stopwatch, captures
+`$deadlineReached` immediately after the loop, and gives deadline/tie precedence
+before examining any completed line. Every elapsed-at-or-beyond-deadline case
+cancels and observes the task, emits only `PREFLIGHT=TIMEOUT`, exits `2`, and
+leaves comparison reads at `0`. A line is processed only when the deadline was
+not reached (`brief:250-273`). This closes the late-line false-accept race.
+
+The startup-line helper applies the same fail-closed ordering at
+`brief:433-472`. The scoped review finds no new timeout-tie defect in the fix
+diff.
+
+### F2 — ADDRESSED
+
+The coordinator calls retained-handle `WaitForExit(15000)` before either
+`ReadToEnd` (`brief:716-727`). Only confirmed exit permits bounded post-exit
+stdout/stderr collection and exit-code access. Unconfirmed exit records the
+exact residual PID, performs no kill, and blocks destructive absence cleanup
+(`brief:728-760`). Page closure is still attempted and the retained handle is
+disposed (`brief:735-763`). The previously ineffective timeout is now reachable
+and fail closed.
+
+### F3 — NOT ADDRESSED
+
+The fix supplies a coherent post-spawn state machine for startup reads,
+browser adapters, one control attempt, ABORT, stdin closure, exit/output, exact
+page closure, external absence checks, and handle disposal
+(`brief:637-763`). That closes the browser/startup exception paths after the
+state variables and process object exist.
+
+However, the coordinator creates the fresh root, writes the reviewed script,
+captures identities/hashes, and performs pre-start checks before entering that
+`try` (`brief:592-617`; the `try` begins at `brief:658`). A failure after root
+creation or script write therefore exits the program without any coordinator
+cleanup. A `Process.Start()` failure inside the `try` also leaves
+`$spawned=false`; the `finally` then skips both the exit-confirmed absence block
+and any exact pre-spawn script/root cleanup (`brief:658-662,711-760`). The result
+can be a retained exact script and temporary root with no child available to run
+the script's self-cleanup.
+
+Minimum correction: begin the coordinator resource `try/finally` before fresh
+root creation and track `rootCreated`, `scriptCreated`, spawn-attempted,
+spawn-confirmed, and residual-process state. When no child was spawned, use the
+same independently reviewed identity/hash guard to delete only the exact script
+and then the exact empty root. When spawn outcome or PID is uncertain, perform
+no deletion and report the exact retained path/PID for owner disposition. Always
+dispose any created process handle. The outer state machine must cover every
+return/throw after the first filesystem mutation, not only work after `Start()`.
+
+### F4 — ADDRESSED
+
+`brief:765-837` parses exactly eleven ordered tail lines after the already
+validated five startup lines. It derives the only permitted comparison count
+and exit code from the single terminal label, constructs an exact expected
+sequence, rejects missing/duplicate/unknown/blank/out-of-order output, requires
+empty stderr, and gates overall PASS on exact `COPY_DONE`, exit `0`, page close,
+script/root absence, no coordinator failure, and no residual PID.
+
+The parser correctly requires comparison `1` for PASS or COPY_DONE mismatch and
+`0` for ABORT/EOF/TIMEOUT; cleanup counters are exactly `1 / 1 / 1 / 1` around
+that comparison value (`brief:789-819`). No manual verdict relaxation remains.
+
+### F5 — NOT ADDRESSED
+
+The added Win32 helper is useful but does not make creation or deletion
+identity-safe. `GetOrdinaryIdentity` opens with
+`FILE_FLAG_OPEN_REPARSE_POINT`, rejects reparse/kind mismatch, returns the
+volume/file ID, and then disposes the handle (`brief:97-176,475-554`). Every
+later write, read, `Remove-Item`, or `Directory.Delete` is a new path lookup.
+
+Two concrete substitution windows remain:
+
+1. The coordinator calls `WriteAllBytes($scriptPath, ...)` before it first opens
+   the script path with the identity helper (`brief:592-603`). `WriteAllBytes`
+   uses replace/create semantics; an existing raced symlink/reparse object at
+   that fresh leaf can be followed and overwritten before the subsequent
+   reparse check rejects it.
+2. The child closes its final root/script identity handles and then performs a
+   path-based `Remove-Item` (`brief:353-373`). A same-user swap after the last
+   identity check can redirect deletion without another hash/identity check.
+   External root deletion similarly closes the identity handle before the
+   path-based delete (`brief:745-755`), although non-recursive emptiness limits
+   that consequence.
+
+Minimum correction:
+
+- create the script atomically with create-new/no-overwrite semantics so any
+  pre-existing file, hard link, symlink, or reparse object fails before bytes
+  are written;
+- extend the Win32 helper to return/retain ordinary safe handles and perform
+  the final identity/hash verification and script disposition through the same
+  retained handle (for example, `SetFileInformationByHandle` with reviewed
+  delete disposition), rather than closing the handle and calling
+  path-based `Remove-Item`;
+- retain or equivalently bind the ordinary root handle through the final
+  materialized-empty check and non-recursive root disposition; and
+- on any handle, identity, reparse, hash, or disposition mismatch, stop without
+  deleting a path-resolved substitute.
+
+The current reparse checks reduce risk but do not close the Windows TOCTOU
+boundary promised by the fix.
+
+### Fix-round-1 conclusion
+
+The revised brief cannot yet earn **PASS FOR ONE NON-SECRET PREFLIGHT EXECUTION
+ONLY**. A narrow second fix should extend the coordinator state machine over
+all filesystem mutations/spawn failure and replace check-then-path-write/delete
+with atomic create-new and retained-handle disposition. A fresh scoped
+direct-byte review is required afterward. Any eventual PASS must still require
+separate exact action-time preflight authority and authorize no credential or
+other live action.

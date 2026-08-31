@@ -117,28 +117,38 @@ $secret = [Security.SecureString]::new()
 $clock = [Diagnostics.Stopwatch]::StartNew()
 $accepted = $false
 $cancelled = $false
+$key = $null
+$keyChar = $null
+$ctrl = $null
 while ($clock.Elapsed -lt $secretDeadline) {
     if (-not [Console]::KeyAvailable) {
         [Threading.Thread]::Sleep(25)
         continue
     }
-    $key = [Console]::ReadKey($true)
-    $ctrl = ($key.Modifiers -band [ConsoleModifiers]::Control) -ne 0
-    if ($key.Key -eq [ConsoleKey]::Escape -or
-        ($ctrl -and $key.Key -eq [ConsoleKey]::C)) {
-        $cancelled = $true
-        break
-    }
-    if ($key.Key -eq [ConsoleKey]::Enter) {
-        $accepted = $secret.Length -gt 0
-        break
-    }
-    if ($key.Key -eq [ConsoleKey]::Backspace) {
-        if ($secret.Length -gt 0) { $secret.RemoveAt($secret.Length - 1) }
-        continue
-    }
-    if (-not [char]::IsControl($key.KeyChar)) {
-        $secret.AppendChar($key.KeyChar)
+    try {
+        $key = [Console]::ReadKey($true)
+        $keyChar = $key.KeyChar
+        $ctrl = ($key.Modifiers -band [ConsoleModifiers]::Control) -ne 0
+        if ($key.Key -eq [ConsoleKey]::Escape -or
+            ($ctrl -and $key.Key -eq [ConsoleKey]::C)) {
+            $cancelled = $true
+            break
+        }
+        if ($key.Key -eq [ConsoleKey]::Enter) {
+            $accepted = $secret.Length -gt 0
+            break
+        }
+        if ($key.Key -eq [ConsoleKey]::Backspace) {
+            if ($secret.Length -gt 0) { $secret.RemoveAt($secret.Length - 1) }
+            continue
+        }
+        if (-not [char]::IsControl($keyChar)) {
+            $secret.AppendChar($keyChar)
+        }
+    } finally {
+        $keyChar = $null
+        $key = $null
+        $ctrl = $null
     }
 }
 $clock.Stop()
@@ -218,6 +228,12 @@ cleanup continues. R5 child count is at most `1`.
 
 The live brief must enumerate and name every plaintext-bearing location:
 
+- `$key`, the managed `ConsoleKeyInfo` value returned by `ReadKey($true)`, and
+  its plaintext-bearing `KeyChar` member;
+- `$keyChar` and every other managed character variable derived from
+  `ConsoleKeyInfo.KeyChar` by the final implementation;
+- every additional input-host or console buffer introduced by the exact live
+  implementation, with its lifetime and cleanup limit;
 - the unmanaged BSTR returned from `SecureStringToBSTR`;
 - the shortest-lived managed token string returned by `PtrToStringBSTR`;
 - the managed Authorization header value and header collection;
@@ -225,6 +241,14 @@ The live brief must enumerate and name every plaintext-bearing location:
 - the two R5 `ProcessStartInfo.Environment` entries above;
 - any R5 child-local environment, header, response, and result references
   already present in the immutable exact-hash script.
+
+Each `$key` object and derived character reference must live only for its
+current loop iteration. Clear `$keyChar`, `$key`, and `$ctrl` in the
+per-iteration `finally` immediately after handling, including `break` and
+`continue`, and clear all three named references again in the full script's one
+outer `finally`. The inner lifetime guard does not create a second terminal
+cleanup path. The exact live-brief review must inventory any further
+input-host buffer before approval.
 
 Convert only immediately before the first authorized same-process request.
 Keep no duplicate token variable. In the one outer `finally`, call

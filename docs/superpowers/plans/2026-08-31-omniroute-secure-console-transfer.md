@@ -82,11 +82,14 @@ token, VM1205 request, proxy, R5 child, or Cloudflare action.
 
 ### Task 2: Obtain fresh independent direct-byte review
 
-**File created by reviewer only:**
-- `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-fix1-sol-review.md`
+**Single authoritative file appended by reviewer only:**
+- `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-sol-review.md`
 
 - [ ] Give the independent Sol High reviewer the authoritative review paths,
   revised commit/hash, and seven required verdict areas F1-F7.
+- [ ] Append one clearly titled `Fix round <n> scoped re-review` section to the
+  authoritative review above. Never create or maintain a second current verdict
+  file for this design.
 - [ ] Require direct committed-byte equality, strict encoding, exact two-path
   scope/parent, no placeholder, no secret, and contradiction review.
 - [ ] Require `PASS` with no HIGH concern before preparing a live brief. `FAIL /
@@ -173,12 +176,19 @@ exit. No parent process-environment secret is permitted.
 
 - [ ] **Step 5: Enumerate plaintext-bearing references**
 
-Name the unmanaged BSTR, shortest-lived managed token string, Authorization
-header string/collection, zone-ID string, the two R5 environment entries, and
-all R5-local environment/header/response/result references. Minimize lifetimes,
-call `ZeroFreeBSTR`, dispose `SecureString`, clear every named reference, and
-prove child/owner exit. Evidence may claim only references cleared and owning
-processes exited, never managed-memory byte zeroization.
+Name `$key`, its managed `ConsoleKeyInfo.KeyChar`, `$keyChar`, every other
+derived character variable, and every additional input-host/console buffer in
+the final implementation, plus the unmanaged BSTR, shortest-lived managed token
+string, Authorization header string/collection, zone-ID string, the two R5
+environment entries, and all R5-local environment/header/response/result
+references. Each key object lives only for its current iteration; clear its
+named reference and derived character references in a per-iteration `finally`
+immediately after handling and again in the full script's one outer `finally`.
+Minimize all other lifetimes, call `ZeroFreeBSTR`, dispose `SecureString`, clear
+every named reference, and prove child/owner exit. The exact live-brief review
+must reject any unenumerated input-host buffer. Evidence may claim only
+references cleared and owning processes exited, never managed-memory byte
+zeroization.
 
 - [ ] **Step 6: Pin acceptance and two cleanup phases**
 

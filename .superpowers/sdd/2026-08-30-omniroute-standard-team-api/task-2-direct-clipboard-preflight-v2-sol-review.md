@@ -293,3 +293,79 @@ Cloudflare, OmniRoute, VM1205, proxy/proof/R5, Rulesets, evidence-worktree
 mutation, revocation, permission change, deletion, or routing action. Any hash,
 size, commit, binding, session, precondition, tool result, counter, or live-state
 mismatch stops before the next mutation and makes the result FAIL / NOT PROVEN.
+
+## Live result classification
+
+### Classification
+
+**NOT PROVEN / FAIL CLOSED.**
+
+The committed report at `e7c597509ee4a06a9e368769636dc254cd2d4fc4`
+faithfully records the approved candidate's terminal browser-uncertainty path.
+It does not meet the PASS branch, consumes the one-shot non-secret preflight
+gate, and cannot be retried. Credential-transfer and routing work remain
+blocked.
+
+No browser, clipboard, Node, PowerShell block, credential, network, or
+live-resource action was executed during this static evidence classification.
+
+### Evidence pins
+
+- Report: `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-direct-clipboard-preflight-v2-live-report.md`
+- Report commit: `e7c597509ee4a06a9e368769636dc254cd2d4fc4`
+- Report parent / independent PASS review commit:
+  `936a17ebcc2cc1cf725446e453629dce755b46cd`
+- Report SHA-256:
+  `C56FB7FBEC6349A7D384F6137D8FDB64276FE4AAB802FFF5D46EE4448AD47E3F`
+- Report size: `2600` bytes
+- Encoding shape: no BOM, zero CR bytes, one trailing LF
+- Approved brief SHA-256:
+  `A4693C150C9A4DD137D71BE3DE1C7A4BE297F5822A219C5D95F1E2CDD3612D57`
+- Commit scope: exactly the one live-report file
+- The report contains no concrete `OMNI-PREFLIGHT-` challenge value and sets
+  `authorizes_live_execution=false` exactly once.
+
+### Transcript-to-contract mapping
+
+- **Call 1 — MATCH.** Baseline clear/read counters are `1 / 1`, and the observed
+  baseline is `TRUE` empty before browser action.
+- **Call 2 — TERMINAL UNCERTAINTY / MATCH.** Result is
+  `BROWSER_UNCERTAIN`, safe error class is `Error`, and tab state is
+  `OPEN_MUTATION_UNCERTAIN`. Counters are exactly
+  `open/goto/focus/selectAll/copy/close = 1/0/0/0/0/0`. The fulfilled create
+  returned an exact retained handle; exact closure is `FALSE`; retained handle
+  is `TRUE`.
+- **Uncertainty routing — MATCH.** The `goto` promise rejected before its
+  fulfilled counter incremented. Under the approved brief, this forbids focus,
+  either key action, close, Call 3, and every later browser or clipboard
+  mutation. The transcript records all corresponding counters as zero.
+- **Call 3 — MATCH / NOT RUN.** It is recorded
+  `FORBIDDEN_NOT_RUN`; comparison reads, final clear calls, and final empty
+  reads are `0 / 0 / 0`.
+- **Retry/fallback — MATCH.** Retry count is `0`; no alternate tab, challenge,
+  fallback, or verdict relaxation is recorded.
+- **Clipboard conclusion — CONSERVATIVE / MATCH.** The initial baseline was
+  proven empty, but final current-clipboard state is `NOT_PROVEN`. The zero
+  fulfilled copy counter is not used to infer final cleanup or clipboard state.
+- **Secret/live-resource boundary — MATCH.** The report omits the fresh
+  challenge value and clipboard text. It records no credential, token,
+  authorization header, private identifier, Cloudflare, OmniRoute, VM1205,
+  proxy/proof/R5, Rulesets, permission, deletion, evidence-worktree,
+  revocation, or other live-resource action.
+
+### Consequence and authority boundary
+
+The transport preflight is **NOT PROVEN** and the no-retry authority is spent.
+The retained exact tab handle remains in the persistent binding, but its remote
+navigation/open state and closure are not proven; this classification
+authorizes no cleanup mutation. The current clipboard final state is also not
+proven.
+
+No credential may be created, copied, pasted, submitted, retained, or revoked,
+and no Cloudflare/OmniRoute/Hermes/DeepSeek or other routing action may proceed
+from this result. This classification authorizes no retry, replacement
+preflight, browser/tab cleanup, clipboard read/clear, credential, permission
+change, deletion, evidence-worktree mutation, or live-resource action. Further
+work requires a new reviewed authority path and the applicable separate
+action-time confirmation; this report itself has
+`authorizes_live_execution=false`.

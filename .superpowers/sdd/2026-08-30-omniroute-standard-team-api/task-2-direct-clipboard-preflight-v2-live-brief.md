@@ -38,8 +38,7 @@ times out outside the reviewed cell, or has an uncertain outcome rather than
 the exact result object, stop immediately with `NOT_PROVEN_TOOL_UNCERTAIN` and
 perform no later browser or clipboard mutation. That fail-closed state may
 leave only the non-secret challenge, an uncertain created tab, or the exact
-retained `globalThis.directPreflightV2RetainedTab`; it cannot be accepted or
-retried.
+retained `directPreflightV2RetainedTab`; it cannot be accepted or retried.
 
 ## Preconditions
 
@@ -76,11 +75,12 @@ Run this exact IIFE once in the already initialized persistent Node REPL. The
 IIFE prevents persistent-binding redeclaration. Its only output is one explicit
 `nodeRepl.write(...)` containing the fresh non-secret challenge, terminal
 label, safe error class, tab state, and counters. If tab creation fulfills, the
-actual tab object is assigned immediately to
-`globalThis.directPreflightV2RetainedTab` and stays there until exact close
-fulfills.
+actual tab object is assigned immediately to the one-shot top-level retained
+binding `directPreflightV2RetainedTab` and stays there until exact close
+fulfills. The binding is declared once and must never be redeclared or reused.
 
 ```javascript
+let directPreflightV2RetainedTab = null;
 await (async () => {
   const { randomBytes: directPreflightRandomBytes } = await import("node:crypto");
   const directPreflightChallenge = `OMNI-PREFLIGHT-${directPreflightRandomBytes(16).toString("hex").toUpperCase()}`;
@@ -91,11 +91,10 @@ await (async () => {
   let directPreflightErrorClass = "NONE";
   let directPreflightTabState = "NOT_ATTEMPTED";
   const directPreflightCounters = { open: 0, goto: 0, focus: 0, selectAll: 0, copy: 0, close: 0 };
-  globalThis.directPreflightV2RetainedTab = null;
   try {
     directPreflightTabState = "CREATE_UNCERTAIN";
     const directPreflightCreatedTab = await chrome.tabs.new();
-    globalThis.directPreflightV2RetainedTab = directPreflightCreatedTab;
+    directPreflightV2RetainedTab = directPreflightCreatedTab;
     directPreflightCounters.open++;
     directPreflightTabState = "OPEN";
     await directPreflightCreatedTab.goto(directPreflightDataUrl);
@@ -117,9 +116,9 @@ await (async () => {
   if (directPreflightResult === "COPY_SETTLED") {
     directPreflightTabState = "CLOSE_UNCERTAIN";
     try {
-      await globalThis.directPreflightV2RetainedTab.close();
+      await directPreflightV2RetainedTab.close();
       directPreflightCounters.close++;
-      globalThis.directPreflightV2RetainedTab = null;
+      directPreflightV2RetainedTab = null;
       directPreflightTabState = "CLOSED";
       directPreflightResult = "COPY_SETTLED_AND_CLOSED";
     } catch (directPreflightCloseError) {
@@ -134,7 +133,7 @@ await (async () => {
     errorClass: directPreflightErrorClass,
     tabState: directPreflightTabState,
     counters: directPreflightCounters,
-    exactTabClosed: directPreflightTabState === "CLOSED" && globalThis.directPreflightV2RetainedTab === null
+    exactTabClosed: directPreflightTabState === "CLOSED" && directPreflightV2RetainedTab === null
   });
 })();
 ```
@@ -166,7 +165,6 @@ Call 2 success object returns. Never emit `$observed`.
 ```powershell
 $ErrorActionPreference = 'Stop'
 $expected = '<EXPECTED_CHALLENGE>'
-if ($expected -cnotmatch '^OMNI-PREFLIGHT-[0-9A-F]{32}$') { throw 'EXPECTED_CHALLENGE_SHAPE_FAIL' }
 $comparisonReads = 0
 $comparison = $false
 $observedLength = -1
@@ -177,12 +175,18 @@ $finalEmptyReads = 0
 $postClearEmpty = $false
 $cleanupError = 'NONE'
 try {
-    $comparisonReads++
-    $observed = [string](Get-Clipboard -Raw)
-    $comparison = $observed -ceq $expected
-    $observedLength = $observed.Length
-} catch {
-    $comparisonError = $_.Exception.GetType().Name
+    if ($expected -cnotmatch '^OMNI-PREFLIGHT-[0-9A-F]{32}$') {
+        $comparisonError = 'EXPECTED_CHALLENGE_SHAPE_FAIL'
+    } else {
+        $comparisonReads++
+        try {
+            $observed = [string](Get-Clipboard -Raw)
+            $comparison = $observed -ceq $expected
+            $observedLength = $observed.Length
+        } catch {
+            $comparisonError = $_.Exception.GetType().Name
+        }
+    }
 } finally {
     $finalClearCalls++
     try {

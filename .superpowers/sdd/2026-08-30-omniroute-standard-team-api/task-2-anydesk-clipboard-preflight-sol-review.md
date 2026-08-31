@@ -498,3 +498,134 @@ non-secret preflight still requires a separate action-time authorization. This
 review authorizes no token, credential, Cloudflare, VM1205, OmniRoute,
 proxy/proof/R5, Rulesets, evidence mutation, revocation, permission change, or
 other live action.
+
+## Fix round 4 scoped re-review — host-rendezvous bridge amendment
+
+Reviewed exact head `e1af4b67d156e115aa451cb778a3a454d0a0df4f`
+against exact base/parent `571815925a5b48d7d1388a44e6f7bf8afe48a18e`.
+The commit changes exactly one path: the preflight live brief. The working file
+equals the exact committed blob.
+
+| Input | Direct-byte result |
+| --- | --- |
+| Revised brief | `87,225` bytes; SHA-256 `7DBC9154EEE21AEE42726340B91E170CC7DDA43EA70BE1DB922066422FA391A1`; blob `17bae8404a7cb3c11e296455278c5de28b27c554` |
+| Child script | unchanged `23,758` bytes; SHA-256 `16470D5E7F68773B259B49C7EC24D46B3A2D4B5238DCB71986990D6B73C5C367` |
+| Coordinator | unchanged `23,958` bytes; SHA-256 `A42E058813231AF53D6502A2FB3341641E32040E22DBC130E62C6453F3A871AE` |
+| Bridge runner | `19,375` bytes; SHA-256 `2EBD922B5156CFCE9E643E39DE3C5F7CB6987002E592D2F2A3CEF940B6872C77` |
+| Fix report | `6,690` bytes; SHA-256 `ECFB8D786DA13F4A23E0A09841D70930E2B577054F631FCD289BA5E175A9091C` |
+| Review package | `35,299` bytes; SHA-256 `96D0ED0DC6FA446D0008460603469CB6EE4354FE62832A40ED4E1982D88C24EB` |
+
+The brief is strict UTF-8 without BOM, LF-only, with exactly one trailing LF.
+Direct extraction finds exactly three PowerShell blocks and independently
+reproduces all three pinned block sizes/hashes. No script, helper, runner,
+coordinator, Node block, browser action, clipboard action, or preflight was
+compiled or executed in this review.
+
+### Scoped verdict
+
+**FAIL / REVISE BEFORE EXECUTION / NOT AUTHORIZED.** The PowerShell bridge's
+normal-path nonce and OPEN/COPY/CLOSE parser are coherent, but the amendment
+has one new HIGH and three new IMPORTANT execution-contract defects. It does not
+earn **PASS FOR ONE NON-SECRET PREFLIGHT EXECUTION ONLY**.
+
+### Verified portions
+
+The runner creates one fresh 16-byte CSPRNG nonce and derives its sole opaque
+PowerShell handle from that nonce (`brief:1415-1419`). It checks the working
+brief against the reviewed commit and all action-time block pins before spawn
+(`brief:1370-1413`). Its PowerShell line reader uses `Stopwatch`, one
+cancellable `ReadLineAsync`, and elapsed-at-or-beyond-deadline precedence before
+examining a completed line (`brief:1331-1368`). The normal success parser binds
+every request/response to the nonce and opaque handle, enforces OPEN then COPY
+then CLOSE, permits one accepted line at each state, requires exact six-line
+coordinator PASS/exit `0`/empty stderr, and gates PASS on all six counters being
+`1` (`brief:1505-1639`).
+
+The documented normal Chrome sequence uses the persistent `chrome` binding,
+one `tabs.new`, one data-URL navigation, one exact accessible-name locator and
+semantic click, one `Control+A`, one `Control+C`, and one retained-tab close
+(`brief:1746-1816`). Executable browser snapshot/screenshot/content extraction,
+title/URL lookup, clipboard API, coordinate, reload, alternate-tab, fallback,
+and retry calls remain absent. The prior child/coordinator fixes are unchanged.
+
+### R4-F1 — HIGH: Node deadlines do not cancel, settle, or give ties fail-closed precedence
+
+`bridgeWithinDeadline` is only `Promise.race(operation(), setTimeout(...))`
+(`brief:1725-1735`). A losing Chrome/Playwright promise continues running after
+the wrapper has returned an ABORT; there is no cancellation, no wait for the
+loser to settle, and no monotonic elapsed-time check after an operation wins.
+Thus a deadline tie can be accepted rather than rejected.
+
+The consequences are load-bearing. If `chrome.tabs.new()` resolves after its
+timer, assignment to `bridgeTab` never occurs and the late-created tab is
+unowned and cannot be closed (`brief:1753-1768`). A late focus, select, or
+`Control+C` can execute after COPY has returned ABORT and can repopulate the
+clipboard after the child reported final clear (`brief:1786-1796`). A late
+`goto` or `close` similarly leaves page state and exact closure unproven
+(`brief:1754-1766,1806-1815`). This contradicts the claimed terminal
+convergence at `brief:1821-1826` and the required atomic exact-tab ownership.
+
+Minimum correction: do not impose mutation deadlines with an uncancelled
+`Promise.race`. Use operations with native bounded cancellation/settlement, or
+retain and observe each actual operation promise so no response is emitted
+until it has settled and every created tab is captured. Use a monotonic clock
+and recheck elapsed time after settlement so elapsed-at-or-beyond-deadline wins
+every tie. On any timed-out copy action, prove the action cannot complete after
+cleanup; on any timed-out page creation/navigation/close, prove the exact tab
+closed or report its retained exact Node handle and stop without acceptance.
+
+### R4-F2 — IMPORTANT: OPEN failure can hide a retained exact tab
+
+Even apart from the uncancelled-race defect, the OPEN catch converts a failed
+or timed-out close into generic `BRIDGE_ABORT|<NONCE>|OPEN` while leaving
+`bridgeTab` non-null in `OPEN_ABORT_RETAINED` (`brief:1758-1768`). The nested
+`OpenExactPage` then throws without returning an opaque handle, so its
+coordinator never issues CLOSE. The protocol carries neither retained-tab
+status nor a later exact disposition request. This violates the existing
+atomic adapter rule and the prose promise to return ABORT only after exact
+created-tab closure has settled (`brief:681-696,1738-1743`).
+
+Minimum correction: OPEN may return ordinary ABORT only after absence/closure
+of every created tab is confirmed. If exact closure cannot be confirmed, emit
+a distinct fail-closed retained-tab terminal state bound to the nonce, preserve
+the actual Node `Tab`, report it for sole-owner disposition, and forbid bridge
+or preflight acceptance. Do not retry or open a replacement.
+
+### R4-F3 — IMPORTANT: bridge failure does not prove nested coordinator-process exit
+
+The runner starts a new coordinator process without start-attempt,
+start-confirmed, PID, or uncertain-spawn state (`brief:1497-1501`). Its normal
+path performs one bounded exit wait (`brief:1611-1616`), but every exceptional
+path merely closes stdin when convenient and disposes the process object
+(`brief:1640-1649`). Disposing a `Process` object does not terminate or prove
+exit of the OS process. A start exception, total-output timeout, failed pipe
+write, or exit timeout can therefore leave an unreported nested coordinator
+and its clipboard-owner child after the bridge itself exits.
+
+Minimum correction: retain and report start-attempt/confirmation/uncertainty,
+exact PID, stdin-close result, and process exit. On every failure, close stdin
+once and perform one bounded retained-handle exit wait; do not read output
+before confirmed exit. If spawn or exit remains uncertain, perform no retry or
+kill, emit the exact retained/unknown PID and residual state, and keep all
+acceptance false for owner disposition.
+
+### Additional protocol strictness
+
+The prose says every duplicate or unknown host input is rejected
+(`brief:1666-1691`), but after accepting CLOSE the runner never reads host stdin
+again (`brief:1582-1602,1611-1639`). A valid CLOSE response followed by a
+duplicate or unknown line can therefore still produce bridge PASS. Before any
+future PASS, either require bounded host-input EOF after the one CLOSE response
+and reject any trailing line, or narrow the claimed protocol and provide an
+equivalent host-enforced exact-one-write proof. This is an IMPORTANT parser
+contract mismatch because the six counters count consumed responses, not all
+supplied protocol lines.
+
+### Round-4 conclusion and authority boundary
+
+The exact bridge amendment is **FAIL / REVISE BEFORE EXECUTION**. No preflight,
+PowerShell bridge, Node/Chrome action, clipboard action, token, credential,
+Cloudflare, VM1205, OmniRoute, proxy/proof/R5, Rulesets, evidence mutation,
+revocation, permission change, or other live action is authorized. A corrected
+exact-byte bridge requires another fresh independent review and, even after
+PASS, a separate exact action-time authorization for one non-secret preflight.

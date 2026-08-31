@@ -71,3 +71,68 @@ action, retry, fallback, replacement preflight, credential, token, Cloudflare,
 OmniRoute, VM1205, proxy/proof/R5, Rulesets, permission change, deletion,
 evidence-worktree mutation, revocation, routing action, or other live-resource
 action. Any result record must set `authorizes_live_execution=false`.
+
+## Live disposition classification
+
+### Classification
+
+**NOT PROVEN / FAIL CLOSED.**
+
+The committed report at `545d514294df741f8064aa085571cbc8cca4d8f7`
+faithfully records the reviewed close-rejection branch. The exact retained tab
+close did not fulfill, closure cannot be inferred, the retained binding remains
+non-null, and the one-shot disposition authority is consumed without retry.
+
+No Node, browser, clipboard, PowerShell, credential, network, or live-resource
+action was executed during this static evidence classification.
+
+### Evidence pins
+
+- Report: `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-direct-preflight-retained-tab-disposition-report.md`
+- Report commit: `545d514294df741f8064aa085571cbc8cca4d8f7`
+- Report parent / independent PASS review commit:
+  `270de948ce65200372ffc18fca90989e8055cca8`
+- Report SHA-256:
+  `576304DCB3130C2696D7C8B8CAACC46A6FCE8C2553A1AC5FEE92205F37B2D8B3`
+- Report size: `1602` bytes
+- Encoding shape: no BOM, zero CR bytes, one trailing LF
+- Approved brief SHA-256:
+  `C4085BF1AD0A492295B622F1731CE4FA29B92A574205A5B43D2E16EFBB965C25`
+- Independent PASS review SHA-256:
+  `99D30025D22E320D2F0838CD63583E16D6D2CB91CD983CF38678210F66CDD631`
+- Commit scope: exactly the one disposition-report file
+- The report contains no challenge value and sets
+  `authorizes_live_execution=false` exactly once.
+
+### Transcript-to-contract mapping
+
+- `result=CLOSE_UNCERTAIN` — **MATCH.** The one close promise rejected, so the
+  reviewed contract forbids an exact-closure claim.
+- `errorClass=Error` — **MATCH.** Only the bounded exception class is recorded;
+  no message, tab object, URL, title, content, or other browser state is
+  emitted.
+- `closeCalls=1`, `closeFulfilled=0` — **MATCH.** Exactly one permitted call was
+  attempted and did not fulfill. The PASS requirement `1 / 1` is not met.
+- `retainedBindingNull=false` — **MATCH.** The rejected branch does not clear
+  the already-retained binding. Actual remote open/closed state remains
+  uncertain.
+- `retryCount=0` — **MATCH.** The spent close authority was not retried; there
+  was no alternate handle, discovery, reacquisition, query, or fallback.
+- Prohibited-action boundary — **MATCH.** The report records no tab lookup,
+  discovery, navigation, reload, keyboard, clipboard, credential, token,
+  Cloudflare, OmniRoute, VM1205, proxy/proof/R5, Rulesets, permission,
+  deletion, evidence-worktree, revocation, routing, or other live-resource
+  action.
+
+### Consequence and authority boundary
+
+The retained tab's actual remote state is **NOT PROVEN**. The exact close
+authority is consumed and may not be retried, and this classification
+authorizes no further tab query, lookup, close, cleanup, or replacement action.
+
+The earlier clipboard transport preflight also remains **NOT PROVEN**.
+Credential creation, copy, paste, submission, retention, or revocation remains
+blocked, as do Cloudflare/OmniRoute/Hermes/DeepSeek and all other routing
+actions. Further work requires a new reviewed authority path and each applicable
+separate action-time confirmation; the report itself has
+`authorizes_live_execution=false`.

@@ -1269,8 +1269,8 @@ authority.
 The exact bridge-runner bytes are the complete contents of the single fenced
 `powershell` block below, beginning with `param(` and ending with the LF after
 `exit $bridgeExitCode`; the fence and surrounding Markdown are excluded. The
-exact extracted byte size is `19,375` and its SHA-256 is
-`2EBD922B5156CFCE9E643E39DE3C5F7CB6987002E592D2F2A3CEF940B6872C77`.
+exact extracted byte size is `24,634` and its SHA-256 is
+`739E597C0BE39AE9A4CFBAE97F327F4FA7398160B13367ED37F47954EBBAF552`.
 The fresh independent review must reproduce both values. At action
 time the sole owner must provide all eight pins: reviewed brief commit and
 SHA-256, coordinator byte size and SHA-256, bridge-runner byte size and
@@ -1425,12 +1425,53 @@ $copyRequests = 0
 $copyResponses = 0
 $closeRequests = 0
 $closeResponses = 0
+$retainedTabSignals = 0
+$retainedTabState = 'NONE'
+$hostInputEofChecks = 0
+$hostInputTrailingLines = 0
+$hostInputEofConfirmed = $false
 $coordinatorLines = [Collections.Generic.List[string]]::new()
 $coordinatorProcess = $null
+$coordinatorStartAttempted = $false
+$coordinatorStartConfirmed = $false
+$coordinatorSpawnUncertain = $false
+$coordinatorPid = 'UNKNOWN'
+$coordinatorInputCloseAttempted = $false
+$coordinatorInputCloseResult = 'NOT_ATTEMPTED'
+$coordinatorExitWaitAttempted = $false
 $coordinatorExited = $false
 $coordinatorExitCode = $null
 $coordinatorStderr = $null
+$coordinatorResidualState = 'NOT_STARTED'
 $bridgeExitCode = 1
+
+function Close-CoordinatorInputOnce {
+    if ($script:coordinatorInputCloseAttempted) { return }
+    $script:coordinatorInputCloseAttempted = $true
+    try {
+        $script:coordinatorProcess.StandardInput.Close()
+        $script:coordinatorInputCloseResult = 'CLOSED'
+    } catch {
+        $script:coordinatorInputCloseResult = 'ERROR:' + $_.Exception.GetType().Name
+    }
+}
+
+function Wait-CoordinatorExitOnce {
+    if ($script:coordinatorExitWaitAttempted) { return }
+    $script:coordinatorExitWaitAttempted = $true
+    try {
+        $script:coordinatorExited = $script:coordinatorProcess.WaitForExit($coordinatorExitTimeoutMilliseconds)
+        if ($script:coordinatorExited) {
+            $script:coordinatorExitCode = $script:coordinatorProcess.ExitCode
+            $script:coordinatorResidualState = 'EXITED'
+        } else {
+            $script:coordinatorResidualState = 'RUNNING_PID:' + $script:coordinatorPid
+        }
+    } catch {
+        $script:coordinatorSpawnUncertain = $true
+        $script:coordinatorResidualState = 'EXIT_UNCERTAIN_PID:' + $script:coordinatorPid + ':' + $_.Exception.GetType().Name
+    }
+}
 
 $coordinatorBase64 = [Convert]::ToBase64String($coordinatorBytes)
 $commitBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($ReviewedBriefCommit))
@@ -1497,8 +1538,20 @@ foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCom
 try {
     $coordinatorProcess = [Diagnostics.Process]::new()
     $coordinatorProcess.StartInfo = $startInfo
-    if (-not $coordinatorProcess.Start()) { throw 'BRIDGE_COORDINATOR_START_FAIL' }
-    $stderrTask = $coordinatorProcess.StandardError.ReadToEndAsync()
+    $coordinatorStartAttempted = $true
+    try {
+        if (-not $coordinatorProcess.Start()) {
+            $coordinatorSpawnUncertain = $true
+            throw 'BRIDGE_COORDINATOR_START_FALSE'
+        }
+        $coordinatorPid = [string]$coordinatorProcess.Id
+        $coordinatorStartConfirmed = $true
+        $coordinatorResidualState = 'RUNNING_PID:' + $coordinatorPid
+    } catch {
+        $coordinatorSpawnUncertain = $true
+        try { $coordinatorPid = [string]$coordinatorProcess.Id } catch { $coordinatorPid = 'UNKNOWN' }
+        throw
+    }
     $coordinatorClock = [Diagnostics.Stopwatch]::StartNew()
     $coordinatorDeadline = [TimeSpan]::FromSeconds($coordinatorTimeoutSeconds)
 
@@ -1531,6 +1584,12 @@ try {
                 $openResponses++
                 if ($response -ceq ('BRIDGE_OPEN_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle)) {
                     $bridgeState = 'OPENED'
+                } elseif ($response -ceq ('BRIDGE_RETAINED_TAB|' + $bridgeNonce + '|' + $bridgeHandle + '|OPEN')) {
+                    $retainedTabSignals++
+                    $retainedTabState = 'OPEN_RETAINED_IN_NODE_BRIDGE_TAB'
+                    $bridgeProtocolError = $true
+                    $bridgeState = 'OPEN_RETAINED_TAB'
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|OPEN'
                 } else {
                     $bridgeProtocolError = $true
                     $bridgeState = 'OPEN_ABORTED'
@@ -1591,7 +1650,33 @@ try {
                 }
                 $closeResponses++
                 if ($response -ceq ('BRIDGE_CLOSE_RESPONSE|' + $bridgeNonce + '|' + $bridgeHandle + '|PASS')) {
-                    $bridgeState = 'CLOSED'
+                    $hostInputEofChecks++
+                    $eofClock = [Diagnostics.Stopwatch]::StartNew()
+                    $eofDeadline = [TimeSpan]::FromSeconds($bridgeResponseTimeoutSeconds)
+                    try {
+                        $trailingLine = Read-LineBeforeDeadline -Reader ([Console]::In) -Clock $eofClock -Deadline $eofDeadline -TimeoutCode 'BRIDGE_HOST_INPUT_EOF_TIMEOUT' -EofCode 'BRIDGE_HOST_INPUT_EOF_CONFIRMED'
+                        $hostInputTrailingLines++
+                        $bridgeProtocolError = $true
+                        $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|CLOSE'
+                        $bridgeState = 'HOST_INPUT_TRAILING_LINE'
+                    } catch {
+                        if ($_.Exception.Message -ceq 'BRIDGE_HOST_INPUT_EOF_CONFIRMED') {
+                            $hostInputEofConfirmed = $true
+                            $bridgeState = 'CLOSED'
+                        } else {
+                            $bridgeProtocolError = $true
+                            $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|CLOSE'
+                            $bridgeState = 'HOST_INPUT_EOF_FAIL'
+                        }
+                    } finally {
+                        $eofClock.Stop()
+                    }
+                } elseif ($response -ceq ('BRIDGE_RETAINED_TAB|' + $bridgeNonce + '|' + $bridgeHandle + '|CLOSE')) {
+                    $retainedTabSignals++
+                    $retainedTabState = 'CLOSE_RETAINED_IN_NODE_BRIDGE_TAB'
+                    $bridgeProtocolError = $true
+                    $bridgeState = 'CLOSE_RETAINED_TAB'
+                    $response = 'BRIDGE_ABORT|' + $bridgeNonce + '|CLOSE'
                 } else {
                     $bridgeProtocolError = $true
                     $bridgeState = 'CLOSE_ABORTED'
@@ -1609,11 +1694,10 @@ try {
     }
 
     $coordinatorClock.Stop()
-    $coordinatorProcess.StandardInput.Close()
-    $coordinatorExited = $coordinatorProcess.WaitForExit($coordinatorExitTimeoutMilliseconds)
+    Close-CoordinatorInputOnce
+    Wait-CoordinatorExitOnce
     if (-not $coordinatorExited) { throw 'BRIDGE_COORDINATOR_EXIT_TIMEOUT' }
-    $coordinatorExitCode = $coordinatorProcess.ExitCode
-    $coordinatorStderr = $stderrTask.GetAwaiter().GetResult()
+    $coordinatorStderr = $coordinatorProcess.StandardError.ReadToEnd()
 
     $expectedCoordinatorPass = @(
         'MACHINE_OUTPUT_VALID=PASS',
@@ -1629,10 +1713,14 @@ try {
     }
     $bridgeCountsPass = $openRequests -eq 1 -and $openResponses -eq 1 -and
         $copyRequests -eq 1 -and $copyResponses -eq 1 -and
-        $closeRequests -eq 1 -and $closeResponses -eq 1
+        $closeRequests -eq 1 -and $closeResponses -eq 1 -and
+        $retainedTabSignals -eq 0 -and $retainedTabState -ceq 'NONE' -and
+        $hostInputEofChecks -eq 1 -and $hostInputTrailingLines -eq 0 -and $hostInputEofConfirmed
     $bridgePass = $coordinatorPass -and $coordinatorExitCode -eq 0 -and
         $coordinatorStderr.Length -eq 0 -and $bridgeState -ceq 'CLOSED' -and
-        $bridgeCountsPass -and -not $bridgeProtocolError
+        $bridgeCountsPass -and -not $bridgeProtocolError -and $coordinatorStartConfirmed -and
+        -not $coordinatorSpawnUncertain -and $coordinatorExited -and
+        $coordinatorInputCloseResult -ceq 'CLOSED' -and $coordinatorResidualState -ceq 'EXITED'
 
     foreach ($coordinatorLine in $coordinatorLines) { $coordinatorLine }
     if ($bridgePass) { 'BRIDGE_PROTOCOL=PASS' } else { 'BRIDGE_PROTOCOL=FAIL' }
@@ -1642,10 +1730,12 @@ try {
     'BRIDGE_PROTOCOL=FAIL'
 } finally {
     if ($null -ne $coordinatorProcess) {
-        if (-not $coordinatorExited) {
-            try { $coordinatorProcess.StandardInput.Close() } catch {}
+        Close-CoordinatorInputOnce
+        Wait-CoordinatorExitOnce
+        if ($coordinatorExited -and $null -eq $coordinatorStderr) {
+            try { $coordinatorStderr = $coordinatorProcess.StandardError.ReadToEnd() } catch { $coordinatorStderr = 'READ_ERROR:' + $_.Exception.GetType().Name }
         }
-        try { $coordinatorProcess.Dispose() } catch {}
+        if ($coordinatorExited) { try { $coordinatorProcess.Dispose() } catch {} }
     }
     [Array]::Clear($childBytes, 0, $childBytes.Length)
     [Array]::Clear($coordinatorBytes, 0, $coordinatorBytes.Length)
@@ -1659,6 +1749,19 @@ try {
 "BRIDGE_COUNTER_COPY_RESPONSES=$copyResponses"
 "BRIDGE_COUNTER_CLOSE_REQUESTS=$closeRequests"
 "BRIDGE_COUNTER_CLOSE_RESPONSES=$closeResponses"
+"BRIDGE_COUNTER_RETAINED_TAB_SIGNALS=$retainedTabSignals"
+"BRIDGE_RETAINED_TAB_STATE=$retainedTabState"
+"BRIDGE_COUNTER_HOST_INPUT_EOF_CHECKS=$hostInputEofChecks"
+"BRIDGE_COUNTER_HOST_INPUT_TRAILING_LINES=$hostInputTrailingLines"
+"BRIDGE_HOST_INPUT_EOF_CONFIRMED=$hostInputEofConfirmed"
+"BRIDGE_COORDINATOR_START_ATTEMPTED=$coordinatorStartAttempted"
+"BRIDGE_COORDINATOR_START_CONFIRMED=$coordinatorStartConfirmed"
+"BRIDGE_COORDINATOR_SPAWN_UNCERTAIN=$coordinatorSpawnUncertain"
+"BRIDGE_COORDINATOR_PID=$coordinatorPid"
+"BRIDGE_COORDINATOR_STDIN_CLOSE=$coordinatorInputCloseResult"
+"BRIDGE_COORDINATOR_EXIT_WAIT_ATTEMPTED=$coordinatorExitWaitAttempted"
+"BRIDGE_COORDINATOR_EXITED=$coordinatorExited"
+"BRIDGE_COORDINATOR_RESIDUAL_STATE=$coordinatorResidualState"
 if ($bridgeExitCode -eq 0) { 'BRIDGE_ACCEPTANCE=PASS' } else { 'BRIDGE_ACCEPTANCE=FAIL' }
 exit $bridgeExitCode
 ```
@@ -1668,11 +1771,20 @@ request, uses a monotonic 45-second deadline, and gives timeout/tie precedence
 before inspecting a completed line. EOF, timeout, malformed, duplicate,
 unknown, or out-of-order input becomes one canonical `BRIDGE_ABORT` response
 to the waiting adapter and then follows the coordinator's existing
-`catch`/`finally`; there is no retry. Each request permits at most one host
-response line. The nested coordinator is extracted from the committed brief,
-passed to a new PowerShell 7 process as an in-memory encoded command, and never
-written to another file. That isolation lets its reviewed `exit` execute
-without terminating the parent bridge parser.
+`catch`/`finally`; there is no retry. After the exact CLOSE response, a fourth
+bounded read must observe host-input EOF. A line is trailing input and fails;
+timeout also fails. Thus PASS proves exactly three supplied response lines and
+one EOF, not merely three consumed prefixes.
+
+The nested coordinator is extracted from the committed brief, passed to one
+new PowerShell 7 process as an in-memory encoded command, and never written to
+another file. The runner records start-attempt, start-confirmed,
+spawn-uncertain, exact PID when available, stdin-close result, its sole bounded
+retained-handle exit wait, confirmed exit, and residual PID/state. Every
+failure closes stdin once and performs that one wait. It never kills or
+retries. Redirected stderr is consumed only after confirmed exit; an uncertain
+spawn or exit retains/reports the PID or literal `UNKNOWN`, leaves acceptance
+false, and does not dispose a still-running retained process handle.
 
 Exact success protocol:
 
@@ -1684,11 +1796,14 @@ Exact success protocol:
    The response must be exactly
    `BRIDGE_COPY_RESPONSE|<NONCE>|H-<NONCE>|COPY_DONE`.
 3. `COPIED` emits `BRIDGE_CLOSE_REQUEST|<NONCE>|H-<NONCE>`. The response
-   must be exactly `BRIDGE_CLOSE_RESPONSE|<NONCE>|H-<NONCE>|PASS`.
+   must be exactly `BRIDGE_CLOSE_RESPONSE|<NONCE>|H-<NONCE>|PASS`, followed by
+   bounded host-input EOF with no trailing line.
 4. `CLOSED` can produce `BRIDGE_ACCEPTANCE=PASS` only when coordinator
    acceptance is its exact ordered six-line PASS output, coordinator stderr is
-   empty, its exit is `0`, all six bridge counters are exactly `1`, and no
-   unknown, duplicate, malformed, or out-of-order message occurred.
+   empty, its exit is `0`, all six bridge counters and the EOF-check counter are
+   exactly `1`, trailing-line and retained-tab counters are `0`, process state
+   is confirmed exited/non-uncertain, and no unknown, duplicate, malformed, or
+   out-of-order message occurred.
 
 `H-<NONCE>` is the only PowerShell-visible handle. It is bound to the runtime
 CSPRNG nonce and has no browser meaning outside this one rendezvous. The actual
@@ -1701,16 +1816,20 @@ required by the Chrome-control skill. The owner starts the exact reviewed
 bridge runner in one live PTY with the eight fresh-review pins above. For each
 request, the owner reads exactly one complete request line from that PTY,
 performs only the corresponding Node block below, and writes the block's one
-exact returned response line plus LF through the same PTY. Every Node call has
-a 12-second deadline, below both the 45-second bridge-response deadline and the
-child's 120-second control deadline.
+exact returned response line plus LF through the same PTY. Each Node operation
+is retained and awaited through settlement. Only after settlement does a
+monotonic elapsed check classify elapsed-at-or-beyond 12 seconds as timeout;
+there is no racing timer, abandoned mutation promise, or response emitted
+while a mutation can still settle later.
 
 The execution order is fixed: encode the exact extracted bridge-runner block
 plus its literal eight-pin invocation in memory; start it once as
 `pwsh -NoLogo -NoProfile -NonInteractive -EncodedCommand <REVIEWED_BASE64>` in
 one live PTY; initialize the Node state once; service OPEN, then COPY, then
-CLOSE from that PTY; wait for bridge exit; and accept only its exact parser
-output. `<REVIEWED_BASE64>` is produced from the fresh reviewed runner bytes
+CLOSE from that PTY; signal EOF on that PTY's input immediately after the one
+CLOSE response line; wait for bridge exit; and accept only its exact parser
+output. The EOF signal contains no line data and is sent exactly once; any
+additional host line fails. `<REVIEWED_BASE64>` is produced from the fresh reviewed runner bytes
 and action-time pins, never from an unreviewed copy. Neither the bridge runner
 nor the extracted coordinator is written to a new file.
 
@@ -1722,25 +1841,36 @@ let bridgeNonce = null;
 let bridgeHandle = null;
 let bridgeState = 'IDLE';
 const bridgeNodeDeadlineMs = 12000;
-const bridgeWithinDeadline = async (operation, code) => {
-  let timer;
+const bridgeObserveOperation = async (operation, timeoutCode) => {
+  const startedAt = performance.now();
+  let value;
+  let operationError = null;
   try {
-    return await Promise.race([
-      operation(),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(code)), bridgeNodeDeadlineMs); }),
-    ]);
-  } finally {
-    clearTimeout(timer);
+    value = await Promise.resolve().then(operation);
+  } catch (error) {
+    operationError = error;
   }
+  const elapsedMs = performance.now() - startedAt;
+  return Object.freeze({ value, operationError, elapsedMs, deadlineReached: elapsedMs >= bridgeNodeDeadlineMs, timeoutCode });
+};
+const bridgeRequireTimelySuccess = (result) => {
+  if (result.deadlineReached) throw new Error(result.timeoutCode);
+  if (result.operationError !== null) throw result.operationError;
+  return result.value;
 };
 ```
 
 For the single open request, substitute the two exact observed request fields
 as JSON string literals. Decode only the supplied non-secret data URL. There
-is exactly one `chrome.tabs.new()` and one `goto(dataUrl)`. If either operation
-fails, close the exact created tab once when it exists, retain no replacement,
-and return exact `BRIDGE_ABORT|<NONCE>|OPEN` only after that close attempt has
-settled; there is no alternate tab or retry.
+is exactly one `chrome.tabs.new()` and one `goto(dataUrl)`. The `tabs.new`
+result is captured before its elapsed-time verdict, so even a late-created tab
+is owned. If either operation fails, close the exact created tab once when it
+exists and retain no replacement. Ordinary `BRIDGE_ABORT|<NONCE>|OPEN` is
+allowed only after no tab was created or exact closure settled successfully.
+If closure fails, the actual `Tab` remains in `bridgeTab`, state becomes
+`OPEN_ABORT_RETAINED`, and the sole response is the distinct nonce/handle-bound
+`BRIDGE_RETAINED_TAB|<NONCE>|H-<NONCE>|OPEN`; every acceptance stays false for
+sole-owner disposition. There is no alternate tab or retry.
 
 ```javascript
 bridgeNonce = <OPEN_NONCE_JSON>;
@@ -1751,21 +1881,28 @@ try {
   const bridgeDataUrl = Buffer.from(bridgeDataUrlBase64, 'base64url').toString('utf8');
   if (!bridgeDataUrl.startsWith('data:text/html;charset=utf-8,')) throw new Error('OPEN_DATA_URL_REJECTED');
   bridgeState = 'OPENING';
-  bridgeTab = await bridgeWithinDeadline(() => chrome.tabs.new(), 'OPEN_NEW_TIMEOUT');
-  await bridgeWithinDeadline(() => bridgeTab.goto(bridgeDataUrl), 'OPEN_GOTO_TIMEOUT');
+  const bridgeNewResult = await bridgeObserveOperation(() => chrome.tabs.new(), 'OPEN_NEW_TIMEOUT');
+  if (bridgeNewResult.operationError === null && bridgeNewResult.value !== null && bridgeNewResult.value !== undefined) bridgeTab = bridgeNewResult.value;
+  bridgeRequireTimelySuccess(bridgeNewResult);
+  if (bridgeTab === null) throw new Error('OPEN_NEW_NO_TAB');
+  const bridgeGotoResult = await bridgeObserveOperation(() => bridgeTab.goto(bridgeDataUrl), 'OPEN_GOTO_TIMEOUT');
+  bridgeRequireTimelySuccess(bridgeGotoResult);
   bridgeState = 'OPENED';
   `BRIDGE_OPEN_RESPONSE|${bridgeNonce}|${bridgeHandle}`;
 } catch (error) {
   bridgeState = 'OPEN_ABORTED';
   if (bridgeTab !== null) {
-    try {
-      await bridgeWithinDeadline(() => bridgeTab.close(), 'OPEN_CLOSE_TIMEOUT');
+    const bridgeOpenCloseResult = await bridgeObserveOperation(() => bridgeTab.close(), 'OPEN_CLOSE_TIMEOUT');
+    if (bridgeOpenCloseResult.operationError === null) {
       bridgeTab = null;
-    } catch (closeError) {
+      bridgeState = 'OPEN_ABORTED_CLOSED';
+    } else {
       bridgeState = 'OPEN_ABORT_RETAINED';
     }
   }
-  `BRIDGE_ABORT|${bridgeNonce}|OPEN`;
+  bridgeState === 'OPEN_ABORT_RETAINED'
+    ? `BRIDGE_RETAINED_TAB|${bridgeNonce}|${bridgeHandle}|OPEN`
+    : `BRIDGE_ABORT|${bridgeNonce}|OPEN`;
 }
 ```
 
@@ -1773,8 +1910,10 @@ For the single copy request, substitute its exact nonce and opaque-handle
 fields as JSON string literals and require equality with the retained values.
 The accessible-name field must decode to the one literal below. Focus is one
 semantic-locator click, never coordinates. Perform one `Control+A` and one
-`Control+C`. On any failure, keep the retained tab, return exact
-`BRIDGE_ABORT|<NONCE>|COPY`, and wait for the coordinator's later close request.
+`Control+C`. Each operation settles before its elapsed deadline verdict or any
+response, so no focus/select/copy promise can complete after cleanup. On any
+failure, keep the retained tab, return exact `BRIDGE_ABORT|<NONCE>|COPY`, and
+wait for the coordinator's later close request.
 
 ```javascript
 const copyNonce = <COPY_NONCE_JSON>;
@@ -1785,9 +1924,12 @@ try {
   if (bridgeState !== 'OPENED' || copyNonce !== bridgeNonce || copyHandle !== bridgeHandle || copyAccessibleName !== 'OmniRoute transport preflight challenge') throw new Error('COPY_REQUEST_REJECTED');
   bridgeState = 'COPYING';
   const challengeField = bridgeTab.playwright.getByLabel('OmniRoute transport preflight challenge',{exact:true});
-  await bridgeWithinDeadline(() => challengeField.click(), 'COPY_FOCUS_TIMEOUT');
-  await bridgeWithinDeadline(() => challengeField.press('Control+A'), 'COPY_SELECT_TIMEOUT');
-  await bridgeWithinDeadline(() => challengeField.press('Control+C'), 'COPY_COPY_TIMEOUT');
+  const bridgeFocusResult = await bridgeObserveOperation(() => challengeField.click(), 'COPY_FOCUS_TIMEOUT');
+  bridgeRequireTimelySuccess(bridgeFocusResult);
+  const bridgeSelectResult = await bridgeObserveOperation(() => challengeField.press('Control+A'), 'COPY_SELECT_TIMEOUT');
+  bridgeRequireTimelySuccess(bridgeSelectResult);
+  const bridgeCopyResult = await bridgeObserveOperation(() => challengeField.press('Control+C'), 'COPY_COPY_TIMEOUT');
+  bridgeRequireTimelySuccess(bridgeCopyResult);
   bridgeState = 'COPIED';
   `BRIDGE_COPY_RESPONSE|${bridgeNonce}|${bridgeHandle}|COPY_DONE`;
 } catch (error) {
@@ -1798,7 +1940,11 @@ try {
 
 For the single close request, substitute its exact fields as JSON string
 literals. It is valid after copy success or copy abort only, and it closes only
-the retained tab with exactly one `tab.close()`. Only exact `PASS` is accepted.
+the retained tab with exactly one `tab.close()`. A resolved late close is
+confirmed closed but returns ordinary ABORT because the deadline wins. A
+failed close preserves `bridgeTab` and returns the distinct nonce-bound
+`BRIDGE_RETAINED_TAB|<NONCE>|H-<NONCE>|CLOSE`. Only exact timely `PASS` plus
+subsequent host-input EOF is accepted.
 
 ```javascript
 const closeNonce = <CLOSE_NONCE_JSON>;
@@ -1806,24 +1952,38 @@ const closeHandle = <CLOSE_HANDLE_JSON>;
 try {
   if (!['COPIED', 'COPY_ABORTED'].includes(bridgeState) || closeNonce !== bridgeNonce || closeHandle !== bridgeHandle || bridgeTab === null) throw new Error('CLOSE_REQUEST_REJECTED');
   bridgeState = 'CLOSING';
-  await bridgeWithinDeadline(() => bridgeTab.close(), 'CLOSE_TIMEOUT');
-  bridgeTab = null;
-  bridgeState = 'CLOSED';
-  `BRIDGE_CLOSE_RESPONSE|${bridgeNonce}|${bridgeHandle}|PASS`;
+  const bridgeCloseResult = await bridgeObserveOperation(() => bridgeTab.close(), 'CLOSE_TIMEOUT');
+  if (bridgeCloseResult.operationError === null) {
+    bridgeTab = null;
+    if (bridgeCloseResult.deadlineReached) {
+      bridgeState = 'CLOSED_LATE_ABORTED';
+      `BRIDGE_ABORT|${bridgeNonce}|CLOSE`;
+    } else {
+      bridgeState = 'CLOSED';
+      `BRIDGE_CLOSE_RESPONSE|${bridgeNonce}|${bridgeHandle}|PASS`;
+    }
+  } else {
+    bridgeState = 'CLOSE_ABORT_RETAINED';
+    `BRIDGE_RETAINED_TAB|${bridgeNonce}|${bridgeHandle}|CLOSE`;
+  }
 } catch (error) {
-  bridgeState = 'CLOSE_ABORTED';
-  `BRIDGE_ABORT|${bridgeNonce}|CLOSE`;
+  bridgeState = bridgeTab === null ? 'CLOSE_ABORTED_NO_TAB' : 'CLOSE_ABORT_RETAINED';
+  bridgeTab === null
+    ? `BRIDGE_ABORT|${bridgeNonce}|CLOSE`
+    : `BRIDGE_RETAINED_TAB|${bridgeNonce}|${bridgeHandle}|CLOSE`;
 }
 ```
 
 The host performs no DOM snapshot, screenshot, content extraction, title or
 URL lookup, browser clipboard API call, coordinate action, reload, alternate
 tab, fallback, or retry. On open failure it attempts closure of the exact
-created tab before responding ABORT. On copy failure it responds ABORT without
-closing, then closes only the retained tab when the coordinator requests it.
-Any Node deadline, ABORT, EOF, invalid response, or tool error is terminal and
-converges through the bridge and coordinator cleanup states; the owner does
-not improvise another response or action.
+created tab before ordinary ABORT; unconfirmed closure emits retained-tab
+terminal state instead. On copy failure it responds ABORT only after the
+mutation operation settled, then closes only the retained tab when the
+coordinator requests it. Any Node deadline, ABORT, EOF, invalid response, or
+tool error is terminal. A retained-tab or residual-process state is reported
+exactly and never described as converged cleanup; the owner does not improvise
+another response or action.
 
 ## Structural counters and non-overlap
 
@@ -1834,6 +1994,8 @@ not improvise another response or action.
 | local pages / bridge handles | `1 / 1` | separately reviewed later page only |
 | bridge open/copy/close requests | `1 / 1 / 1` on PASS | separately counted |
 | bridge open/copy/close responses | `1 / 1 / 1` on PASS | separately counted |
+| host-input EOF checks / trailing lines | `1 / 0` on PASS | separately counted |
+| retained-tab signals / process kills | `0 / 0` on PASS | `0 / 0` |
 | transfer attempts / child control lines | `1 / 0..1` | separately counted |
 | semantic focuses / `Control+A` / `Control+C` | `1 / 1 / 1` | separately counted |
 | baseline / comparison / post-clear reads | `1 / 0..1 / 1` | not shared |
@@ -1876,11 +2038,13 @@ No evidence file is read or mutated under this brief-preparation authority.
 
 ## Independent-review stop
 
-Stop after committing this one ignored brief and writing its ignored fix-round-4
+Stop after committing this one ignored brief and writing its ignored fix-round-5
 report. A fresh independent Sol High reviewer must verify the direct committed
 bytes; exact child, coordinator, and bridge-runner extraction; strict encoding;
 single committed-path scope; no unresolved marker or secret; static syntax and
-structure; both bounded async-read tie rules; exact bridge state/counter parser;
+structure; both bounded async-read tie rules; settled Node-operation deadline
+precedence; retained-tab terminal state; process-start/exit residual reporting;
+exact host-input EOF and bridge state/counter parser;
 cleanup/deletion guards; prohibited-action scan; and every authority boundary
 above. `FAIL / REVISE` authorizes nothing. Even a future PASS authorizes only a
 later explicit preflight action-time decision.

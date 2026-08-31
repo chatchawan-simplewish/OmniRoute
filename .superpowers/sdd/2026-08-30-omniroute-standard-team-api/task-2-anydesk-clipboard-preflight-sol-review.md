@@ -629,3 +629,89 @@ Cloudflare, VM1205, OmniRoute, proxy/proof/R5, Rulesets, evidence mutation,
 revocation, permission change, or other live action is authorized. A corrected
 exact-byte bridge requires another fresh independent review and, even after
 PASS, a separate exact action-time authorization for one non-secret preflight.
+
+## Fix round 5 final scoped re-review
+
+Reviewed exact head `1e0beb0b39fd054c178d6508e1baf65b092ace00`
+against exact base/parent `6ed6c224591e36efe0f2639910decdc415dea0f0`.
+The commit changes exactly one path: the preflight live brief. The working file
+equals the committed blob.
+
+| Input | Direct-byte result |
+| --- | --- |
+| Revised brief | `96,444` bytes; SHA-256 `E649220FA6FF3FA06C079A8BFEF68EEA16B50C6F344C2FFD93691C71DFDB2766`; blob `cbe6ab1b918515831cc2349480953541d8c29fea` |
+| Child script | unchanged `23,758` bytes; SHA-256 `16470D5E7F68773B259B49C7EC24D46B3A2D4B5238DCB71986990D6B73C5C367` |
+| Coordinator | unchanged `23,958` bytes; SHA-256 `A42E058813231AF53D6502A2FB3341641E32040E22DBC130E62C6453F3A871AE` |
+| Bridge runner | `24,634` bytes; SHA-256 `739E597C0BE39AE9A4CFBAE97F327F4FA7398160B13367ED37F47954EBBAF552` |
+| Fix report | `3,128` bytes; SHA-256 `683E0C2201A9B76A47C7543D346529A0562664D10715384753B89AD9A2BBBD49` |
+| Review package | `33,261` bytes; SHA-256 `905B030AAC9C3D4B0165EC283CC2F9BE1C939E133C461B51DED67E3284DE8FA9` |
+
+The brief is strict UTF-8 without BOM, LF-only, with exactly one trailing LF.
+Direct extraction finds exactly three PowerShell blocks and independently
+reproduces every pinned block size/hash. No embedded PowerShell, Node/browser,
+clipboard, process, or preflight code was executed.
+
+### Final scoped verdict
+
+**FAIL / NOT AUTHORIZED.** One load-bearing HIGH defect from round 4 remains.
+Therefore the exact amendment does not earn **PASS FOR ONE NON-SECRET
+PREFLIGHT EXECUTION ONLY**. No additional new Critical, HIGH, or IMPORTANT
+defect was found in the round-5 diff.
+
+### Round-4 finding disposition
+
+- **R4-F1 — NOT ADDRESSED.** The local JavaScript `Promise.race` was removed,
+  but the independent bridge-response deadline still races the same browser
+  mutation and can initiate cleanup before that mutation settles.
+- **R4-F2 — ADDRESSED when a Node block returns.** Late tab creation is captured
+  before its elapsed verdict; failed OPEN/CLOSE disposition retains the actual
+  `bridgeTab` and returns a nonce/opaque-handle-bound retained-tab terminal line
+  that forces acceptance false (`brief:1584-1595,1674-1683,1863-1906,1941-1974`).
+- **R4-F3 — ADDRESSED.** The runner records start attempt/confirmation,
+  uncertainty, PID, one stdin close, one bounded exit wait, confirmed exit, and
+  residual state; every post-process failure reaches the same helpers, no kill
+  or retry exists, and redirected stderr is read only after confirmed exit
+  (`brief:1435-1474,1538-1554,1696-1700,1719-1739,1757-1764`).
+- **R4-F4 — ADDRESSED.** Exact CLOSE success performs one bounded fourth read,
+  accepts only EOF, rejects a trailing line or timeout, and includes EOF and
+  trailing counters in PASS (`brief:1651-1673,1714-1723,1774-1777,1798-1806`).
+
+Static inspection also confirms one runtime 16-byte CSPRNG nonce, no retry, no
+process kill, and no executable browser clipboard, DOM snapshot/content,
+screenshot, coordinate, reload, alternate-tab, or fallback API. The prior
+child/coordinator fixes and hashes remain unchanged.
+
+### R5-F1 — HIGH: the outer 45-second rendezvous can still abandon a live browser mutation
+
+`bridgeObserveOperation` awaits an operation without any cancellation or
+native upper bound and computes elapsed time only after it settles
+(`brief:1844-1859`). In parallel, the PowerShell runner gives each host response
+only 45 seconds (`brief:1377,1574-1583,1611-1620,1641-1650`). When that outer
+deadline expires, it synthesizes `BRIDGE_ABORT` and sends it to the nested
+coordinator even though the sole-owner Node call can still be awaiting the
+browser mutation.
+
+This preserves the exact round-4 hazard across a different boundary. A
+`Control+C` that settles after 45 seconds can run after the coordinator has
+sent ABORT and the child has performed its final clipboard clear
+(`brief:1614-1631,1923-1938`). A late `tabs.new`, navigation, or close can settle
+after the bridge has already failed without ever delivering the retained-tab
+terminal signal (`brief:1577-1598,1880-1905,1952-1974`). The fact that the Node
+block itself emits no response before settlement (`brief:1816-1823`) does not
+prevent the independent bridge process from timing out and advancing cleanup.
+Thus mutation settlement, exact tab ownership, final clipboard emptiness, and
+retained-tab reporting are not guaranteed on every terminal path.
+
+Closing this finding would require browser mutations with a native,
+reviewed cancellation/settlement guarantee that completes before the outer
+rendezvous deadline, or a protocol that cannot advance coordinator/clipboard
+cleanup while the host reports an operation outstanding. Merely awaiting an
+unbounded promise while another process times out is not fail closed.
+
+### Final authority boundary
+
+Round 5 is final and remains **FAIL / NOT AUTHORIZED**. No preflight, bridge,
+Node/Chrome action, clipboard action, token, credential, Cloudflare, VM1205,
+OmniRoute, proxy/proof/R5, Rulesets, evidence mutation, revocation, permission
+change, or other live action is authorized. The earlier child/coordinator PASS
+does not authorize this failed bridge path or any action-time gate consumption.

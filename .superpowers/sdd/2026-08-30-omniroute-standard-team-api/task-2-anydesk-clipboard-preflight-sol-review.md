@@ -430,3 +430,71 @@ browser, clipboard, token, credential, Cloudflare, VM1205, OmniRoute,
 proxy/proof/R5, Rulesets, evidence mutation, revocation, deletion, permission
 change, or other live action. Any later corrected PASS would still require a
 separate exact action-time authorization for one non-secret preflight only.
+
+## Fix round 3 scoped re-review
+
+Reviewed fixed commit:
+`49bb3ab533b91b98c1a3cb70a7c20cb626093928` with exact parent
+`b72a70ab7c9d2c36ac2e91ac30549dcc24d50a2b` and exactly one changed path: the
+preflight brief. The working brief equals its exact committed blob.
+
+| Input | Direct-byte result |
+| --- | --- |
+| Revised brief | `58,331` bytes; SHA-256 `514320C3D80BA7529847A3634BAF0837BE71C325DE80016A78EE6293D239F4B6`; blob `13df28dfeeb3b152222ba99adc2383d7eeb5db84` |
+| Revised child script | `23,758` bytes; SHA-256 `16470D5E7F68773B259B49C7EC24D46B3A2D4B5238DCB71986990D6B73C5C367` |
+| Revised coordinator | `23,958` bytes; SHA-256 `A42E058813231AF53D6502A2FB3341641E32040E22DBC130E62C6453F3A871AE` |
+| Fix report | SHA-256 `FD6303A4B3785257E858FAEF9F2FE519B3954FC1D58E60D7213C612F2215AAD6` |
+| Fix diff package | SHA-256 `E7A753A6F1138F339B06E569BE4BB0CD1E176AC57D4DF006C94961142FCD3B1D` |
+
+The fixed brief is strict UTF-8 without BOM, LF-only, and has exactly one
+trailing LF. Direct-byte extraction yields exactly two fenced PowerShell
+blocks and independently reproduces the pinned child/coordinator sizes and
+hashes above. This review did not compile or run any script, helper,
+coordinator, browser adapter, clipboard operation, process, or deletion.
+
+### Scoped verdict
+
+**PASS FOR ONE NON-SECRET PREFLIGHT EXECUTION ONLY.** The sole HIGH F5 finding
+is **ADDRESSED**. The narrow fix diff introduces no new Critical, HIGH, or
+IMPORTANT issue, and the prior F1-F5 corrections remain intact.
+
+### F5 — ADDRESSED
+
+Atomic `CREATE_NEW` now returns a write-capable creation handle whose share mode
+is exactly `ShareRead`, excluding every concurrent writer and delete/rename
+handle while the reviewed bytes are written, flushed, identified, sized, and
+hashed (`brief:246-258,887-895`). After that handle closes, the coordinator
+opens a guard whose share mode is also exactly `ShareRead` and validates the
+recorded identity, byte size, and SHA-256 through that guard before the sole
+spawn (`brief:274-285,897-900,950-968`). A writer retained across the handoff
+would make guard acquisition fail; a mutation or substitution completed in the
+transition is rejected by the post-acquisition identity/size/hash validation.
+
+The guard remains retained while `pwsh -File` loads the exact script and until
+the coordinator has received and validated exact `OWNER_READY=PASS`
+(`brief:919-927,970-986`). Before emitting that label, the child opens its exact
+ordinary script object, verifies identity/size/hash, and retains the handle
+(`brief:453-488`). That lifetime handle shares `ShareRead | ShareDelete` and
+never `ShareWrite` (`brief:260-271`), so when the coordinator releases its
+guard, no write window opens. The delete-capable child and coordinator handles
+and the child's `ReOpenFile` handle likewise share read plus delete without
+write (`brief:288-312`). The child's final identity/hash verification and
+`SetFileInformationByHandle` disposition remain on the retained object
+(`brief:612-646`). Thus unreviewed script bytes cannot be introduced between
+pre-spawn validation, PowerShell load, child ownership, and final disposition.
+
+The diff changes only these file share modes, the exact script pins, and the
+corresponding explanatory prose. It preserves the prior fresh challenge,
+deadline-tie cancellation, bounded retained-process exit/output handling,
+single coordinator resource state machine, ordered terminal parser and
+counters, atomic no-overwrite creation, identity/reparse guards, handle-based
+file/root disposition, no-retry rule, and fail-closed authority boundaries.
+
+### Fix-round-3 conclusion and authority boundary
+
+This is a static contract PASS for the exact brief, child, and coordinator
+bytes above. It does not itself authorize or perform the preflight. One exact
+non-secret preflight still requires a separate action-time authorization. This
+review authorizes no token, credential, Cloudflare, VM1205, OmniRoute,
+proxy/proof/R5, Rulesets, evidence mutation, revocation, permission change, or
+other live action.

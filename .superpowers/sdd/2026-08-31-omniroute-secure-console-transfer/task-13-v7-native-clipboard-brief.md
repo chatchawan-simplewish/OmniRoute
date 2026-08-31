@@ -5,8 +5,8 @@ Status: fresh static candidate. `authorizes_live_execution=false`.
 This is a new one-shot non-secret native clipboard preflight, not a retry,
 continuation, fallback, or override of v6 or any consumed gate. It preserves
 the corrected v6 state machine and changes only the bounded comparison child's
-executable from the nonexistent PowerShell 7 path to the verified installed
-Windows PowerShell executable.
+executable from the incompatible Windows PowerShell path to the verified
+installed bundled PowerShell executable.
 
 ## Pins, executable, API, and report path
 
@@ -21,11 +21,10 @@ Windows PowerShell executable.
 - Task 12 PASS classification commit:
   `ce26c909a259b17ce02768b813d3563c872c580e`;
 - installed child executable:
-  `C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`;
-- child executable bytes / SHA-256: `495616` /
-  `8BB6FA8C283B4D92120B1EF249A9B311B0F804D4CABBE9981159976C8BE76A5E`;
-- child file version / product version:
-  `10.0.26100.8972 (WinBuild.160101.0800)` / `10.0.26100.8972`;
+  `C:/Users/chatc/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/powershell/pwsh.exe`;
+- child executable bytes / SHA-256: `301368` /
+  `DB6DD81183FE57D22E03B911EC9A30A2FD7C40542E97743615355A6FB44F458F`;
+- child file version: `7.6.4.500`;
 - installed browser module: `149210` bytes / SHA-256
   `C52BA09202F0E82CAA6F6D2A6463A8635C1B1316567975D9B91C1A05FB5AF501`;
 - installed browser API: `58477` bytes / SHA-256
@@ -44,8 +43,35 @@ connected `residualV5Chrome` binding. Old v3/v5 listener/process residuals
 remain `NOT PROVEN` and untouched.
 
 Action-time pins must re-prove the exact child path exists as a regular file and
-matches the pinned bytes, SHA-256, file version, and product version before
-Call 1. Drift or ambiguity stops without executing any call.
+matches the pinned bytes, SHA-256, and file version before Call 1. Drift or
+ambiguity stops without executing any call.
+
+## Exact inert child compatibility evidence
+
+The exact pinned executable was statically probed through the same child launch
+shape used below: `-NoLogo -NoProfile -NonInteractive -EncodedCommand`,
+`shell:false`, `windowsHide:true`, UTF-8 capture, 30000 ms timeout, 16384-byte
+buffer, and an environment containing only `SystemRoot=C:\Windows` and
+`WINDIR=C:\Windows`. The inert encoded command was exactly:
+
+```powershell
+$ErrorActionPreference = 'Stop'; 'V7_CHILD_COMPAT=PASS'; exit 0
+```
+
+It performs no clipboard, browser, listener, process-management, credential,
+or routing action. Observed compatibility tuple:
+
+```text
+status=0
+signal=null
+error=null
+stdoutLines=1
+stdoutExact=V7_CHILD_COMPAT=PASS
+stderrLength=0
+```
+
+Independent review must reproduce this exact tuple. Any mismatch stops and
+cannot be handled by ignoring stderr, changing schema, or relaxing the verdict.
 
 The future report path is
 `.superpowers/sdd/2026-08-31-omniroute-secure-console-transfer/task-13-v7-native-clipboard-live-report.md`.
@@ -283,7 +309,7 @@ if($pass){exit 0}; exit 2`;
   result.childStartAttempted = 1;
   let child;
   try {
-    child = spawnSync("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], {
+    child = spawnSync("C:\\Users\\chatc\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\powershell\\pwsh.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], {
       shell: false, windowsHide: true, encoding: "utf8", input: `${nativeClipboardPreflightV7ExpectedChallenge}\n`, timeout: 30000, killSignal: "SIGKILL", maxBuffer: 16384,
       env: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" }
     });
@@ -338,7 +364,7 @@ success clears that binding.
 ## Static and acceptance boundary
 
 Review must prove UTF-8/LF bytes, Call 1 PowerShell parsing, and embedded child
-syntax through the exact pinned Windows PowerShell executable's parser without
+syntax through the exact pinned bundled PowerShell executable's parser without
 evaluating the child. It must prove non-evaluating JavaScript syntax, fresh v7
 bindings, lexical-only Call 2 challenge until exact browser
 success, session-name uncertainty tracking, eligibility consumption before the

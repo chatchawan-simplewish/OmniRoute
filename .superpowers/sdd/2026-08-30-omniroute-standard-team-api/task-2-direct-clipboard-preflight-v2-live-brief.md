@@ -28,16 +28,18 @@ user disabled AnyDesk clipboard sync.
 There are exactly three serial host calls. Call 2 is one Node REPL cell. Every
 browser mutation is directly awaited; the cell has no `Promise.race`, timer,
 background task, helper process, stdin/stdout bridge, or independent cleanup.
-Its `finally` starts only after the active browser promise settles. Call 3 may
-start only after Call 2 returns its exact result object, which proves that the
-cell and its `finally` completed.
+A rejected browser-client promise is always classified as remote-state
+uncertainty. It causes no later browser mutation and forbids Call 3. Call 3 may
+start only after all six browser calls fulfill and the cell explicitly emits
+the exact success object.
 
 Do not add an outer mutation deadline. If Call 2 returns a tool-transport error,
 times out outside the reviewed cell, or has an uncertain outcome rather than
 the exact result object, stop immediately with `NOT_PROVEN_TOOL_UNCERTAIN` and
 perform no later browser or clipboard mutation. That fail-closed state may
-leave only the non-secret challenge or the exact retained `directPreflightTab`;
-it cannot be accepted or retried.
+leave only the non-secret challenge, an uncertain created tab, or the exact
+retained `globalThis.directPreflightV2RetainedTab`; it cannot be accepted or
+retried.
 
 ## Preconditions
 
@@ -70,56 +72,71 @@ Any error or mismatch stops before Call 2 and does not consume a browser copy.
 
 ## Call 2 — one atomic awaited Node REPL browser cell
 
-Run this exact cell once in the already initialized persistent Node REPL. The
-only returned content is the fresh non-secret challenge, terminal label, safe
-error class, and counters. The actual tab object remains in
-`directPreflightTab` only if exact close failed.
+Run this exact IIFE once in the already initialized persistent Node REPL. The
+IIFE prevents persistent-binding redeclaration. Its only output is one explicit
+`nodeRepl.write(...)` containing the fresh non-secret challenge, terminal
+label, safe error class, tab state, and counters. If tab creation fulfills, the
+actual tab object is assigned immediately to
+`globalThis.directPreflightV2RetainedTab` and stays there until exact close
+fulfills.
 
 ```javascript
-const { randomBytes: directPreflightRandomBytes } = await import("node:crypto");
-const directPreflightChallenge = `OMNI-PREFLIGHT-${directPreflightRandomBytes(16).toString("hex").toUpperCase()}`;
-const directPreflightAccessibleName = "OmniRoute transport preflight challenge";
-const directPreflightHtml = `<!doctype html><meta charset="utf-8"><title>OmniRoute transport preflight</title><label for="challenge">${directPreflightAccessibleName}</label><input id="challenge" aria-label="${directPreflightAccessibleName}" value="${directPreflightChallenge}" readonly>`;
-const directPreflightDataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(directPreflightHtml)}`;
-let directPreflightTab = null;
-let directPreflightResult = "ABORT";
-let directPreflightErrorClass = "NONE";
-const directPreflightCounters = { open: 0, goto: 0, focus: 0, selectAll: 0, copy: 0, close: 0 };
-try {
-  directPreflightTab = await chrome.tabs.new();
-  directPreflightCounters.open++;
-  await directPreflightTab.goto(directPreflightDataUrl);
-  directPreflightCounters.goto++;
-  const directPreflightField = directPreflightTab.playwright.getByLabel(directPreflightAccessibleName, { exact: true });
-  await directPreflightField.click();
-  directPreflightCounters.focus++;
-  await directPreflightField.press("Control+A");
-  directPreflightCounters.selectAll++;
-  await directPreflightField.press("Control+C");
-  directPreflightCounters.copy++;
-  directPreflightResult = "COPY_SETTLED";
-} catch (directPreflightError) {
-  directPreflightErrorClass = typeof directPreflightError?.name === "string" ? directPreflightError.name : "ERROR";
-  directPreflightResult = "ABORT";
-} finally {
-  if (directPreflightTab !== null) {
+await (async () => {
+  const { randomBytes: directPreflightRandomBytes } = await import("node:crypto");
+  const directPreflightChallenge = `OMNI-PREFLIGHT-${directPreflightRandomBytes(16).toString("hex").toUpperCase()}`;
+  const directPreflightAccessibleName = "OmniRoute transport preflight challenge";
+  const directPreflightHtml = `<!doctype html><meta charset="utf-8"><title>OmniRoute transport preflight</title><label for="challenge">${directPreflightAccessibleName}</label><input id="challenge" aria-label="${directPreflightAccessibleName}" value="${directPreflightChallenge}" readonly>`;
+  const directPreflightDataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(directPreflightHtml)}`;
+  let directPreflightResult = "BROWSER_UNCERTAIN";
+  let directPreflightErrorClass = "NONE";
+  let directPreflightTabState = "NOT_ATTEMPTED";
+  const directPreflightCounters = { open: 0, goto: 0, focus: 0, selectAll: 0, copy: 0, close: 0 };
+  globalThis.directPreflightV2RetainedTab = null;
+  try {
+    directPreflightTabState = "CREATE_UNCERTAIN";
+    const directPreflightCreatedTab = await chrome.tabs.new();
+    globalThis.directPreflightV2RetainedTab = directPreflightCreatedTab;
+    directPreflightCounters.open++;
+    directPreflightTabState = "OPEN";
+    await directPreflightCreatedTab.goto(directPreflightDataUrl);
+    directPreflightCounters.goto++;
+    const directPreflightField = directPreflightCreatedTab.playwright.getByLabel(directPreflightAccessibleName, { exact: true });
+    await directPreflightField.click();
+    directPreflightCounters.focus++;
+    await directPreflightField.press("Control+A");
+    directPreflightCounters.selectAll++;
+    await directPreflightField.press("Control+C");
+    directPreflightCounters.copy++;
+    directPreflightResult = "COPY_SETTLED";
+    directPreflightTabState = "COPY_SETTLED";
+  } catch (directPreflightError) {
+    directPreflightErrorClass = typeof directPreflightError?.name === "string" ? directPreflightError.name : "ERROR";
+    directPreflightResult = "BROWSER_UNCERTAIN";
+    if (directPreflightTabState !== "CREATE_UNCERTAIN") directPreflightTabState += "_MUTATION_UNCERTAIN";
+  }
+  if (directPreflightResult === "COPY_SETTLED") {
+    directPreflightTabState = "CLOSE_UNCERTAIN";
     try {
-      await directPreflightTab.close();
+      await globalThis.directPreflightV2RetainedTab.close();
       directPreflightCounters.close++;
-      directPreflightTab = null;
+      globalThis.directPreflightV2RetainedTab = null;
+      directPreflightTabState = "CLOSED";
+      directPreflightResult = "COPY_SETTLED_AND_CLOSED";
     } catch (directPreflightCloseError) {
       directPreflightErrorClass = typeof directPreflightCloseError?.name === "string" ? directPreflightCloseError.name : "CLOSE_ERROR";
-      directPreflightResult = "RETAINED_TAB";
+      directPreflightResult = "BROWSER_UNCERTAIN";
+      directPreflightTabState = "CLOSE_UNCERTAIN";
     }
   }
-}
-({
-  challenge: directPreflightChallenge,
-  result: directPreflightResult,
-  errorClass: directPreflightErrorClass,
-  counters: directPreflightCounters,
-  exactTabClosed: directPreflightTab === null
-});
+  nodeRepl.write({
+    challenge: directPreflightChallenge,
+    result: directPreflightResult,
+    errorClass: directPreflightErrorClass,
+    tabState: directPreflightTabState,
+    counters: directPreflightCounters,
+    exactTabClosed: directPreflightTabState === "CLOSED" && globalThis.directPreflightV2RetainedTab === null
+  });
+})();
 ```
 
 Prohibited in this call: snapshot, screenshot, DOM/content extraction, browser
@@ -129,37 +146,69 @@ timer, `Promise.race`, background work, or any network URL.
 Call 2 is eligible for comparison only when it returns one exact object with:
 
 - challenge matching `^OMNI-PREFLIGHT-[0-9A-F]{32}$`;
-- `result=COPY_SETTLED`, `errorClass=NONE`, `exactTabClosed=true`;
+- `result=COPY_SETTLED_AND_CLOSED`, `errorClass=NONE`, `tabState=CLOSED`,
+  `exactTabClosed=true`;
 - counters `open/goto/focus/selectAll/copy/close = 1/1/1/1/1/1`.
 
-If an exact result object returns with any other value, Call 3 still performs
-one shape-only compare and final clear because every browser promise and the
-cell `finally` have settled; the overall verdict is FAIL. If no exact object
-returns, Call 3 is forbidden to avoid racing an uncertain mutation.
+Any rejection from `tabs.new`, `goto`, `click`, either `press`, or `close`
+produces `BROWSER_UNCERTAIN`; no later browser call is made. A rejected
+`tabs.new` keeps `tabState=CREATE_UNCERTAIN` and `exactTabClosed=false` even
+though the local tab binding is null. Any exact object other than the exact
+success object, any missing object, or any tool-transport error forbids Call 3
+and stops without further browser or clipboard mutation.
 
 ## Call 3 — exact compare, shape-only report, and final clear
 
 Substitute only the exact regex-validated non-secret challenge returned by
-Call 2 for `<EXPECTED_CHALLENGE>`. Run once in PowerShell 7 after the exact
-Call 2 object returns. Never emit `$observed`.
+Call 2 for `<EXPECTED_CHALLENGE>`. Run once in PowerShell 7 only after the exact
+Call 2 success object returns. Never emit `$observed`.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
 $expected = '<EXPECTED_CHALLENGE>'
 if ($expected -cnotmatch '^OMNI-PREFLIGHT-[0-9A-F]{32}$') { throw 'EXPECTED_CHALLENGE_SHAPE_FAIL' }
-$observed = [string](Get-Clipboard -Raw)
-$comparison = $observed -ceq $expected
-$observedLength = $observed.Length
-Set-Clipboard -Value ''
-$postClear = [string](Get-Clipboard -Raw)
-$postClearEmpty = $postClear.Length -eq 0
-'PREFLIGHT_V2_COMPARISON_READS=1'
+$comparisonReads = 0
+$comparison = $false
+$observedLength = -1
+$comparisonError = 'NONE'
+$finalClearCalls = 0
+$finalClearSucceeded = $false
+$finalEmptyReads = 0
+$postClearEmpty = $false
+$cleanupError = 'NONE'
+try {
+    $comparisonReads++
+    $observed = [string](Get-Clipboard -Raw)
+    $comparison = $observed -ceq $expected
+    $observedLength = $observed.Length
+} catch {
+    $comparisonError = $_.Exception.GetType().Name
+} finally {
+    $finalClearCalls++
+    try {
+        Set-Clipboard -Value ''
+        $finalClearSucceeded = $true
+    } catch {
+        $cleanupError = 'CLEAR_' + $_.Exception.GetType().Name
+    }
+    $finalEmptyReads++
+    try {
+        $postClear = [string](Get-Clipboard -Raw)
+        $postClearEmpty = $postClear.Length -eq 0
+    } catch {
+        if ($cleanupError -eq 'NONE') { $cleanupError = 'READ_' + $_.Exception.GetType().Name }
+    }
+}
+'PREFLIGHT_V2_COMPARISON_READS=' + $comparisonReads
 'PREFLIGHT_V2_COMPARISON_MATCH=' + $comparison.ToString().ToUpperInvariant()
 'PREFLIGHT_V2_OBSERVED_LENGTH=' + $observedLength
-'PREFLIGHT_V2_FINAL_CLEAR_CALLS=1'
-'PREFLIGHT_V2_FINAL_EMPTY_READS=1'
+'PREFLIGHT_V2_COMPARISON_ERROR=' + $comparisonError
+'PREFLIGHT_V2_FINAL_CLEAR_CALLS=' + $finalClearCalls
+'PREFLIGHT_V2_FINAL_CLEAR_SUCCEEDED=' + $finalClearSucceeded.ToString().ToUpperInvariant()
+'PREFLIGHT_V2_FINAL_EMPTY_READS=' + $finalEmptyReads
 'PREFLIGHT_V2_FINAL_EMPTY=' + $postClearEmpty.ToString().ToUpperInvariant()
-if ($comparison -and $postClearEmpty) { exit 0 }
+'PREFLIGHT_V2_CLEANUP_ERROR=' + $cleanupError
+if ($comparison -and $comparisonError -eq 'NONE' -and $finalClearSucceeded -and $postClearEmpty -and $cleanupError -eq 'NONE') { exit 0 }
 exit 2
 ```
 
@@ -170,8 +219,9 @@ PASS requires every condition below; otherwise FAIL / NOT PROVEN:
 - Call 1 exact exit/labels/counters and empty baseline;
 - one exact Call 2 result object with challenge shape, no error, exact tab
   closed, and all six counters exactly `1`;
-- Call 3 exact exit `0`, one comparison, exact equality, one final clear, one
-  final empty read, and final empty `TRUE`;
+- Call 3 exact exit `0`, one comparison, exact equality, comparison error
+  `NONE`, one final clear, clear success `TRUE`, one final empty read, final
+  empty `TRUE`, and cleanup error `NONE`;
 - no tool-transport uncertainty, retry, fallback, retained tab, residual
   process, secret, live-resource action, or prohibited browser operation.
 

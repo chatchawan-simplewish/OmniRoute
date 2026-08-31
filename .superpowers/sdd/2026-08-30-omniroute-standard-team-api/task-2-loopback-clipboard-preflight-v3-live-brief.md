@@ -259,7 +259,7 @@ await (async () => {
     const field = tab.playwright.getByLabel(accessibleName, { exact: true });
     tabState = "FOCUS_UNCERTAIN";
     counters.browserFocusAttempted++;
-    await field.focus();
+    await field.click();
     counters.browserFocusFulfilled++;
     tabState = "FOCUSED";
     if (serverState !== "RESPONSE_FULFILLED" || serverUncertain) {

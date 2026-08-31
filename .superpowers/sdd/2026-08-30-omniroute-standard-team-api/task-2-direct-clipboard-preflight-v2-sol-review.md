@@ -116,3 +116,95 @@ revocation, permission change, deletion, or other live action. A corrected
 direct-byte candidate requires a fresh independent review. Even a future PASS
 would authorize only the one already user-approved non-secret preflight and
 would not authorize credential or routing work.
+
+## Fix round 1 scoped re-review
+
+### Scoped verdict
+
+**FAIL / NOT AUTHORIZED.**
+
+The committed fix at `d4dbc5044412123ea6bc3c031f8c797a875c1dc6`
+corrects the browser-error routing, conservative create state, explicit result
+emission, and ordinary Call 3 cleanup mechanics. It is not executable under
+the mandatory Chrome skill because the exact cell uses `globalThis` five times,
+which that skill expressly forbids. Call 3 also retains one cleanup-bypass path:
+its expected-value shape guard throws before entering the `try/finally`.
+
+No browser, clipboard, PowerShell block, credential, network, or live-resource
+action was executed during this static re-review.
+
+### Fix-round inputs and static proof
+
+- Fix range: `67465e63d5718063d0ef06412aee28f0f74df4c3..d4dbc5044412123ea6bc3c031f8c797a875c1dc6`
+- Fix commit scope: exactly the candidate brief
+- Candidate SHA-256: `CA38C3CB66923373E6D4C6E83FDC9507BE84D9133B7EB76EA59F563B549B33E9`
+- Candidate size: `11173` bytes
+- Encoding shape: no BOM, zero CR bytes, one trailing LF
+- Static parse: both PowerShell blocks have zero parser errors; the JavaScript
+  module parse exits `0`
+- Exact action counts: six awaited browser calls, one explicit
+  `nodeRepl.write(...)`, no timer, `Promise.race`, process, bridge, helper,
+  background task, retry, or fallback
+- Existing unrelated modified and untracked implementation files remain
+  unchanged and unstaged.
+
+### Original finding disposition
+
+- **F1 — ADDRESSED in the exact browser sequence.** A rejection from any of
+  `tabs.new`, `goto`, `click`, either `press`, or `close` produces
+  `BROWSER_UNCERTAIN`. After a mutation rejection the cell makes no later
+  browser call, and every non-success or missing result forbids Call 3.
+- **F2 — ADDRESSED.** Before creation the state is `CREATE_UNCERTAIN`; a
+  rejected create cannot report exact closure. A fulfilled create assigns the
+  exact returned handle before incrementing the open counter or starting any
+  later browser call. Normal success closes only that handle. Closing after the
+  fulfilled `Control+C` is allowed: the copy promise has settled, close is the
+  next serial call, and a rejected close is terminal uncertainty with no Call
+  3.
+- **F3 — ADDRESSED mechanically; blocked by R1-F1.** The cell is one IIFE and
+  emits exactly one bounded object with explicit `nodeRepl.write(...)`.
+  IIFE-local declarations avoid persistent lexical redeclaration, but the new
+  retained-handle mechanism violates the actual browser skill.
+- **F4 — PARTIALLY ADDRESSED.** A comparison-read error now reaches one final
+  clear attempt and one final empty-read attempt in `finally`, with separate
+  safe error labels and PASS requiring successful cleanup. R1-F2 remains.
+
+### R1-F1 — IMPORTANT: the retained-tab mechanism violates the Chrome skill
+
+The Chrome skill says `Never use globalThis`. The exact candidate uses
+`globalThis.directPreflightV2RetainedTab` at `brief:80,94,98,120,122,137` to
+initialize, retain, close, clear, and test the tab handle. This is not a style
+preference: it is a mandatory execution-surface constraint, so the reviewed
+cell cannot be authorized as written.
+
+Minimum correction: use one uniquely named top-level `let` retained-tab
+binding declared once for this one-shot candidate, then reassign that binding
+inside the IIFE. The one-shot/no-retry rule prevents a second declaration; do
+not use `globalThis`, reacquire Chrome, add a helper cell, or relax retained-tab
+uncertainty.
+
+### R1-F2 — IMPORTANT: the expected-shape guard still bypasses cleanup
+
+At `brief:168-169`, an invalid or unsubstituted expected value throws before
+the `try/finally` begins. That path performs neither the promised final clear
+attempt nor the empty-read attempt, leaving the fresh non-secret challenge on
+the current clipboard and contradicting the all-terminal-state cleanup rule.
+The fact that the sole owner is instructed to substitute a valid value does not
+make the executable guard's failure path cleanup-safe.
+
+Minimum correction: initialize counters first and move expected-shape
+validation inside the protected `try`, recording a bounded shape error while
+still reaching the same single clear and single empty-read attempts in
+`finally`. Do not perform a comparison read when the expected shape is invalid;
+PASS remains limited to one successful comparison read and complete cleanup.
+
+### Fix-round-1 authority boundary
+
+The exact fix-round candidate remains **FAIL / NOT AUTHORIZED**. This re-review
+authorizes no preflight execution and no browser, clipboard, PowerShell,
+credential, token, Cloudflare, OmniRoute, VM1205, proxy/proof/R5, Rulesets,
+evidence mutation, revocation, permission change, deletion, or other live
+action. A corrected committed candidate requires another fresh scoped
+independent review. Even a future PASS is limited to the one already
+user-approved non-secret preflight and authorizes no credential or routing
+action.

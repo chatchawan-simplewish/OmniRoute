@@ -136,3 +136,77 @@ blocked, as do Cloudflare/OmniRoute/Hermes/DeepSeek and all other routing
 actions. Further work requires a new reviewed authority path and each applicable
 separate action-time confirmation; the report itself has
 `authorizes_live_execution=false`.
+
+## Manual external disposition classification
+
+### Classification
+
+**PASS — RETAINED-TAB RESIDUAL RESOLVED ONLY.**
+
+The committed addendum at
+`8431d2cb65af1c113bbc89ca57fe24a7eef29e40` faithfully records a bounded
+manual external disposition. The user closed all Chrome tabs, one subsequent
+read-only query proved the connected Chrome session contained zero tabs, and
+the now-stale local retained binding was set to null without another browser
+mutation. This resolves only the retained-tab residual.
+
+The original one-call disposition remains `CLOSE_UNCERTAIN`; it is not
+retroactively reclassified as a fulfilled close. The clipboard preflight also
+remains **NOT PROVEN**, its no-retry authority remains spent, and credential and
+routing work remain blocked.
+
+No browser, Node, clipboard, PowerShell, credential, network, or live-resource
+action was executed during this static evidence classification.
+
+### Evidence pins
+
+- Updated report commit:
+  `8431d2cb65af1c113bbc89ca57fe24a7eef29e40`
+- Updated report parent / prior classification commit:
+  `fa6d15aabcedd1f6e16e72771d5db0ef3f6d8533`
+- Full report SHA-256:
+  `33EC4B221E421EAD962BE15C7699F8CE02E67BBE771777D8DCD96FAD9190F1EF`
+- Full report size: `2470` bytes
+- Encoding shape: no BOM, zero CR bytes, one trailing LF
+- Commit scope: exactly the retained-tab disposition report
+- Manual evidence labels are exactly
+  `MANUAL_DISPOSITION_CHROME_TAB_COUNT=0` and
+  `MANUAL_DISPOSITION_RETAINED_BINDING_NULL=TRUE`.
+- The full report contains no concrete preflight challenge value and preserves
+  `authorizes_live_execution=false`.
+
+### Scope verification
+
+- **External user action — BOUNDED.** The user manually closed Chrome tabs.
+  This was not an agent close retry and does not change the rejected promise's
+  `closeFulfilled=0` record.
+- **Connected-browser absence — PROVEN.** One read-only `tabs.list()` result
+  returned count `0`. For the connected Chrome session that owned the retained
+  handle, this proves no residual remote tab remained. No ID, URL, title,
+  content, screenshot, snapshot, or other tab data was read or emitted.
+- **Local binding disposition — PROVEN.** After remote absence was established,
+  the stale `directPreflightV2RetainedTab` binding was reassigned to null. This
+  was local state cleanup and made no browser call or mutation.
+- **No retry/fallback — PRESERVED.** The report retains retry count `0`; the
+  addendum contains no `.close()` call, reacquisition, alternate handle,
+  navigation, keyboard, clipboard, replacement-preflight, or fallback action.
+- **Prior uncertainty — PRESERVED.** The original close remains
+  `CLOSE_UNCERTAIN`, the clipboard transport remains `NOT PROVEN`, and no final
+  clipboard-state or transport-success claim is inferred from tab absence.
+- **Authority boundary — PRESERVED.** The addendum claims no credential, token,
+  Cloudflare, OmniRoute, VM1205, proxy/proof/R5, Rulesets, permission, deletion,
+  evidence-worktree, revocation, routing, or other live-resource action.
+
+### Consequence and authority boundary
+
+The retained-tab residual is closed: connected Chrome has zero tabs and the
+local retained binding is null. No further tab cleanup action is needed or
+authorized.
+
+Everything else remains fail closed. The one non-secret clipboard preflight is
+still **NOT PROVEN** and cannot be retried under the spent authority. No
+credential may be created, copied, pasted, submitted, retained, or revoked, and
+no Cloudflare/OmniRoute/Hermes/DeepSeek or other routing action may proceed from
+this addendum. A new reviewed authority path and every applicable separate
+action-time confirmation remain required; the report continues to set
+`authorizes_live_execution=false`.

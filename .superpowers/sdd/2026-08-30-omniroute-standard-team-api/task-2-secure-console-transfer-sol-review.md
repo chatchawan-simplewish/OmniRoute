@@ -251,3 +251,138 @@ Even a later design PASS may authorize only preparation and independent review
 of exact live briefs. It must not authorize preflight execution, token creation,
 masked submission, revocation, Cloudflare/VM1205 action, proxy/R5 consumption,
 or evidence mutation without their separately required action-time gates.
+
+## Fix round 1 scoped re-review
+
+Reviewed fixed commit:
+`5cd8fedd31626549fdfc4e44fe3678fba37183f0` with exact parent
+`5d8ea953ce9bfdde88fc9fbeb99db1c43b6d41be` and exactly two changed paths.
+The working files equal their committed blobs.
+
+| Input | Direct-byte result |
+| --- | --- |
+| Revised design | `17,959` bytes; SHA-256 `9887530CA9F2F1EACD51C5E4628926A2F359E74691B90B86BA432ABB74667D4E`; blob `1b4c13f0baa32a3d2e607f096efbb4e74bf69c18` |
+| Revised plan | `14,431` bytes; SHA-256 `66D405BE579752AF131874F6F3D6FB816E7A75C90AA5C9816F259C5B9B4883BE`; blob `5dabe6ecb7055b38de8dd2cfb55cd15160ae1a84` |
+| Fix report | SHA-256 `34DCA6C45EE04F23F2E1F8B104D0BD7D25FF3BFD863BF140AA40ED408F049125` |
+| Fix diff package | SHA-256 `D9EAC38943486226E0051586CBC3C1BEC437691D77CD0C0D4EC7D32EC6BC85C9` |
+
+### Scoped verdict
+
+**FAIL / REVISE BEFORE LIVE-BRIEF PREPARATION / NOT AUTHORIZED.**
+
+Fix round 1 addresses F1-F5 and F7 without introducing a new Critical or HIGH
+security defect. F6 remains incomplete because the newly added masked-input
+primitive creates a plaintext-bearing managed `ConsoleKeyInfo` variable that
+the supposedly exhaustive lifetime inventory omits. The fix also introduces
+one IMPORTANT workflow contradiction by directing the reviewer to create a new
+review file instead of appending the already authoritative review required by
+this scoped re-review.
+
+This scoped result authorizes no preflight, token, browser, clipboard,
+Cloudflare, VM1205, proxy/proof/R5, Rulesets, evidence, revocation, deletion, or
+other live execution.
+
+### F1 — ADDRESSED
+
+`design:7-10,200-239` now explicitly permits exactly two possible credential
+holders: the retained fixed owner and the immutable synchronous exact-hash R5
+child. It passes only the token and zone-ID entries through that child's
+`ProcessStartInfo.Environment`, keeps the parent environment clean, strips both
+names from every other child, forbids an R5 grandchild, retains the child
+handle/PID, and proves exit. `plan:164-181` carries the same exact ownership and
+bounded-claim requirements into the future live brief. This resolves the
+original owner/R5 contradiction without changing the reviewed R5 bytes.
+
+### F2 — ADDRESSED
+
+`design:12-18,156-179` blocks creation unless OS-build-specific read-only proof
+shows Windows clipboard history and OS/device sync disabled, distinguishes
+current clearing from history erasure, allows exactly one owner cleanup clear
+and one post-clear shape check, retains zero agent/browser-API clipboard calls,
+and closes the token page before agent browser access. `design:278-283` handles
+the pair once on all later cleanup paths without retry. `plan:155-162,216-233`
+pins those prerequisites and counters. Exact live proof remains a future
+live-brief review gate; it is not established by this design review.
+
+### F3 — ADDRESSED
+
+`design:107-154` forbids `Read-Host` and supplies an executable single-process
+monotonic `Stopwatch` plus `Console.KeyAvailable` / `ReadKey(true)` loop with
+Enter, Backspace, Escape, Ctrl+C, empty-input, and timeout behavior, no second
+prompt, no supervisory child, and one outer `finally`. `plan:146-153,198-203`
+requires exact numeric deadlines plus credential-free timeout/cancel fixtures.
+This closes the blocking-timeout contradiction.
+
+### F4 — ADDRESSED
+
+`design:181-198,241-283` now separates pre-token cleanup from the post-token
+revocation-required hold. Once the exact token reaches the owner, a failure is
+treated as post-accept for disposition safety; separate authority permits only
+one exact-row revocation, one retained-token HTTP `401` check, and one refreshed
+`0 / 0` row check before final cleanup. Denial/timeout infers no authority,
+reports the active-row risk, bounds local residency, and preserves NOT PROVEN.
+`plan:183-196,235-247` implements the same checkpoint. Cleanup no longer
+destroys the exact token before the authorized invalidity proof can use it.
+
+### F5 — ADDRESSED
+
+`design:42-88` pins runtime CSPRNG challenge generation, strict script bytes,
+validated direct-child temp ownership, deletion guard, retained handle/PID
+equality, exact `COPY_DONE / ABORT / EOF / timeout` comparison counts
+`1 / 0 / 0 / 0`, common cleanup, page closure, guarded deletion, external exit
+proof, and bounded non-transferable conclusion. `design:90-105` separately
+counts and forbids overlap with the credential owner. `plan:101-130` requires
+the exact future brief, four credential-free fixtures, independent review, and
+separate execution authority.
+
+### F6 — NOT ADDRESSED
+
+`design:219-235` says the future live brief must enumerate **every**
+plaintext-bearing location, but its list omits the plaintext keystroke carrier
+created by the design's own primitive: `$key = [Console]::ReadKey($true)` at
+`design:125`. That managed `ConsoleKeyInfo` retains `KeyChar`; `$ctrl` and the
+subsequent branches repeatedly dereference it through `design:126-142`.
+`plan:174-181` repeats the incomplete inventory. Appending into `SecureString`
+does not make the intermediate `ConsoleKeyInfo` cease to be a plaintext-bearing
+managed reference.
+
+Minimum correction: add `$key` / `ConsoleKeyInfo.KeyChar` and any derived
+character variable to the named plaintext-bearing inventory; keep each key
+object only for the current iteration; clear the named reference immediately
+after handling and again in outer `finally`; and preserve the bounded evidence
+claim that named references were cleared and owning processes exited, not that
+managed-memory bytes were zeroized. The exact live brief must be reviewed for
+any additional input-host buffer introduced by its final implementation.
+
+### F7 — ADDRESSED
+
+`design:302-339` keeps Task 1 evidence-free and defines one later
+`secure_console_transfer_v1` object with separate `transport_preflight` and
+`credential_gate` subobjects, hashes/sizes, timestamps, expected/observed PIDs,
+counters, cleanup results, revocation/invalidity fields, and
+`authorizes_live_execution=false`. It preserves every prior incident fact,
+allows only exact-token `401` to update that specific status, pins the initial
+parent/path, and stops for reviewed parent drift. `plan:249-286` carries the
+same additive schema, redaction, one-path commit, and independent-review stop.
+
+### New IMPORTANT — review artifact path contradicts the scoped authority
+
+The fix changed `plan:83-87` to require creation of
+`task-2-secure-console-transfer-fix1-sol-review.md`. The authoritative original
+review is `task-2-secure-console-transfer-sol-review.md`, and the scoped fix
+authority requires this round to be appended there. Following the revised plan
+would therefore create a second competing verdict artifact, while following
+the actual authority leaves the plan's declared Task 2 output absent.
+
+Minimum correction: make `plan:83-93` name the existing authoritative review
+path and require a clearly titled appended fix-round section, or explicitly
+replace the plan output with the exact review artifact authorized by the owner.
+Do not maintain two independent current verdict files for the same design.
+
+### Fix-round conclusion
+
+No Critical or HIGH defect is newly introduced by the fix diff. One original
+IMPORTANT finding remains and one new IMPORTANT governance contradiction must
+be corrected. After those two narrow documentation corrections are committed,
+a fresh scoped direct-byte review may decide PASS FOR DESIGN/LIVE-BRIEF
+PREPARATION ONLY. Such a PASS still cannot authorize any live action.

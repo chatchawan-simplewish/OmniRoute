@@ -24,7 +24,9 @@ terminal bridge. It creates no live report and authorizes no execution.
   uncertainty, but it may not trigger any later browser or clipboard mutation.
   Server ownership remains in the Call 2 cell until one fulfilled close and a
   false `server.listening` check. Any uncertain server state or residual
-  listener forbids Call 3.
+  listener forbids Call 3. A monotonic private uncertainty flag records every
+  request, response, server, or lifecycle error; successful listener cleanup
+  can never clear or rehabilitate it.
 - Output is redacted. No call emits the challenge, clipboard text, HTML, URL,
   port, request path, tab object, stack, exception message, credential, key, or
   token.
@@ -32,12 +34,18 @@ terminal bridge. It creates no live report and authorizes no execution.
 ## Exact in-memory Call 2 to Call 3 handoff
 
 Call 2 keeps the fresh challenge only in the persistent private Node binding
-`loopbackPreflightV3ExpectedChallenge`. Its one emitted result contains only
+`loopbackPreflightV3ExpectedChallenge` and initializes the separate persistent
+`loopbackPreflightV3Call3Eligible` binding to `false`. Only the exact Call 2
+success branch sets eligibility to `true`. Its one emitted result contains only
 challenge shape and length, never the value. Call 3 is one later Node cell in
-that same persistent session. Only after the exact Call 2 success object, it
-starts exactly one synchronous, no-shell PowerShell 7 child and passes the
-challenge once through that child's standard input. The challenge is never an
-argument, environment value, file, network message, or tool output.
+that same persistent session. It first detaches the challenge to one local
+binding, sets eligibility to `false`, and clears the persistent challenge with
+no intervening await. Only when the detached value is shaped and the consumed
+eligibility was exactly `true` does it start one synchronous, no-shell
+PowerShell 7 child and pass the challenge once through that child's standard
+input. Every failure is non-retryable because persistent eligibility and the
+persistent challenge are consumed before the sole child attempt. The challenge
+is never an argument, environment value, file, network message, or tool output.
 
 This narrow in-memory handoff is not the abandoned terminal bridge: Call 2 has
 already proved the exact tab closed, the server close fulfilled, and no
@@ -52,7 +60,7 @@ session-binding uncertainty fails closed.
 
 1. The repo HEAD and exact committed brief bytes match the independent PASS.
 2. The persistent `chrome` binding is the already initialized Chrome session,
-   and the two v3 bindings below have never been declared in that session.
+   and the three v3 bindings below have never been declared in that session.
 3. There is no retained preflight tab, active preflight server, helper,
    background process, or earlier preflight execution.
 4. The sole owner runs Calls 1, 2, and 3 serially, records counters locally,
@@ -104,6 +112,7 @@ binding. Every browser mutation is directly awaited in order.
 
 ```javascript
 let loopbackPreflightV3ExpectedChallenge = null;
+let loopbackPreflightV3Call3Eligible = false;
 let loopbackPreflightV3RetainedTab = null;
 await (async () => {
   const safeErrorClass = (error, defaultClass) => {
@@ -141,6 +150,11 @@ await (async () => {
   let server = null;
   let exactRequestServed = false;
   let browserUncertain = false;
+  let serverUncertain = false;
+  const markServerUncertain = (state) => {
+    serverUncertain = true;
+    serverState = state;
+  };
   try {
     const { randomBytes } = await import("node:crypto");
     const { createServer } = await import("node:http");
@@ -154,6 +168,7 @@ await (async () => {
     server = createServer((request, response) => {
       counters.serverRequestAttempted++;
       if (exactRequestServed || request.method !== "GET" || request.url !== requestPath) {
+        markServerUncertain("REQUEST_REJECTED");
         response.writeHead(404, {
           "Cache-Control": "no-store",
           "Content-Length": "0",
@@ -167,12 +182,21 @@ await (async () => {
       exactRequestServed = true;
       counters.serverRequestFulfilled++;
       counters.serverResponseAttempted++;
+      request.once("aborted", () => {
+        markServerUncertain("REQUEST_UNCERTAIN");
+      });
+      request.once("error", () => {
+        markServerUncertain("REQUEST_UNCERTAIN");
+      });
       response.once("finish", () => {
         counters.serverResponseFulfilled++;
         serverState = "RESPONSE_FULFILLED";
       });
       response.once("error", () => {
-        serverState = "RESPONSE_UNCERTAIN";
+        markServerUncertain("RESPONSE_UNCERTAIN");
+      });
+      response.once("close", () => {
+        if (!response.writableFinished) markServerUncertain("RESPONSE_UNCERTAIN");
       });
       response.writeHead(200, {
         "Cache-Control": "no-store",
@@ -183,17 +207,18 @@ await (async () => {
       response.end(html);
     });
     server.on("clientError", (_error, socket) => {
-      serverState = "CLIENT_ERROR";
+      markServerUncertain("CLIENT_ERROR");
       socket.destroy();
     });
     server.on("error", () => {
-      serverState = "SERVER_ERROR";
+      markServerUncertain("SERVER_ERROR");
     });
     counters.serverStartAttempted++;
     serverState = "START_UNCERTAIN";
     await new Promise((resolve, reject) => {
       const onError = (error) => {
         server.off("listening", onListening);
+        markServerUncertain("START_UNCERTAIN");
         reject(error);
       };
       const onListening = () => {
@@ -208,6 +233,7 @@ await (async () => {
     serverState = "LISTENING";
     const address = server.address();
     if (address === null || typeof address === "string" || address.address !== "127.0.0.1" || address.port < 1) {
+      markServerUncertain("INVALID_LISTENER_ADDRESS");
       throw new Error("LoopbackAddressError");
     }
     const url = `http://127.0.0.1:${address.port}${requestPath}`;
@@ -217,13 +243,17 @@ await (async () => {
     counters.browserOpenFulfilled++;
     loopbackPreflightV3RetainedTab = tab;
     tabState = "OPEN";
-    if (serverState !== "LISTENING") throw new Error("ServerStateError");
+    if (serverState !== "LISTENING" || serverUncertain) {
+      markServerUncertain("INVALID_SERVER_LIFECYCLE");
+      throw new Error("ServerStateError");
+    }
     tabState = "GOTO_UNCERTAIN";
     counters.browserGotoAttempted++;
     await tab.goto(url);
     counters.browserGotoFulfilled++;
     tabState = "LOADED";
-    if (serverState !== "RESPONSE_FULFILLED" || counters.serverRequestAttempted !== 1 || counters.serverRequestFulfilled !== 1 || counters.serverResponseAttempted !== 1 || counters.serverResponseFulfilled !== 1) {
+    if (serverState !== "RESPONSE_FULFILLED" || serverUncertain || counters.serverRequestAttempted !== 1 || counters.serverRequestFulfilled !== 1 || counters.serverResponseAttempted !== 1 || counters.serverResponseFulfilled !== 1) {
+      markServerUncertain("INVALID_EXCHANGE_LIFECYCLE");
       throw new Error("ServerExchangeError");
     }
     const field = tab.playwright.getByLabel(accessibleName, { exact: true });
@@ -232,19 +262,28 @@ await (async () => {
     await field.focus();
     counters.browserFocusFulfilled++;
     tabState = "FOCUSED";
-    if (serverState !== "RESPONSE_FULFILLED") throw new Error("ServerStateError");
+    if (serverState !== "RESPONSE_FULFILLED" || serverUncertain) {
+      markServerUncertain("INVALID_SERVER_LIFECYCLE");
+      throw new Error("ServerStateError");
+    }
     tabState = "SELECT_ALL_UNCERTAIN";
     counters.browserSelectAllAttempted++;
     await field.press("Control+A");
     counters.browserSelectAllFulfilled++;
     tabState = "SELECTED";
-    if (serverState !== "RESPONSE_FULFILLED") throw new Error("ServerStateError");
+    if (serverState !== "RESPONSE_FULFILLED" || serverUncertain) {
+      markServerUncertain("INVALID_SERVER_LIFECYCLE");
+      throw new Error("ServerStateError");
+    }
     tabState = "COPY_UNCERTAIN";
     counters.browserCopyAttempted++;
     await field.press("Control+C");
     counters.browserCopyFulfilled++;
     tabState = "COPIED";
-    if (serverState !== "RESPONSE_FULFILLED") throw new Error("ServerStateError");
+    if (serverState !== "RESPONSE_FULFILLED" || serverUncertain) {
+      markServerUncertain("INVALID_SERVER_LIFECYCLE");
+      throw new Error("ServerStateError");
+    }
     tabState = "CLOSE_UNCERTAIN";
     counters.browserCloseAttempted++;
     await loopbackPreflightV3RetainedTab.close();
@@ -265,18 +304,20 @@ await (async () => {
           server.close((error) => error ? reject(error) : resolve());
         });
         counters.serverCloseFulfilled++;
-        serverState = server.listening ? "RESIDUAL_LISTENER" : "CLOSED";
+        if (server.listening) markServerUncertain("RESIDUAL_LISTENER");
+        serverState = server.listening ? "RESIDUAL_LISTENER" : (serverUncertain ? "CLOSED_AFTER_UNCERTAINTY" : "CLOSED");
       } catch (error) {
         if (errorClass === "NONE") errorClass = safeErrorClass(error, "SERVER_CLOSE_ERROR");
-        serverState = "CLOSE_UNCERTAIN";
+        markServerUncertain("CLOSE_UNCERTAIN");
       }
     } else if (server !== null && serverState !== "CLOSED") {
-      serverState = server.listening ? "RESIDUAL_LISTENER" : "NOT_LISTENING_UNPROVEN_CLOSE";
+      markServerUncertain(server.listening ? "RESIDUAL_LISTENER" : "NOT_LISTENING_UNPROVEN_CLOSE");
     }
     const exactCounters = Object.values(counters).every((value) => value === 1);
     const exactTabClosed = tabState === "CLOSED" && loopbackPreflightV3RetainedTab === null;
     const exactServerClosed = serverState === "CLOSED" && server !== null && server.listening === false;
-    if (result === "BROWSER_SETTLED_PENDING_SERVER_CLOSE" && errorClass === "NONE" && challengeShape && challengeLength === 47 && exactCounters && exactTabClosed && exactServerClosed && !browserUncertain) {
+    if (result === "BROWSER_SETTLED_PENDING_SERVER_CLOSE" && errorClass === "NONE" && challengeShape && challengeLength === 47 && exactCounters && exactTabClosed && exactServerClosed && !browserUncertain && !serverUncertain) {
+      loopbackPreflightV3Call3Eligible = true;
       result = "COPY_SETTLED_TAB_AND_SERVER_CLOSED";
     }
     nodeRepl.write({
@@ -289,7 +330,8 @@ await (async () => {
       exactTabClosed,
       retainedTabBinding: loopbackPreflightV3RetainedTab !== null,
       serverState,
-      serverListening: server?.listening === true
+      serverListening: server?.listening === true,
+      serverUncertain
     });
   }
 })();
@@ -302,7 +344,9 @@ The exact Call 2 success object requires:
 - every attempted and fulfilled counter exactly `1`;
 - `tabState=CLOSED`, `exactTabClosed=true`, and
   `retainedTabBinding=false`; and
-- `serverState=CLOSED` and `serverListening=false`.
+- `serverState=CLOSED`, `serverListening=false`, and
+  `serverUncertain=false`. Successful close after sticky uncertainty is cleanup
+  only and can never produce the exact success object.
 
 Every other object, missing or malformed output, rejected tool call, or
 transport uncertainty forbids Call 3. After any browser rejection, the
@@ -321,7 +365,6 @@ empty.
 
 ```javascript
 await (async () => {
-  const { spawnSync } = await import("node:child_process");
   const safeErrorClass = (value, defaultClass) => /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(value) ? value : defaultClass;
   const expectedShape = /^OMNI-PREFLIGHT-[0-9A-F]{32}$/;
   const result = {
@@ -333,8 +376,23 @@ await (async () => {
     stdoutSchemaValid: false,
     comparison: null
   };
-  if (typeof loopbackPreflightV3ExpectedChallenge !== "string" || !expectedShape.test(loopbackPreflightV3ExpectedChallenge)) {
+  const consumedEligibility = loopbackPreflightV3Call3Eligible === true;
+  let call3Challenge = loopbackPreflightV3ExpectedChallenge;
+  loopbackPreflightV3Call3Eligible = false;
+  loopbackPreflightV3ExpectedChallenge = null;
+  if (!consumedEligibility || typeof call3Challenge !== "string" || !expectedShape.test(call3Challenge)) {
+    call3Challenge = null;
     result.result = "HANDOFF_BINDING_INVALID";
+    nodeRepl.write(result);
+    return;
+  }
+  let spawnSync;
+  try {
+    ({ spawnSync } = await import("node:child_process"));
+  } catch (error) {
+    call3Challenge = null;
+    result.errorClass = safeErrorClass(typeof error?.name === "string" ? error.name : "", "IMPORT_ERROR");
+    result.result = "CHILD_IMPORT_UNCERTAIN";
     nodeRepl.write(result);
     return;
   }
@@ -414,19 +472,29 @@ $pass = $handoffReads -eq 1 -and $expectedShape -and $expectedLength -eq 47 -and
 if ($pass) { exit 0 }
 exit 2`;
   result.childStartAttempted = 1;
-  const child = spawnSync("C:\\Program Files\\PowerShell\\7\\pwsh.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], {
-    shell: false,
-    windowsHide: true,
-    encoding: "utf8",
-    input: `${loopbackPreflightV3ExpectedChallenge}\n`,
-    timeout: 30000,
-    killSignal: "SIGKILL",
-    maxBuffer: 16384,
-    env: {
-      SystemRoot: "C:\\Windows",
-      WINDIR: "C:\\Windows"
-    }
-  });
+  let child;
+  try {
+    child = spawnSync("C:\\Program Files\\PowerShell\\7\\pwsh.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], {
+      shell: false,
+      windowsHide: true,
+      encoding: "utf8",
+      input: `${call3Challenge}\n`,
+      timeout: 30000,
+      killSignal: "SIGKILL",
+      maxBuffer: 16384,
+      env: {
+        SystemRoot: "C:\\Windows",
+        WINDIR: "C:\\Windows"
+      }
+    });
+  } catch (error) {
+    result.errorClass = safeErrorClass(typeof error?.name === "string" ? error.name : "", "CHILD_ERROR");
+    result.result = "CHILD_SPAWN_UNCERTAIN";
+    nodeRepl.write(result);
+    return;
+  } finally {
+    call3Challenge = null;
+  }
   const childErrorName = typeof child.error?.code === "string" ? child.error.code : (typeof child.error?.name === "string" ? child.error.name : "NONE");
   result.errorClass = safeErrorClass(childErrorName, "CHILD_ERROR");
   result.childExitCode = Number.isInteger(child.status) ? child.status : null;
@@ -484,7 +552,6 @@ exit 2`;
   }
   const exactSuccess = result.errorClass === "NONE" && result.childExitFulfilled === 1 && result.childExitCode === 0 && schemaValid && result.comparison.handoffReads === 1 && result.comparison.expectedShape === "TRUE" && result.comparison.expectedLength === 47 && result.comparison.comparisonReads === 1 && result.comparison.comparisonMatch === "TRUE" && result.comparison.observedShape === "TRUE" && result.comparison.observedLength === 47 && result.comparison.comparisonError === "NONE" && result.comparison.finalClearCalls === 1 && result.comparison.finalClearFulfilled === 1 && result.comparison.finalEmptyReads === 1 && result.comparison.finalEmptyReadFulfilled === 1 && result.comparison.finalEmpty === "TRUE" && result.comparison.cleanupError === "NONE" && result.comparison.powerShellResult === "PASS";
   result.result = exactSuccess ? "EXACT_MATCH_AND_FINAL_EMPTY" : "HANDOFF_OR_COMPARISON_UNCERTAIN";
-  if (exactSuccess) loopbackPreflightV3ExpectedChallenge = null;
   nodeRepl.write(result);
 })();
 ```

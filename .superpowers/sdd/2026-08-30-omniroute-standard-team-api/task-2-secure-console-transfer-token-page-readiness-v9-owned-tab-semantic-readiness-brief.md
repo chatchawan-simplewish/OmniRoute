@@ -35,15 +35,17 @@ through the filtered terminal. Each proof requires at least 1200 ms elapsed,
 1000 ms mutation quiet, an unchanged internal row-content fingerprint,
 connected exact identities, no busy/progress marker, one physical `tbody`, and
 no row-count or common virtualizer marker inconsistent with the materialized
-rows. A zero-row baseline requires one recognized empty-token status; a
-nonempty baseline requires the filtered proof to observe a relevant mutation.
+rows. A zero-row baseline requires one recognized status-role empty-token
+marker scoped to the exact root. A nonempty baseline retains its private table
+fingerprint and requires an exact-table descendant mutation after the captured
+input event plus a changed final table fingerprint; unrelated root mutations
+cannot satisfy the causal proof.
 After the fill, the input must exactly echo
 `OmniRoute secure console R5 20260901`, the exact table must have zero body
 rows, the empty-token status must be unique, and both exact token-text and
 matching-row counts must be zero. Internal fingerprints and page text are
 never emitted. A listener installed before the fill must observe its input
-event and exact query value; when baseline rows existed, the table mutation
-must occur causally after that input event.
+event and exact query value.
 
 ## One-shot ownership and residue
 
@@ -66,10 +68,10 @@ Execute at most once only after commit, independent Sol High PASS review,
 non-self-referential classification, post-commit tuple, and fresh action-time
 pins. The executable is complete only with its final LF.
 
-Executable bytes: `21505`.
+Executable bytes: `22483`.
 
 Executable SHA-256:
-`27DED59F00F4176195625A42477B28536D3448B7214BD4F989E095E092040CAF`.
+`288B6070C8843F787305FF6D11E91CBD3BB59FB86E97E8024BD59BA015D9DD4E`.
 
 ```javascript
 let secureConsoleV9ReadinessConsumed = false;
@@ -161,15 +163,28 @@ await (async () => {
         retainedIdentity.inputEventCount = 0;
         retainedIdentity.lastInputValue = null;
         retainedIdentity.lastInputAt = 0;
+        retainedIdentity.tableMutationCount = 0;
+        retainedIdentity.lastTableMutation = 0;
+        retainedIdentity.baselineFingerprint = null;
+        retainedIdentity.baselineRowCount = -1;
         retainedIdentity.inputListener = () => {
           retainedIdentity.inputEventCount++;
           retainedIdentity.lastInputValue = input.value;
           retainedIdentity.lastInputAt = performance.now();
         };
         input.addEventListener("input", retainedIdentity.inputListener);
-        retainedIdentity.observer = new MutationObserver(() => {
+        retainedIdentity.observer = new MutationObserver((records) => {
           retainedIdentity.mutationCount++;
           retainedIdentity.lastMutation = performance.now();
+          if (
+            records.some(
+              (record) =>
+                record.target === exactTable || exactTable?.contains(record.target) === true,
+            )
+          ) {
+            retainedIdentity.tableMutationCount++;
+            retainedIdentity.lastTableMutation = performance.now();
+          }
         });
         retainedIdentity.observer.observe(exactRoot, {
           subtree: true,
@@ -196,6 +211,7 @@ await (async () => {
       };
       const snapshot = () => {
         const rows = exactTable === null ? [] : [...exactTable.querySelectorAll("tbody tr")];
+        const contentFingerprint = fingerprint();
         const tbody = exactTable?.querySelector("tbody") ?? null;
         const ariaRowCount = exactTable?.getAttribute("aria-rowcount") ?? null;
         const physicalRowsExact =
@@ -220,9 +236,11 @@ await (async () => {
           inputValueExact: input?.value === expected,
           inputEventObserved: retainedIdentity.inputEventCount > 0,
           inputEventValueExact: retainedIdentity.lastInputValue === expected,
-          causalMutationObserved:
-            retainedIdentity.mutationCount > 0 &&
-            retainedIdentity.lastMutation >= retainedIdentity.lastInputAt,
+          causalTableTransitionObserved:
+            retainedIdentity.tableMutationCount > 0 &&
+            retainedIdentity.lastTableMutation >= retainedIdentity.lastInputAt &&
+            retainedIdentity.baselineRowCount > 0 &&
+            retainedIdentity.baselineFingerprint !== contentFingerprint,
           pageTableCount: document.querySelectorAll("table").length,
           rootSearchCount: exactRoot.querySelectorAll('input[placeholder*="search" i]').length,
           rootTableCount: exactRoot.querySelectorAll("table").length,
@@ -230,7 +248,7 @@ await (async () => {
           busyCount: exactRoot.querySelectorAll('[aria-busy="true"], [role="progressbar"]').length,
           paginationCount: document.querySelectorAll('[aria-label="Pagination"], [aria-label="Next page"], [aria-label="Previous page"]').length,
           nonVirtualized,
-          fingerprint: fingerprint(),
+          fingerprint: contentFingerprint,
         };
       };
       let previous = JSON.stringify(snapshot());
@@ -251,8 +269,12 @@ await (async () => {
         if (contentStable) {
           const mutationCount = retainedIdentity.mutationCount;
           if (initialize) {
+            retainedIdentity.baselineFingerprint = current.fingerprint;
+            retainedIdentity.baselineRowCount = current.rowCount;
             retainedIdentity.mutationCount = 0;
             retainedIdentity.lastMutation = performance.now();
+            retainedIdentity.tableMutationCount = 0;
+            retainedIdentity.lastTableMutation = 0;
           } else {
             observer.disconnect();
             input.removeEventListener("input", retainedIdentity.inputListener);
@@ -358,9 +380,9 @@ await (async () => {
     const tokenRoot = tokenFilter.locator("xpath=ancestor::*[.//table][1]");
     if (await counted(tokenRoot) !== 1) throw new Error("ReadinessRootCountError");
     if (await counted(tokenRoot.locator("table")) !== 1) throw new Error("ReadinessRootTableCountError");
-    const emptyStatus = tab.playwright.getByText(
-      /^(no api tokens found|no tokens found|no results)$/i,
-    );
+    const emptyStatus = tokenRoot
+      .getByRole("status")
+      .filter({ hasText: /^(no api tokens found|no tokens found|no results)$/i });
     baseline = await settle(tokenRoot, "", true);
     baselineEmptyStatusCount = await counted(emptyStatus);
     const baselineComplete =
@@ -406,7 +428,6 @@ await (async () => {
       filtered.inputEventObserved === true &&
       filtered.inputEventValueExact === true &&
       filtered.pageTableCount === 2 &&
-      filtered.rootFound === true &&
       filtered.rootSearchCount === 1 &&
       filtered.rootTableCount === 1 &&
       filtered.rowCount === 0 &&
@@ -414,7 +435,7 @@ await (async () => {
       filtered.paginationCount === 0 &&
       filtered.nonVirtualized === true &&
       filteredEmptyStatusCount === 1 &&
-      (baseline.rowCount === 0 || filtered.causalMutationObserved === true);
+      (baseline.rowCount === 0 || filtered.causalTableTransitionObserved === true);
     semanticSignature =
       navigationTargetExact === true &&
       v8SignatureExact === true &&
@@ -538,9 +559,9 @@ await (async () => {
     filteredBusyCount: filtered?.busyCount ?? -1,
     filteredPaginationCount: filtered?.paginationCount ?? -1,
     filteredNonVirtualized: filtered?.nonVirtualized === true,
-    filteredCausalMutationObserved:
+    filteredCausalTableTransitionObserved:
       baseline !== null &&
-      (baseline.rowCount === 0 || filtered?.causalMutationObserved === true),
+      (baseline.rowCount === 0 || filtered?.causalTableTransitionObserved === true),
     filteredEmptyStatusCount,
     semanticSignature,
     ownershipTransferred,

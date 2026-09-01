@@ -28,7 +28,9 @@ revocation hold, cleanup rule, and terminal condition from:
 - first replacement FAIL review commit
   `d77851c13ee8a0f2f54a214a9175aad1f4ee9285`;
 - fix-round FAIL review commit
-  `c6e6674cf508c2df11f3da15394007df030a7353`.
+  `c6e6674cf508c2df11f3da15394007df030a7353`;
+- second-fix FAIL review commit
+  `318e6de4c99cca9cb56ae99a77393718dbe83c1a`.
 
 The fixed Cloudflare token remains:
 
@@ -85,6 +87,8 @@ missing/truncated output, or uncertain completion spends the subgate.
 let secureConsoleOwnedTaskTabV2 = null;
 let secureConsoleOwnedTaskTabV2Eligible = false;
 let secureConsoleOwnedTaskTabV2State = "UNADOPTED";
+let secureConsoleOwnedTaskTabV2PreCreateDetachConsumed = false;
+let secureConsoleOwnedTaskTabV2PostNativeDetachConsumed = false;
 await (async () => {
   const counters = {
     getAttempted: 0,
@@ -171,6 +175,8 @@ await (async () => {
     secureConsoleOwnedTaskTabV2 = adopted;
     secureConsoleOwnedTaskTabV2Eligible = true;
     secureConsoleOwnedTaskTabV2State = "ADOPTED_ELIGIBLE";
+    secureConsoleOwnedTaskTabV2PreCreateDetachConsumed = false;
+    secureConsoleOwnedTaskTabV2PostNativeDetachConsumed = false;
   }
 })();
 ```
@@ -200,15 +206,43 @@ fixed `10000 ms`-deadline, no-browser detachment cell once. It leaves the
 candidate tab retained and untouched while removing the new authority alias:
 
 ```javascript
-secureConsoleOwnedTaskTabV2Eligible = false;
-secureConsoleOwnedTaskTabV2 = null;
-secureConsoleOwnedTaskTabV2State = "RETAINED_UNTOUCHED_PRECREATE_FAILURE";
+let preCreateDetachAttemptedV2 = 0;
+let preCreateDetachFulfilledV2 = 0;
+const preCreateDetachDeclarationsV2 =
+  typeof secureConsoleOwnedTaskTabV2 === "object" &&
+  typeof secureConsoleOwnedTaskTabV2Eligible === "boolean" &&
+  typeof secureConsoleOwnedTaskTabV2State === "string" &&
+  typeof secureConsoleOwnedTaskTabV2PreCreateDetachConsumed === "boolean" &&
+  typeof secureConsoleOwnedTaskTabV2PostNativeDetachConsumed === "boolean";
+const preCreateDetachPreconditionV2 =
+  preCreateDetachDeclarationsV2 &&
+  secureConsoleOwnedTaskTabV2 !== null &&
+  secureConsoleOwnedTaskTabV2Eligible === true &&
+  secureConsoleOwnedTaskTabV2State === "ADOPTED_ELIGIBLE" &&
+  secureConsoleOwnedTaskTabV2PreCreateDetachConsumed === false &&
+  secureConsoleOwnedTaskTabV2PostNativeDetachConsumed === false;
+let preCreateDetachResultV2 = "PRECONDITION_FAIL";
+if (preCreateDetachPreconditionV2) {
+  preCreateDetachAttemptedV2++;
+  secureConsoleOwnedTaskTabV2Eligible = false;
+  secureConsoleOwnedTaskTabV2 = null;
+  secureConsoleOwnedTaskTabV2State = "RETAINED_UNTOUCHED_PRECREATE_FAILURE";
+  secureConsoleOwnedTaskTabV2PreCreateDetachConsumed = true;
+  preCreateDetachFulfilledV2++;
+  preCreateDetachResultV2 = "EXACT_PRECREATE_BINDING_DETACH_PASS";
+}
 nodeRepl.write({
-  result: "EXACT_PRECREATE_BINDING_DETACH_PASS",
+  result: preCreateDetachResultV2,
+  declarationsValid: preCreateDetachDeclarationsV2,
+  preconditionValid: preCreateDetachPreconditionV2,
+  detachAttempted: preCreateDetachAttemptedV2,
+  detachFulfilled: preCreateDetachFulfilledV2,
+  preCreateConsumed: preCreateDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2PreCreateDetachConsumed : null,
+  postNativeConsumed: preCreateDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2PostNativeDetachConsumed : null,
   browserCalls: 0,
-  bindingEligible: secureConsoleOwnedTaskTabV2Eligible,
-  bindingNull: secureConsoleOwnedTaskTabV2 === null,
-  bindingState: secureConsoleOwnedTaskTabV2State,
+  bindingEligible: preCreateDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2Eligible : null,
+  bindingNull: preCreateDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2 === null : false,
+  bindingState: preCreateDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2State : "DECLARATION_INVALID",
 });
 ```
 
@@ -217,20 +251,54 @@ execute this fixed `10000 ms`-deadline, no-browser detachment cell once without
 any page/tab inspection:
 
 ```javascript
-secureConsoleOwnedTaskTabV2Eligible = false;
-secureConsoleOwnedTaskTabV2 = null;
-secureConsoleOwnedTaskTabV2State = "USER_NATIVE_CLOSE_REPORTED_BINDING_DETACHED";
+let postNativeDetachAttemptedV2 = 0;
+let postNativeDetachFulfilledV2 = 0;
+const postNativeDetachDeclarationsV2 =
+  typeof secureConsoleOwnedTaskTabV2 === "object" &&
+  typeof secureConsoleOwnedTaskTabV2Eligible === "boolean" &&
+  typeof secureConsoleOwnedTaskTabV2State === "string" &&
+  typeof secureConsoleOwnedTaskTabV2PreCreateDetachConsumed === "boolean" &&
+  typeof secureConsoleOwnedTaskTabV2PostNativeDetachConsumed === "boolean";
+const postNativeDetachPreconditionV2 =
+  postNativeDetachDeclarationsV2 &&
+  secureConsoleOwnedTaskTabV2 !== null &&
+  secureConsoleOwnedTaskTabV2Eligible === true &&
+  secureConsoleOwnedTaskTabV2State === "ADOPTED_ELIGIBLE" &&
+  secureConsoleOwnedTaskTabV2PreCreateDetachConsumed === false &&
+  secureConsoleOwnedTaskTabV2PostNativeDetachConsumed === false;
+let postNativeDetachResultV2 = "PRECONDITION_FAIL";
+if (postNativeDetachPreconditionV2) {
+  postNativeDetachAttemptedV2++;
+  secureConsoleOwnedTaskTabV2Eligible = false;
+  secureConsoleOwnedTaskTabV2 = null;
+  secureConsoleOwnedTaskTabV2State = "USER_NATIVE_CLOSE_REPORTED_BINDING_DETACHED";
+  secureConsoleOwnedTaskTabV2PostNativeDetachConsumed = true;
+  postNativeDetachFulfilledV2++;
+  postNativeDetachResultV2 = "EXACT_POST_NATIVE_CLOSE_BINDING_DETACH_PASS";
+}
 nodeRepl.write({
-  result: "EXACT_POST_NATIVE_CLOSE_BINDING_DETACH_PASS",
+  result: postNativeDetachResultV2,
+  declarationsValid: postNativeDetachDeclarationsV2,
+  preconditionValid: postNativeDetachPreconditionV2,
+  detachAttempted: postNativeDetachAttemptedV2,
+  detachFulfilled: postNativeDetachFulfilledV2,
+  preCreateConsumed: postNativeDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2PreCreateDetachConsumed : null,
+  postNativeConsumed: postNativeDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2PostNativeDetachConsumed : null,
   browserCalls: 0,
-  bindingEligible: secureConsoleOwnedTaskTabV2Eligible,
-  bindingNull: secureConsoleOwnedTaskTabV2 === null,
-  bindingState: secureConsoleOwnedTaskTabV2State,
+  bindingEligible: postNativeDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2Eligible : null,
+  bindingNull: postNativeDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2 === null : false,
+  bindingState: postNativeDetachDeclarationsV2 ? secureConsoleOwnedTaskTabV2State : "DECLARATION_INVALID",
 });
 ```
 
-Each detachment cell requires its complete fixed terminal and completed tool
-status. Neither cell proves tab closure. The pre-Create terminal explicitly
+Each detachment cell requires declaration/precondition `true`, its mutually
+exclusive consumed tuple, detach `1/1`, browser calls `0`, binding null,
+eligibility false, exact state, complete fixed terminal, and completed tool
+status. A precondition failure, second/opposite cell, repeated invocation,
+timeout, missing/truncated output, or uncertain completion spends that
+disposition without retry or fallback; if mutation may have occurred, alias
+state is `NOT_PROVEN` and the other cell is forbidden. Neither cell proves tab
+closure. The pre-Create terminal explicitly
 classifies the tab retained/untouched; the post-native-close terminal records
 only the user's reported native action and JS alias detachment. No second get,
 list, reacquisition, alternate handle, agent close, or metadata read is
@@ -280,6 +348,22 @@ $scopeOwnerWaitFulfilled = 0
 $scopeOwnerFileCleanup = 0
 $scopeOwnerRootCleanup = 0
 $scopeProxyCleanup = 0
+$scopeProxyChildStartAttempted = 0
+$scopeProxyChildStartFulfilled = 0
+$scopeProxyChildWaitAttempted = 0
+$scopeProxyChildWaitFulfilled = 0
+$scopeProxyChildTerminationAttempted = 0
+$scopeProxyChildTerminationFulfilled = 0
+$scopeProxyChildExitProofAttempted = 0
+$scopeProxyChildExitProofFulfilled = 0
+$scopeProxyChildDrainAttempted = 0
+$scopeProxyChildDrainFulfilled = 0
+$scopeProxyChildDisposeAttempted = 0
+$scopeProxyChildDisposeFulfilled = 0
+$scopeProxyChildResidual = 'NONE'
+$scopeProxyCleanupProcess = $null
+$scopeProxyCleanupOutTask = $null
+$scopeProxyCleanupErrTask = $null
 $scopeOwnerResidual = 'NONE'
 $ownerTerminationAttempted = 0
 $ownerTerminationFulfilled = 0
@@ -313,20 +397,67 @@ printf 'EXACT_PROXY_CLEANUP=PASS\n'
     foreach ($arg in @('-i','C:\Users\chatc\.ssh\codex-prox01-vms-ed25519','-o','BatchMode=yes','-o','ConnectTimeout=10','-o','ServerAliveInterval=5','-o','ServerAliveCountMax=3','belladmin@192.168.1.68',$remote)) {
         $null = $startInfo.ArgumentList.Add($arg)
     }
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    if (-not $process.Start()) { throw 'SCOPE_PROXY_CLEANUP_START_FAILED' }
-    $outTask = $process.StandardOutput.ReadToEndAsync()
-    $errTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(60000)) {
-        try { $process.Kill() } catch {}
-        $null = $process.WaitForExit(10000)
-        throw 'SCOPE_PROXY_CLEANUP_TIMEOUT'
+    $script:scopeProxyCleanupProcess = [Diagnostics.Process]::new()
+    $script:scopeProxyCleanupProcess.StartInfo = $startInfo
+    $script:scopeProxyChildStartAttempted++
+    try { $started = $script:scopeProxyCleanupProcess.Start() }
+    catch {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_START_UNCERTAIN'
+        throw 'SCOPE_PROXY_CLEANUP_START_UNCERTAIN'
     }
-    if (-not [Threading.Tasks.Task]::WaitAll(@($outTask,$errTask),5000)) { throw 'SCOPE_PROXY_CLEANUP_DRAIN_UNCERTAIN' }
-    $ok = $process.ExitCode -eq 0 -and $outTask.Result.Trim() -eq 'EXACT_PROXY_CLEANUP=PASS' -and [string]::IsNullOrWhiteSpace($errTask.Result)
-    $process.Dispose()
-    if (-not $ok) { throw 'SCOPE_PROXY_CLEANUP_NOT_PROVEN' }
+    if (-not $started) {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_START_FAILED'
+        $script:scopeProxyChildDisposeAttempted++
+        $script:scopeProxyCleanupProcess.Dispose()
+        $script:scopeProxyChildDisposeFulfilled++
+        $script:scopeProxyCleanupProcess = $null
+        throw 'SCOPE_PROXY_CLEANUP_START_FAILED'
+    }
+    $script:scopeProxyChildStartFulfilled++
+    $script:scopeProxyCleanupOutTask = $script:scopeProxyCleanupProcess.StandardOutput.ReadToEndAsync()
+    $script:scopeProxyCleanupErrTask = $script:scopeProxyCleanupProcess.StandardError.ReadToEndAsync()
+    $script:scopeProxyChildWaitAttempted++
+    if (-not $script:scopeProxyCleanupProcess.WaitForExit(60000)) {
+        $script:scopeProxyChildTerminationAttempted++
+        try {
+            $script:scopeProxyCleanupProcess.Kill()
+            $script:scopeProxyChildTerminationFulfilled++
+        }
+        catch {}
+        $script:scopeProxyChildExitProofAttempted++
+        if ($script:scopeProxyCleanupProcess.WaitForExit(10000)) {
+            $script:scopeProxyChildExitProofFulfilled++
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_TIMEOUT_EXIT_PROVEN'
+            throw 'SCOPE_PROXY_CLEANUP_TIMEOUT_EXIT_PROVEN'
+        }
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_EXIT_NOT_PROVEN'
+        throw 'SCOPE_PROXY_CLEANUP_TIMEOUT_EXIT_NOT_PROVEN'
+    }
+    $script:scopeProxyChildWaitFulfilled++
+    $script:scopeProxyChildDrainAttempted++
+    if (-not [Threading.Tasks.Task]::WaitAll(@($script:scopeProxyCleanupOutTask,$script:scopeProxyCleanupErrTask),5000)) {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DRAIN_NOT_PROVEN'
+        throw 'SCOPE_PROXY_CLEANUP_DRAIN_UNCERTAIN'
+    }
+    $script:scopeProxyChildDrainFulfilled++
+    $ok = $script:scopeProxyCleanupProcess.ExitCode -eq 0 -and $script:scopeProxyCleanupOutTask.Result.Trim() -eq 'EXACT_PROXY_CLEANUP=PASS' -and [string]::IsNullOrWhiteSpace($script:scopeProxyCleanupErrTask.Result)
+    if (-not $ok) {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_TERMINAL_NOT_PROVEN'
+        $script:scopeProxyChildDisposeAttempted++
+        $script:scopeProxyCleanupProcess.Dispose()
+        $script:scopeProxyChildDisposeFulfilled++
+        $script:scopeProxyCleanupProcess = $null
+        $script:scopeProxyCleanupOutTask = $null
+        $script:scopeProxyCleanupErrTask = $null
+        throw 'SCOPE_PROXY_CLEANUP_NOT_PROVEN'
+    }
+    $script:scopeProxyChildDisposeAttempted++
+    $script:scopeProxyCleanupProcess.Dispose()
+    $script:scopeProxyChildDisposeFulfilled++
+    $script:scopeProxyCleanupProcess = $null
+    $script:scopeProxyCleanupOutTask = $null
+    $script:scopeProxyCleanupErrTask = $null
+    $script:scopeProxyChildResidual = 'NONE'
 }
 
 function Remove-ExactScopePreparedFiles {
@@ -371,7 +502,7 @@ try {
     $ownerPreacceptDispositionCodeForScope = $dispositionMatchForScope.Groups['code'].Value
     $dispositionBytesForScope = [Text.UTF8Encoding]::new($false).GetBytes($ownerPreacceptDispositionCodeForScope)
     $dispositionHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($dispositionBytesForScope))
-    if ($dispositionBytesForScope.Length -ne 2190 -or $dispositionHashForScope -cne '53AF93C906957FB11124674512B28088870128529AC5D6944B7C880E21415094') { throw 'DISPOSITION_SCOPE_BYTE_PIN_FAILED' }
+    if ($dispositionBytesForScope.Length -ne 3308 -or $dispositionHashForScope -cne 'B8087F2CB77A695C1B6DD145DDD3D39D48F8AABEBBA00863BEA0610C8BE6518E') { throw 'DISPOSITION_SCOPE_BYTE_PIN_FAILED' }
 
     $scopeOwnerStartAttempted++
     . ([scriptblock]::Create($launchMatchForScope.Groups['code'].Value))
@@ -391,7 +522,7 @@ catch {
             $scopeOwnerResidual = 'PRESTART_CLEANUP_PASS'
         }
         catch { $scopeOwnerResidual = 'PRESTART_CLEANUP_NOT_PROVEN' }
-        [Console]::Out.WriteLine(('EXACT_RETAINED_SCOPE_OWNER_LAUNCH=FAIL START={0}/{1} HANDLE=FALSE FILE_CLEANUP={2} ROOT_CLEANUP={3} PROXY_CLEANUP={4} RESIDUAL={5}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual))
+        [Console]::Out.WriteLine(('EXACT_RETAINED_SCOPE_OWNER_LAUNCH=FAIL START={0}/{1} HANDLE=FALSE FILE_CLEANUP={2} ROOT_CLEANUP={3} PROXY_CLEANUP={4} RESIDUAL={5} PROXY_CHILD_START={6}/{7} WAIT={8}/{9} TERMINATION={10}/{11} EXIT_PROOF={12}/{13} DRAIN={14}/{15} DISPOSE={16}/{17} CHILD_RESIDUAL={18}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual,$scopeProxyChildStartAttempted,$scopeProxyChildStartFulfilled,$scopeProxyChildWaitAttempted,$scopeProxyChildWaitFulfilled,$scopeProxyChildTerminationAttempted,$scopeProxyChildTerminationFulfilled,$scopeProxyChildExitProofAttempted,$scopeProxyChildExitProofFulfilled,$scopeProxyChildDrainAttempted,$scopeProxyChildDrainFulfilled,$scopeProxyChildDisposeAttempted,$scopeProxyChildDisposeFulfilled,$scopeProxyChildResidual))
         throw 'RETAINED_SCOPE_PRESTART_FAILURE_NO_RETRY'
     }
     if ($owner -is [Diagnostics.Process] -and $null -ne $ownerClock) {
@@ -401,7 +532,7 @@ catch {
         throw 'RETAINED_SCOPE_POSTSTART_FAILURE_DISPOSED_NO_RETRY'
     }
     $scopeOwnerResidual = 'START_UNCERTAIN_NO_HANDLE'
-    [Console]::Out.WriteLine(('EXACT_RETAINED_SCOPE_OWNER_LAUNCH=FAIL START={0}/{1} HANDLE=FALSE WAIT=0/0 TERMINATION=0/0 EXIT_PROOF=0/0 FILE_CLEANUP=0 ROOT_CLEANUP=0 PROXY_CLEANUP=0 RESIDUAL={2}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerResidual))
+    [Console]::Out.WriteLine(('EXACT_RETAINED_SCOPE_OWNER_LAUNCH=FAIL START={0}/{1} HANDLE=FALSE WAIT=0/0 TERMINATION=0/0 EXIT_PROOF=0/0 FILE_CLEANUP=0 ROOT_CLEANUP=0 PROXY_CLEANUP=0 RESIDUAL={2} PROXY_CHILD_START=0/0 WAIT=0/0 TERMINATION=0/0 EXIT_PROOF=0/0 DRAIN=0/0 DISPOSE=0/0 CHILD_RESIDUAL=NONE' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerResidual))
     throw 'RETAINED_SCOPE_START_UNCERTAIN_NO_HANDLE_NO_RETRY'
 }
 ```
@@ -426,7 +557,7 @@ try {
     Invoke-ExactScopeProxyCleanup
     $scopeProxyCleanup = 1
     $scopeOwnerResidual = 'NONE'
-    [Console]::Out.WriteLine(('EXACT_PREACCEPT_OWNER_DISPOSITION=PASS START={0}/{1} HANDLE={2} WAIT={3}/{4} TERMINATION={5}/{6} EXIT_PROOF={7}/{8} FILE_CLEANUP={9} ROOT_CLEANUP={10} PROXY_CLEANUP={11} RESIDUAL={12}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerHandleRetained.ToString().ToUpperInvariant(),$scopeOwnerWaitAttempted,$scopeOwnerWaitFulfilled,$ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual))
+    [Console]::Out.WriteLine(('EXACT_PREACCEPT_OWNER_DISPOSITION=PASS START={0}/{1} HANDLE={2} WAIT={3}/{4} TERMINATION={5}/{6} EXIT_PROOF={7}/{8} FILE_CLEANUP={9} ROOT_CLEANUP={10} PROXY_CLEANUP={11} RESIDUAL={12} PROXY_CHILD_START={13}/{14} WAIT={15}/{16} TERMINATION={17}/{18} EXIT_PROOF={19}/{20} DRAIN={21}/{22} DISPOSE={23}/{24} CHILD_RESIDUAL={25}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerHandleRetained.ToString().ToUpperInvariant(),$scopeOwnerWaitAttempted,$scopeOwnerWaitFulfilled,$ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual,$scopeProxyChildStartAttempted,$scopeProxyChildStartFulfilled,$scopeProxyChildWaitAttempted,$scopeProxyChildWaitFulfilled,$scopeProxyChildTerminationAttempted,$scopeProxyChildTerminationFulfilled,$scopeProxyChildExitProofAttempted,$scopeProxyChildExitProofFulfilled,$scopeProxyChildDrainAttempted,$scopeProxyChildDrainFulfilled,$scopeProxyChildDisposeAttempted,$scopeProxyChildDisposeFulfilled,$scopeProxyChildResidual))
 }
 catch {
     if ($null -ne $owner) {
@@ -437,7 +568,7 @@ catch {
         catch { $scopeOwnerResidual = 'EXACT_OWNER_STATE_NOT_PROVEN' }
     }
     elseif ($scopeOwnerResidual -eq 'NONE') { $scopeOwnerResidual = 'POSTEXIT_CLEANUP_NOT_PROVEN' }
-    [Console]::Out.WriteLine(('EXACT_PREACCEPT_OWNER_DISPOSITION=FAIL START={0}/{1} HANDLE={2} WAIT={3}/{4} TERMINATION={5}/{6} EXIT_PROOF={7}/{8} FILE_CLEANUP={9} ROOT_CLEANUP={10} PROXY_CLEANUP={11} RESIDUAL={12}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerHandleRetained.ToString().ToUpperInvariant(),$scopeOwnerWaitAttempted,$scopeOwnerWaitFulfilled,$ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual))
+    [Console]::Out.WriteLine(('EXACT_PREACCEPT_OWNER_DISPOSITION=FAIL START={0}/{1} HANDLE={2} WAIT={3}/{4} TERMINATION={5}/{6} EXIT_PROOF={7}/{8} FILE_CLEANUP={9} ROOT_CLEANUP={10} PROXY_CLEANUP={11} RESIDUAL={12} PROXY_CHILD_START={13}/{14} WAIT={15}/{16} TERMINATION={17}/{18} EXIT_PROOF={19}/{20} DRAIN={21}/{22} DISPOSE={23}/{24} CHILD_RESIDUAL={25}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerHandleRetained.ToString().ToUpperInvariant(),$scopeOwnerWaitAttempted,$scopeOwnerWaitFulfilled,$ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual,$scopeProxyChildStartAttempted,$scopeProxyChildStartFulfilled,$scopeProxyChildWaitAttempted,$scopeProxyChildWaitFulfilled,$scopeProxyChildTerminationAttempted,$scopeProxyChildTerminationFulfilled,$scopeProxyChildExitProofAttempted,$scopeProxyChildExitProofFulfilled,$scopeProxyChildDrainAttempted,$scopeProxyChildDrainFulfilled,$scopeProxyChildDisposeAttempted,$scopeProxyChildDisposeFulfilled,$scopeProxyChildResidual))
     throw 'RETAINED_SCOPE_PREACCEPT_DISPOSITION_NOT_PROVEN_NO_RETRY'
 }
 ```
@@ -473,6 +604,14 @@ The retained parent records fixed start-state counters and booleans:
 `OWNER_WAIT_ATTEMPTED/FULFILLED`, `OWNER_TERMINATION_ATTEMPTED/FULFILLED`,
 `OWNER_EXIT_PROOF_ATTEMPTED/FULFILLED`, `OWNER_FILE_CLEANUP`,
 `OWNER_ROOT_CLEANUP`, and `OWNER_RESIDUAL`.
+
+The guarded proxy-cleanup SSH child separately records start, wait,
+termination, exit-proof, stream-drain, and dispose attempted/fulfilled counters,
+retains its exact process plus output/error tasks until proven drain and safe
+disposal, and reports `PROXY_CLEANUP_CHILD_RESIDUAL`. Timeout permits one
+exact-handle kill and one checked exit-proof wait only. Exit-not-proven,
+start-uncertain, or drain-not-proven retains the exact handle/tasks, forbids a
+second wait/kill/cleanup invocation or process lookup, and stops.
 
 The parent increments start attempted immediately before dot-sourcing the exact
 launch fence. It increments start fulfilled and sets handle retained only after

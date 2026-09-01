@@ -63,7 +63,8 @@ exactly `task-2-secure-console-transfer-token-page-readiness-replacement-brief.m
 `task-2-secure-console-transfer-token-page-readiness-replacement-sol-review.md`,
 `task-2-secure-console-transfer-token-page-readiness-replacement-fix1-sol-review.md`,
 `task-2-secure-console-transfer-token-page-readiness-replacement-fix2-sol-review.md`,
-and `task-2-secure-console-transfer-token-page-readiness-replacement-fix2-execution-classification.md`.
+`task-2-secure-console-transfer-token-page-readiness-replacement-fix3-sol-review.md`,
+and `task-2-secure-console-transfer-token-page-readiness-replacement-fix3-execution-classification.md`.
 No directory, glob, prefix, suffix, or other artifact is excluded.
 
 Reject paths containing control characters. Enumerate every tracked path with
@@ -76,7 +77,7 @@ bytes. Sort complete lines ordinally, concatenate without BOM or any other
 transformation, and hash those bytes. Required digest:
 `C4C9807FD5667E872BCBCFFD60FBF2AA71AEBC788AC744EFCD93FF18457C8E0F`.
 
-`git diff --cached --quiet` must succeed. After the five exclusions, exact
+`git diff --cached --quiet` must succeed. After the six exclusions, exact
 `git status --porcelain=v1 --untracked-files=normal` is 12 records: modified
 `open-sse/services/codexQuotaFetcher.ts`, `src/app/api/v1/models/catalog.ts`,
 `src/lib/localDb.ts`, `tests/unit/api/models-agent-route-aliases.test.ts`, and
@@ -100,8 +101,12 @@ Fix1 brief `cbb2209a375b8f17b8745513f7e43bde3f0b377a` is `42057` bytes SHA-256
 `A901FAB22A750DB64ACBE38148EB67A961BCE5C600700C3FA33EF129B93474C4`;
 fix1 FAIL review `bfc203bfe1ad49086c11f53b413d1cc8971b18c6` is `9773` bytes SHA-256
 `E16F0448A0A414875ED4C50E55963A01F8CAA7A4EEBAE6C8906F548679256965`.
-The fix2 brief commit must have `bfc203...` as direct parent, its fix2 review
-must have the fix2 brief as direct parent, and the fix2 execution
+Fix2 brief `d56e2bb9443aebfae301ff0f883266dfa7946890` is `53932` bytes SHA-256
+`4041BB6B6B9A4AB0735BB7A1AA41953112BEE37CCDE0083EA4284AFEA9230666`;
+fix2 FAIL review `080f9bec66a3b8f94b93e59e0c5e5463d9695401` is `7249` bytes SHA-256
+`2233C0A1F71343FC253F2851EFAC46526EA841C2E6A625B5EA55399ED3BCCB71`.
+The fix3 brief commit must have `080f9bec...` as direct parent, its fix3 review
+must have the fix3 brief as direct parent, and the fix3 execution
 classification must have that review as direct parent. Classification pins
 only already-existing incident/brief/review objects above, the committed fix2
 brief and review direct bytes, the exact expected classification path, and the
@@ -111,7 +116,7 @@ After classification is committed, the root owner records a separate
 action-time coordinator evidence tuple containing the classification commit,
 its direct parent, exact path, direct byte length, direct SHA-256, current HEAD,
 and projection digest. It is valid only when HEAD equals that classification
-commit, its parent equals the reviewed fix2-review commit, and all direct bytes
+commit, its parent equals the reviewed fix3-review commit, and all direct bytes
 reproduce. The tuple is not committed and does not pin its own identity. It
 must exist and revalidate immediately before browser use. Missing, non-direct,
 merged, substituted, self-referential, or unpinned ancestry blocks execution.
@@ -146,8 +151,8 @@ below and are part of this contract:
 
 | New V3 fence | Bytes | SHA-256 |
 | --- | ---: | --- |
-| adopt and token readiness | `11813` | `B508877FBBA9546C8C7655FDFF989D13CE982C9F0B4CE027C64A521D707A6765` |
-| fresh Cloudflare prestart reads | `20834` | `A61097CDB9902C1CB3F59D5F455F7CC84305CF0E3AC33656CFCDD76523A403EE` |
+| adopt and token readiness | `10987` | `9000B5CBB1770DF58C307D1D3FED66844B0A6A2A239ED100D144C6C9DEBCAEA7` |
+| fresh Cloudflare prestart reads | `19737` | `C9299E0BE4FFFB211B052C1F0E71D8DBEAFA89422EFA5BFC0BB88C380F65EE73` |
 | pre-Create detach | `2196` | `467F98589FD335AC6393B8BFEF64D7A3101EBE27C5BAA74E37A7FABA68AC5F60` |
 | post-native detach | `2201` | `55B407F463C351B64174800617E8B3F64B3CE98D60BAA1BEAEF1E6D3312B10A5` |
 
@@ -165,9 +170,10 @@ wait before title/control/name/row checks.
 The search input's required `aria-controls` must identify exactly one result
 region. Fresh-navigation baseline is complete only with its exact paginator,
 row total, busy-free state, and either a complete nonempty page or authoritative
-global `0-0 of 0` terminal. A nonempty baseline must mutate to the exact
-query-empty terminal after the one fill; a globally empty baseline proves
-absence before the fill, so no unchanged empty marker is load-bearing.
+global `0-0 of 0` terminal. From a nonempty baseline, a bounded native locator
+wait requires the exact empty status to become visible after the one fill; a
+globally empty baseline proves absence before the fill, so an unchanged empty
+marker is not load-bearing. Evaluate calls only take synchronous read snapshots.
 
 ```javascript
 let secureConsoleOwnedTaskTabV3 = null;
@@ -282,42 +288,28 @@ await (async () => {
       };
     });
     if (!tokenBaseline.terminalZero && !tokenBaseline.completeNonempty) throw new Error("TokenBaselineIncompleteError");
-    if (tokenBaseline.completeNonempty) await tokenFilter.evaluate((input, args) => {
-      const root = document.getElementById(args.regionId);
-      if (root === null) throw new Error("TokenRegionMissingError");
-      const state = { mutations: 0, input, resolve: null, reject: null, observer: null, timer: null };
-      state.promise = new Promise((resolve, reject) => { state.resolve = resolve; state.reject = reject; });
-      const check = () => {
-        const pager = root.querySelector('[aria-label="Pagination"]');
-        const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager?.textContent || "").replace(/\s+/g, " ").trim());
-        const rows = root.querySelectorAll("table tbody tr").length;
-        const statuses = [...root.querySelectorAll('[role="status"]')].filter((item) => /^(?:no api tokens found|no tokens found)$/i.test((item.textContent || "").trim()));
-        const buttons = pager === null ? [] : [...pager.querySelectorAll("button")];
-        const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
-        const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
-        const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
-        const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
-        if (state.mutations > 0 && input.value === args.expected && !busy && match !== null && Number(match[1]) === 0 && Number(match[2]) === 0 && Number(match[3]) === 0 && rows === 0 && statuses.length === 1 && next.length === 1 && previous.length === 1 && disabled(next[0]) && disabled(previous[0])) {
-          state.observer.disconnect(); clearTimeout(state.timer); state.resolve(true);
-        }
-      };
-      state.observer = new MutationObserver(() => { state.mutations++; check(); });
-      state.observer.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
-      state.timer = setTimeout(() => { state.observer.disconnect(); state.reject(new Error("TokenResultTransitionTimeout")); }, 20000);
-      root.__secureConsoleTokenTransitionV3 = state;
-    }, { regionId: tokenRegionId, expected: "OmniRoute secure console R5 20260901" });
     counters.fillAttempted++;
     await tokenFilter.fill("OmniRoute secure console R5 20260901");
     counters.fillFulfilled++;
-    tokenFilterComplete = tokenBaseline.terminalZero
-      ? await tokenFilter.evaluate((input) => input.value === "OmniRoute secure console R5 20260901")
-      : await tokenResultsRoot.evaluate(async (root) => {
-          const state = root.__secureConsoleTokenTransitionV3;
-          if (typeof state !== "object" || state === null) return false;
-          const complete = await state.promise;
-          delete root.__secureConsoleTokenTransitionV3;
-          return complete === true;
-        });
+    const tokenEmptyStatus = tokenResultsRoot.getByRole("status").filter({ hasText: /^(?:no api tokens found|no tokens found)$/i });
+    counters.readinessAttempted++;
+    await tokenEmptyStatus.waitFor({ state: "visible", timeoutMs: 20000 });
+    counters.readinessFulfilled++;
+    if (await tokenEmptyStatus.count() !== 1) throw new Error("TokenEmptyStatusCountError");
+    const tokenValueExact = await tokenFilter.evaluate((input) => input.value === "OmniRoute secure console R5 20260901");
+    const tokenTerminal = await tokenResultsRoot.evaluate((root) => {
+      const pager = root.querySelector('[aria-label="Pagination"]');
+      const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager?.textContent || "").replace(/\s+/g, " ").trim());
+      const rows = root.querySelectorAll("table tbody tr").length;
+      const statuses = [...root.querySelectorAll('[role="status"]')].filter((item) => /^(?:no api tokens found|no tokens found)$/i.test((item.textContent || "").trim()));
+      const buttons = pager === null ? [] : [...pager.querySelectorAll("button")];
+      const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
+      const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
+      const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
+      const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
+      return !busy && match !== null && Number(match[1]) === 0 && Number(match[2]) === 0 && Number(match[3]) === 0 && rows === 0 && statuses.length === 1 && next.length === 1 && previous.length === 1 && disabled(next[0]) && disabled(previous[0]);
+    });
+    tokenFilterComplete = tokenValueExact && tokenTerminal && (tokenBaseline.terminalZero || tokenBaseline.completeNonempty);
 
     counters.titleAttempted++;
     const title = await adopted.title();
@@ -335,6 +327,7 @@ await (async () => {
     matchingRowCount = await tokenResultsRoot.getByRole("row").filter({ hasText: "OmniRoute secure console R5 20260901" }).count();
     counters.rowFulfilled++;
     if (!titleExact || createControlCount !== 1 || tokenNameCount !== 0 || matchingRowCount !== 0 || !tokenFilterComplete ||
+        counters.readinessAttempted !== 2 || counters.readinessFulfilled !== 2 ||
         counters.fillAttempted !== 1 || counters.fillFulfilled !== 1) {
       throw new Error("AuthenticatedTokenPageStateError");
     }
@@ -389,8 +382,9 @@ await (async () => {
 ```
 
 Exact PASS requires the fixed PASS terminal; all declaration/ownership/title
-booleans and `tokenFilterComplete` true; Create count `1`; token-name/row `0/0`; get, navigation, readiness,
-title, Create, name, and row counters all `1/1`; page-local search fill `1/1`;
+booleans and `tokenFilterComplete` true; Create count `1`; token-name/row `0/0`;
+get, navigation, title, Create, name, and row counters all `1/1`; native
+locator readiness `2/2`; page-local search fill `1/1`;
 write attempted `1`;
 `errorClass=NONE`; complete untruncated output; completed tool status; and the
 later private V3 alias/eligibility/state tuple exact. Alias assignment and
@@ -411,19 +405,19 @@ After exact V3 PASS and before clipboard clear, proxy start, preparation, or
 owner launch, run this exact cell once with fixed outer deadline `240000 ms`.
 It serially proves fresh DNS, rate-rule, Tunnel/connector, Access-application,
 and final token-row state. Each page transition has one fixed `20000 ms`
-visible-locator readiness wait. Private hrefs, account/zone identifiers,
+visible-locator readiness sequence, and every exact empty-status transition is
+individually bounded at `20000 ms`. Private hrefs, account/zone identifiers,
 titles, page text, and DOM content are never output.
 
 Every search filter must bind by required `aria-controls` to one exact result
-region. A fresh-navigation clear is accepted only after the bound paginator
-readiness and a completed region baseline; each reused-filter clear must arm
-and observe a new region mutation to that baseline. An authoritative busy-free
-`0-0 of 0`, zero-row, exact-status,
-terminal-paginator baseline proves global absence; otherwise the prior empty
-status must leave for a completed nonempty baseline. The query fill then must
-cause a new region mutation to the exact query-empty terminal. Thus an already
-visible marker never proves a new query. Rate state uses the same exact
-panel-bound paginator/row/busy terminal without a broad page scan.
+region. Every query starts from a fresh navigation to its exact page; its clear
+is accepted only after bound-paginator readiness and a completed region
+baseline. An authoritative busy-free `0-0 of 0`, zero-row, exact-status,
+terminal-paginator baseline proves global absence; otherwise the fresh baseline
+must be complete and nonempty before the query fill, after which a bounded
+native locator wait requires a newly visible exact empty status. No injected
+observer, timer, Promise, expando, concurrent wait, or post-failure cleanup is
+used. Rate uses the same exact panel-bound paginator/row/busy terminal.
 
 ```javascript
 await (async () => {
@@ -481,55 +475,14 @@ await (async () => {
     await locator.waitFor({ state: "visible", timeoutMs: 20000 });
     counters.readinessFulfilled++;
   };
-  const filteredZero = async (filter, query, targetTexts, emptyTexts, freshBaseline) => {
+  const filteredZero = async (filter, query, targetTexts, emptyTexts) => {
     if (await filter.count() !== 1) throw new Error("FilterCountError");
     const regionId = await filter.getAttribute("aria-controls");
     if (typeof regionId !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,127}$/.test(regionId)) throw new Error("FilterRegionBindingError");
     const resultsRoot = secureConsoleOwnedTaskTabV3.playwright.locator(`#${regionId}`);
     if (await resultsRoot.count() !== 1) throw new Error("FilterRegionCountError");
     await readyOne(resultsRoot.locator('[aria-label="Pagination"]'));
-    const arm = async (expected, mode) => {
-      await filter.evaluate((input, args) => {
-        const root = document.getElementById(args.regionId);
-        if (root === null) throw new Error("FilterRegionMissingError");
-        const old = root.__secureConsoleFilterTransitionV3;
-        if (typeof old === "object" && old !== null) { old.observer?.disconnect(); clearTimeout(old.timer); }
-        const state = { mutations: 0, input, resolve: null, reject: null, observer: null, timer: null };
-        state.promise = new Promise((resolve, reject) => { state.resolve = resolve; state.reject = reject; });
-        const check = () => {
-          const pagerList = [...root.querySelectorAll('[aria-label="Pagination"]')];
-          if (pagerList.length !== 1) return;
-          const pager = pagerList[0];
-          const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager.textContent || "").replace(/\s+/g, " ").trim());
-          const rows = root.querySelectorAll("table tbody tr").length;
-          const statuses = [...root.querySelectorAll('[role="status"]')].filter((item) => args.emptyTexts.includes((item.textContent || "").trim()));
-          const buttons = [...pager.querySelectorAll("button")];
-          const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
-          const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
-          const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
-          const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
-          if (state.mutations < 1 || input.value !== args.expected || busy || match === null || next.length !== 1 || previous.length !== 1) return;
-          const start = Number(match[1]), end = Number(match[2]), total = Number(match[3]);
-          const terminalZero = start === 0 && end === 0 && total === 0 && rows === 0 && statuses.length === 1 && disabled(next[0]) && disabled(previous[0]);
-          const completeNonempty = start === 1 && end === rows && total >= rows && rows > 0 && statuses.length === 0 && disabled(previous[0]) && disabled(next[0]) === (end >= total);
-          if ((args.mode === "baseline" && (terminalZero || completeNonempty)) || (args.mode === "zero" && terminalZero)) {
-            state.observer.disconnect(); clearTimeout(state.timer); state.resolve({ terminalZero, completeNonempty });
-          }
-        };
-        state.observer = new MutationObserver(() => { state.mutations++; check(); });
-        state.observer.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
-        state.timer = setTimeout(() => { state.observer.disconnect(); state.reject(new Error("FilterResultTransitionTimeout")); }, 20000);
-        root.__secureConsoleFilterTransitionV3 = state;
-      }, { regionId, expected, mode, emptyTexts });
-    };
-    const finish = async () => resultsRoot.evaluate(async (root) => {
-      const state = root.__secureConsoleFilterTransitionV3;
-      if (typeof state !== "object" || state === null) throw new Error("FilterTransitionStateError");
-      const proof = await state.promise;
-      delete root.__secureConsoleFilterTransitionV3;
-      return proof;
-    });
-    const readBaseline = async () => resultsRoot.evaluate((root, expectedEmptyTexts) => {
+    const readState = async () => resultsRoot.evaluate((root, expectedEmptyTexts) => {
       const pagerList = [...root.querySelectorAll('[aria-label="Pagination"]')];
       if (pagerList.length !== 1) return { terminalZero: false, completeNonempty: false };
       const pager = pagerList[0];
@@ -548,22 +501,23 @@ await (async () => {
         completeNonempty: start === 1 && end === rows && total >= rows && rows > 0 && statuses.length === 0 && disabled(previous[0]) && disabled(next[0]) === (end >= total),
       };
     }, emptyTexts);
-    if (!freshBaseline) await arm("", "baseline");
     counters.fillAttempted++;
     await filter.fill("");
     counters.fillFulfilled++;
-    const baseline = freshBaseline ? await readBaseline() : await finish();
+    const baseline = await readState();
     if (baseline.terminalZero !== true && baseline.completeNonempty !== true) throw new Error("FilterBaselineIncompleteError");
-    if (baseline.completeNonempty) await arm(query, "zero");
     counters.fillAttempted++;
     await filter.fill(query);
     counters.fillFulfilled++;
-    if (baseline.completeNonempty) {
-      const completion = await finish();
-      if (completion.terminalZero !== true) throw new Error("FilteredResultsIncompleteError");
-    } else if (!await filter.evaluate((input, expected) => input.value === expected, query)) {
-      throw new Error("FilterValueFreshnessError");
-    }
+    const exactEmpty = new RegExp(`^(?:${emptyTexts.map((text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})$`);
+    const emptyStatus = resultsRoot.getByRole("status").filter({ hasText: exactEmpty });
+    counters.readinessAttempted++;
+    await emptyStatus.waitFor({ state: "visible", timeoutMs: 20000 });
+    counters.readinessFulfilled++;
+    if (await emptyStatus.count() !== 1) throw new Error("FilteredEmptyStatusCountError");
+    const queryExact = await filter.evaluate((input, expected) => input.value === expected, query);
+    const completion = await readState();
+    if (!queryExact || completion.terminalZero !== true) throw new Error("FilteredResultsIncompleteError");
     const counts = [];
     for (const text of targetTexts) counts.push(await resultsRoot.getByRole("row").filter({ hasText: text }).count());
     if (counts.some((count) => count !== 0)) throw new Error("FilteredTargetPresentError");
@@ -612,7 +566,6 @@ await (async () => {
       "ai-api-omniroute.mysw.me",
       ["ai-api-omniroute.mysw.me"],
       ["No DNS records found", "No records found"],
-      true,
     );
     dnsFilterComplete = true;
 
@@ -691,8 +644,20 @@ await (async () => {
     await clickOne(tunnelsLink);
     await readyOne(secureConsoleOwnedTaskTabV3.playwright.getByText(/create.*tunnel/i));
     const tunnelFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search tunnels/i });
-    [tunnelTargetNameCount] = await filteredZero(tunnelFilter, "omniroute-team-tunnel", ["omniroute-team-tunnel"], ["No tunnels found"], true);
-    [tunnelTargetHostCount] = await filteredZero(tunnelFilter, "ai-api-omniroute.mysw.me", ["ai-api-omniroute.mysw.me"], ["No tunnels found"], false);
+    [tunnelTargetNameCount] = await filteredZero(tunnelFilter, "omniroute-team-tunnel", ["omniroute-team-tunnel"], ["No tunnels found"]);
+    await navigate(zeroTrustUrl.href);
+    const tunnelHostUrl = new URL(await secureConsoleOwnedTaskTabV3.url());
+    const tunnelHostPath = /^\/([0-9a-f]{32})(?:\/home)?\/?$/.exec(tunnelHostUrl.pathname);
+    if (tunnelHostUrl.hostname !== "one.dash.cloudflare.com" || tunnelHostPath === null || tunnelHostPath[1] !== accountSegment) throw new Error("TunnelHostAccountBindingError");
+    const networksButtonForHost = secureConsoleOwnedTaskTabV3.playwright.getByRole("button", { name: "Networks", exact: true });
+    await readyOne(networksButtonForHost);
+    await clickOne(networksButtonForHost);
+    const tunnelsLinkForHost = secureConsoleOwnedTaskTabV3.playwright.getByRole("link", { name: /tunnels/i });
+    await readyOne(tunnelsLinkForHost);
+    await clickOne(tunnelsLinkForHost);
+    await readyOne(secureConsoleOwnedTaskTabV3.playwright.getByText(/create.*tunnel/i));
+    const tunnelHostFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search tunnels/i });
+    [tunnelTargetHostCount] = await filteredZero(tunnelHostFilter, "ai-api-omniroute.mysw.me", ["ai-api-omniroute.mysw.me"], ["No tunnels found"]);
     tunnelFiltersComplete = true;
 
     const accessButton = secureConsoleOwnedTaskTabV3.playwright.getByRole("button", { name: "Access", exact: true });
@@ -703,13 +668,25 @@ await (async () => {
     await clickOne(applicationsLink);
     await readyOne(secureConsoleOwnedTaskTabV3.playwright.getByText(/add an application|add application/i));
     const accessFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search applications/i });
-    [accessTargetHostCount] = await filteredZero(accessFilter, "ai-api-omniroute.mysw.me", ["ai-api-omniroute.mysw.me"], ["No applications found"], true);
-    [accessTargetNameCount] = await filteredZero(accessFilter, "OmniRoute team API", ["OmniRoute team API"], ["No applications found"], false);
+    [accessTargetHostCount] = await filteredZero(accessFilter, "ai-api-omniroute.mysw.me", ["ai-api-omniroute.mysw.me"], ["No applications found"]);
+    await navigate(zeroTrustUrl.href);
+    const accessNameUrl = new URL(await secureConsoleOwnedTaskTabV3.url());
+    const accessNamePath = /^\/([0-9a-f]{32})(?:\/home)?\/?$/.exec(accessNameUrl.pathname);
+    if (accessNameUrl.hostname !== "one.dash.cloudflare.com" || accessNamePath === null || accessNamePath[1] !== accountSegment) throw new Error("AccessNameAccountBindingError");
+    const accessButtonForName = secureConsoleOwnedTaskTabV3.playwright.getByRole("button", { name: "Access", exact: true });
+    await readyOne(accessButtonForName);
+    await clickOne(accessButtonForName);
+    const applicationsLinkForName = secureConsoleOwnedTaskTabV3.playwright.getByRole("link", { name: /applications/i });
+    await readyOne(applicationsLinkForName);
+    await clickOne(applicationsLinkForName);
+    await readyOne(secureConsoleOwnedTaskTabV3.playwright.getByText(/add an application|add application/i));
+    const accessNameFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search applications/i });
+    [accessTargetNameCount] = await filteredZero(accessNameFilter, "OmniRoute team API", ["OmniRoute team API"], ["No applications found"]);
     accessFiltersComplete = true;
 
     await navigate("https://dash.cloudflare.com/profile/api-tokens");
     const tokenFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search api tokens/i });
-    [tokenRowCount] = await filteredZero(tokenFilter, "OmniRoute secure console R5 20260901", ["OmniRoute secure console R5 20260901"], ["No API tokens found", "No tokens found"], true);
+    [tokenRowCount] = await filteredZero(tokenFilter, "OmniRoute secure console R5 20260901", ["OmniRoute secure console R5 20260901"], ["No API tokens found", "No tokens found"]);
     tokenFilterComplete = true;
     tokenTitleExact = await secureConsoleOwnedTaskTabV3.title() === "API Tokens | Cloudflare";
     tokenCreateControlCount =
@@ -724,9 +701,9 @@ await (async () => {
         !dnsFilterComplete || !rateCompletenessProven || !tunnelFiltersComplete || !accessFiltersComplete || !tokenFilterComplete) {
       throw new Error("FinalTokenPageStateError");
     }
-    if (counters.navigationAttempted !== 4 || counters.navigationFulfilled !== 4 ||
-        counters.clickAttempted !== 9 || counters.clickFulfilled !== 9 ||
-        counters.readinessAttempted !== 21 || counters.readinessFulfilled !== 21 ||
+    if (counters.navigationAttempted !== 6 || counters.navigationFulfilled !== 6 ||
+        counters.clickAttempted !== 13 || counters.clickFulfilled !== 13 ||
+        counters.readinessAttempted !== 33 || counters.readinessFulfilled !== 33 ||
         counters.fillAttempted !== 12 || counters.fillFulfilled !== 12) {
       throw new Error("BrowserCounterError");
     }
@@ -776,10 +753,11 @@ await (async () => {
 ```
 
 Exact PASS requires declarations/precondition and private account binding true;
-navigation `4/4`; clicks `9/9`, each preceded by count one; readiness `21/21`;
+navigation `6/6`; clicks `13/13`, each preceded by count one; native locator
+readiness `33/33`;
 page-local search fills `12/12` (six clear/query pairs only);
 DNS target `0` with exact filter complete; rate unique-table data rows `1`,
-target description/host `0/0`, and no enabled next page; Tunnel name/host
+target description/host `0/0`, and exact terminal paginator; Tunnel name/host
 `0/0` with both filters complete; Access host/name `0/0` with both filters
 complete; final token title true, Create count `1`, token name/row `0/0`, and
 exact filter complete; write attempted `1`;

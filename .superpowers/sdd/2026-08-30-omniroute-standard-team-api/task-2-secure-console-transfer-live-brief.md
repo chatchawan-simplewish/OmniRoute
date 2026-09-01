@@ -8,6 +8,14 @@ VM1205, proxy, Rulesets, evidence, deletion, permission, or routing action.
 
 ## Authoritative pins
 
+- Fix-round base brief commit
+  `5026b28140ad2431c1a5b77903845d174e4ed606`: `47893` bytes, SHA-256
+  `5C413FE3D6757166F4CCC9C5E969488126E06BC67261ACF37E51B0570891476E`.
+- Fix-round-1 FAIL review commit
+  `646d42f40d5c217688252630ec91c2aff893a999`: `13874` bytes, SHA-256
+  `029022661371EC6768900DF96FFA22F21F4A4FCD04DD24A690FB2146875C959A`.
+  This replacement addresses exactly its three HIGH and two IMPORTANT
+  findings and remains unconsumable until a fresh independent Sol High PASS.
 - Revised design commit `4cd480bcdd85f6d5bdee5645b0f16e6a870177e3`:
   `19055` bytes, SHA-256
   `39254F4AE68A9AC9F856BEB4E8C2CE0CCE771263E5496A5E23A90B6BD6C4901F`.
@@ -96,8 +104,11 @@ parent environment.
    action-time user confirmation naming all three actions. The user performs
    Copy and Paste natively. No agent or Computer Use terminal keystroke is
    allowed.
-4. After R5 reaches a terminal result, pause again for a separate explicit
-   action-time confirmation naming deletion of the exact token row. That
+4. On every post-accept outcome, including zero R5 starts, R5 failure, R5
+   timeout, or R5 success, wait for the owner's exact safe tuple
+   `REVOCATION_REQUIRED=PASS`, the fixed `REVOCATION_ROW_NAME`, and
+   `REVOCATION_AUTHORITY=WAITING`. Pause there for a separate explicit
+   action-time confirmation naming deletion of that exact token row. That
    confirmation grants no other delete or mutation.
 5. Any failed, malformed, interrupted, timed-out, or uncertain consuming action
    spends this gate. Stop on the first mismatch. No retry, second token, second
@@ -108,7 +119,8 @@ The sole Sol High owner task retains the live lane. The fixed visible owner
 process remains the only token holder from masked acceptance through active
 verification, exact Zone-ID lookup, R5, revocation hold, invalid-token proof,
 and final cleanup. Its sole permitted credential-bearing child is the one
-synchronous exact-hash R5 child.
+exact-hash R5 child. The child is retained, asynchronously drained, and bounded
+by a fixed wall clock; no blocking pre-deadline stream read is permitted.
 
 Pre-accept and post-accept are distinct. Before masked acceptance, any owner
 failure exits through common cleanup. If final Create occurred but no exact
@@ -116,7 +128,10 @@ value reached the owner, request separate exact-row deletion authority; row
 absence may be proved but exact-token HTTP `401` remains `NOT PROVEN`. Once a
 nonempty masked value reaches the owner, every outcome enters the bounded
 revocation-required hold; local token references are retained only until its
-grant/deny/timeout disposition, then common cleanup runs.
+grant/deny/timeout disposition, then common cleanup runs. If conversion fails
+and no usable token exists, the separately confirmed exact-row deletion and
+refreshed `0 / 0` proof remain available, while exact-token HTTP `401` remains
+explicitly `NOT PROVEN`.
 
 ## Credential-free action-time preconditions
 
@@ -181,8 +196,12 @@ $ErrorActionPreference = 'Stop'
 $sshPath = 'C:\Windows\System32\OpenSSH\ssh.exe'
 $sshKey = 'C:\Users\chatc\.ssh\codex-prox01-vms-ed25519'
 $sshTarget = 'belladmin@192.168.1.68'
+$sshWallDeadlineMs = 60000
+$sshExitProofDeadlineMs = 10000
+$sshStreamDrainDeadlineMs = 5000
+$sshRetainedProcess = $null
 
-function Invoke-ExactSsh([string]$RemoteCommand) {
+function Invoke-ExactSsh([string]$Operation, [string]$RemoteCommand) {
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $sshPath
     $startInfo.UseShellExecute = $false
@@ -191,22 +210,39 @@ function Invoke-ExactSsh([string]$RemoteCommand) {
     foreach ($name in @('CLOUDFLARE_API_TOKEN','CLOUDFLARE_ZONE_ID')) {
         $null = $startInfo.Environment.Remove($name)
     }
-    foreach ($arg in @('-i',$sshKey,'-o','BatchMode=yes','-o','ConnectTimeout=10',$sshTarget,$RemoteCommand)) {
+    foreach ($arg in @('-i',$sshKey,'-o','BatchMode=yes','-o','ConnectTimeout=10','-o','ServerAliveInterval=5','-o','ServerAliveCountMax=3',$sshTarget,$RemoteCommand)) {
         $null = $startInfo.ArgumentList.Add($arg)
     }
-    $sshProcess = [Diagnostics.Process]::new()
-    $sshProcess.StartInfo = $startInfo
-    if (-not $sshProcess.Start()) { throw 'SSH_CHILD_START_FAILED_NO_RETRY' }
-    $out = $sshProcess.StandardOutput.ReadToEnd()
-    $err = $sshProcess.StandardError.ReadToEnd()
-    $sshProcess.WaitForExit()
-    $exit = $sshProcess.ExitCode
-    $sshProcess.Dispose()
-    [pscustomobject]@{ Exit = $exit; Out = $out; Err = $err }
+    $script:sshRetainedProcess = [Diagnostics.Process]::new()
+    $script:sshRetainedProcess.StartInfo = $startInfo
+    if (-not $script:sshRetainedProcess.Start()) { throw "SSH_${Operation}_START_FAILED_NO_RETRY" }
+    $outTask = $script:sshRetainedProcess.StandardOutput.ReadToEndAsync()
+    $errTask = $script:sshRetainedProcess.StandardError.ReadToEndAsync()
+    if (-not $script:sshRetainedProcess.WaitForExit($sshWallDeadlineMs)) {
+        $terminationAttempted = 1
+        $terminationFulfilled = 0
+        try {
+            $script:sshRetainedProcess.Kill()
+            $terminationFulfilled = 1
+        }
+        catch {}
+        $exitProven = $script:sshRetainedProcess.WaitForExit($sshExitProofDeadlineMs)
+        throw ("SSH_{0}_TIMEOUT_NO_RETRY TERMINATION={1}/{2} EXIT_PROVEN={3}" -f
+            $Operation,$terminationAttempted,$terminationFulfilled,$exitProven.ToString().ToUpperInvariant())
+    }
+    if (-not [Threading.Tasks.Task]::WaitAll(@($outTask,$errTask),$sshStreamDrainDeadlineMs)) {
+        throw "SSH_${Operation}_STREAM_DRAIN_UNCERTAIN_NO_RETRY"
+    }
+    $exit = $script:sshRetainedProcess.ExitCode
+    $out = $outTask.Result
+    $err = $errTask.Result
+    $script:sshRetainedProcess.Dispose()
+    $script:sshRetainedProcess = $null
+    [pscustomobject]@{ Exit = $exit; Out = $out; Err = $err; WallDeadlineMs = $sshWallDeadlineMs }
 }
 
 $startCommand = 'sudo docker run -d --name team-api-proxy --restart unless-stopped --network omniroute-internal --read-only --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges:true --memory 128m --cpus 0.5 --tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --mount type=bind,src=/opt/omniroute-team-api/Caddyfile,dst=/etc/caddy/Caddyfile,readonly caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 caddy run --config /etc/caddy/Caddyfile'
-$startResult = Invoke-ExactSsh $startCommand
+$startResult = Invoke-ExactSsh 'START' $startCommand
 $startLines = @($startResult.Out -split "`r?`n" | Where-Object { $_ })
 if ($startResult.Exit -ne 0 -or $startLines.Count -ne 1 -or
     $startLines[0] -notmatch '^[0-9a-f]{64}$' -or
@@ -260,7 +296,7 @@ check_eq deny_wrong_method 404 curl --max-time 10 -sS -o /dev/null -w '%{http_co
 printf 'PROXY_PROOF=PASS ASSERTIONS=19\n'
 '@.Replace('__PROXY_ID__',$proxyId)
 
-$proofResult = Invoke-ExactSsh $remoteProof
+$proofResult = Invoke-ExactSsh 'PROOF' $remoteProof
 $proofLines = @($proofResult.Out -split "`r?`n" | Where-Object { $_ })
 $expectedLabels = @('same_container_id','state_running','image_id','port_bindings','readonly_rootfs','cap_drop','cap_add','security_opt','memory','nano_cpus','restart_policy','caddy_mount','caddy_sha','network_members','listener_20130','proxy_ip','allow_get_models','deny_dashboard','deny_wrong_method')
 $proofPass = $proofResult.Exit -eq 0 -and [string]::IsNullOrWhiteSpace($proofResult.Err) -and $proofLines.Count -eq 20
@@ -280,7 +316,7 @@ test "$(sudo docker network inspect omniroute-internal --format '{{len .Containe
 ! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
 printf 'EXACT_PROXY_ROLLBACK=PASS\n'
 '@.Replace('__PROXY_ID__',$proxyId)
-    $rollbackResult = Invoke-ExactSsh $rollback
+    $rollbackResult = Invoke-ExactSsh 'ROLLBACK' $rollback
     if ($rollbackResult.Exit -ne 0 -or $rollbackResult.Out.Trim() -ne 'EXACT_PROXY_ROLLBACK=PASS' -or
         -not [string]::IsNullOrWhiteSpace($rollbackResult.Err)) {
         throw 'PROXY_PROOF_AND_ROLLBACK_UNCERTAIN_NO_RETRY'
@@ -298,15 +334,22 @@ captured ID to equal the live object's ID, remove only that exact new proxy
 once, prove proxy absent/network members `2`/listener absent, record
 `FAIL / NOT PROVEN`, and stop. No second start, proof, or token.
 
+Every retained SSH child uses `ConnectTimeout=10`, transport liveness
+`ServerAliveInterval=5`/`ServerAliveCountMax=3`, a `60000 ms` wall deadline,
+asynchronous stdout/stderr drains, and a `10000 ms` exit-proof deadline. A
+timeout permits at most one reviewed exact-handle termination attempt, reports
+the named start/proof/rollback operation uncertain, retains the exact handle if
+exit is not proven, and stops without retry or a later-stage inference.
+
 ## Credential-free script preparation
 
 The complete credential-free owner script is the sole `powershell` fence under
 the next heading. Independent review pins its extracted strict UTF-8, LF-only,
 one-trailing-LF bytes as:
 
-- owner bytes: `16234`;
+- owner bytes: `22013`;
 - owner SHA-256:
-  `3EFA4F6287361EEC64BE04B0FF379368384C66684065759D68B1156A589D1C94`.
+  `27E4F7E447104BA6253682D082D54A0EBBE4AFBD843D7AA9806B82B6B8136BBB`.
 
 Create one new GUID-named directory directly below the resolved Windows temp
 root. Extract the exact R5 fence following `### Deterministic R5 script` from
@@ -330,8 +373,8 @@ $ErrorActionPreference = 'Stop'
 $utf8 = [Text.UTF8Encoding]::new($false, $true)
 $briefPath = '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-secure-console-transfer-live-brief.md'
 $r5ReviewPath = '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-rulesets-api-incident-sol-review.md'
-$expectedOwnerBytes = 16234
-$expectedOwnerHash = '3EFA4F6287361EEC64BE04B0FF379368384C66684065759D68B1156A589D1C94'
+$expectedOwnerBytes = 22013
+$expectedOwnerHash = '27E4F7E447104BA6253682D082D54A0EBBE4AFBD843D7AA9806B82B6B8136BBB'
 $expectedR5Bytes = 10890
 $expectedR5Hash = 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41'
 $expectedR5ReviewBytes = 32520
@@ -408,8 +451,14 @@ $r5FileName = 'omniroute-r5-exact.ps1'
 $pwshPath = 'C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe'
 $r5ExpectedBytes = 10890
 $r5ExpectedHash = 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41'
+$pwshExpectedBytes = 301368
+$pwshExpectedHash = 'DB6DD81183FE57D22E03B911EC9A30A2FD7C40542E97743615355A6FB44F458F'
+$pwshExpectedVersion = '7.6.4.500'
 $secretDeadline = [TimeSpan]::FromSeconds(600)
 $revocationDeadline = [TimeSpan]::FromSeconds(600)
+$r5WallDeadlineMs = 180000
+$r5ExitProofDeadlineMs = 10000
+$r5StreamDrainDeadlineMs = 5000
 $tokenName = 'OmniRoute secure console R5 20260901'
 $zoneName = 'mysw.me'
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
@@ -435,6 +484,8 @@ $r5StartInfo = $null
 $r5Raw = $null
 $r5Err = $null
 $r5State = $null
+$r5OutTask = $null
+$r5ErrTask = $null
 $maskedAccepted = $false
 $tokenAccepted = $false
 $r5Passed = $false
@@ -452,6 +503,18 @@ $zoneLookupFulfilled = 0
 $r5ChildAttempted = 0
 $r5ChildStarted = 0
 $r5ChildExited = 0
+$r5WaitAttempted = 0
+$r5WaitFulfilled = 0
+$r5TimeoutObserved = 0
+$r5TerminationAttempted = 0
+$r5TerminationFulfilled = 0
+$r5ExitProofAttempted = 0
+$r5ExitProofFulfilled = 0
+$r5StdoutCaptureFulfilled = 0
+$r5StderrCaptureFulfilled = 0
+$r5PrivateEnvClearAttempted = 0
+$r5PrivateEnvClearFulfilled = 0
+$r5Residual = 'NONE'
 $invalidCheckAttempted = 0
 $invalidCheckFulfilled = 0
 $ownerDeleteAttempted = 0
@@ -460,12 +523,31 @@ $r5DeleteAttempted = 0
 $r5DeleteFulfilled = 0
 $cleanupError = 'NONE'
 $postAcceptError = 'NONE'
+$safeOutputUncertain = $false
 $terminal = 'FAIL_STOP_NO_RETRY'
 $exitCode = 90
 
 function Write-Safe([string]$Line) {
-    [Console]::Out.WriteLine($Line)
-    [Console]::Out.Flush()
+    try {
+        [Console]::Out.WriteLine($Line)
+        [Console]::Out.Flush()
+    }
+    catch {
+        $script:safeOutputUncertain = $true
+    }
+}
+
+function Set-PostAcceptFailure([string]$Code) {
+    if ($script:postAcceptError -eq 'NONE') { $script:postAcceptError = $Code }
+}
+
+function Clear-R5PrivateEnvironmentOnce {
+    if (-not $script:r5StartInfo -or $script:r5PrivateEnvClearAttempted -ne 0) { return }
+    foreach ($name in @('CLOUDFLARE_API_TOKEN','CLOUDFLARE_ZONE_ID')) {
+        $script:r5PrivateEnvClearAttempted++
+        $null = $script:r5StartInfo.Environment.Remove($name)
+        $script:r5PrivateEnvClearFulfilled++
+    }
 }
 
 function Clear-CurrentClipboardOnce {
@@ -547,14 +629,15 @@ try {
     if (-not $accepted) { throw 'MASKED_INPUT_EMPTY_OR_TIMEOUT' }
     $secret.MakeReadOnly()
     $maskedAccepted = $true
-    Clear-CurrentClipboardOnce
-
-    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
-    $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-    if ([string]::IsNullOrWhiteSpace($token)) { throw 'TOKEN_CONVERSION_EMPTY' }
-
     try {
-        $authorization = "Bearer $token"
+        try {
+            Clear-CurrentClipboardOnce
+
+            $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+            $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+            if ([string]::IsNullOrWhiteSpace($token)) { throw 'TOKEN_CONVERSION_EMPTY' }
+
+            $authorization = "Bearer $token"
         $headers = @{ Authorization = $authorization }
         $tokenVerifyAttempted++
         $verifyResponse = Invoke-RestMethod -Method Get -Uri 'https://api.cloudflare.com/client/v4/user/tokens/verify' -Headers $headers -TimeoutSec 20
@@ -576,19 +659,19 @@ try {
         }
         $zoneId = [string]$zones[0].id
         $zones = $null
-    }
-    catch {
-        $postAcceptError = 'VERIFY_OR_ZONE_LOOKUP_FAILED'
-    }
-    finally {
-        if ($headers) { $headers.Authorization = $null }
-        $headers = $null
-        $authorization = $null
-        $verifyResponse = $null
-        $zoneResponse = $null
-    }
+        }
+        catch {
+            Set-PostAcceptFailure 'VERIFY_ZONE_OR_CONVERSION_FAILED'
+        }
+        finally {
+            if ($headers) { $headers.Authorization = $null }
+            $headers = $null
+            $authorization = $null
+            $verifyResponse = $null
+            $zoneResponse = $null
+        }
 
-    if ($tokenAccepted -and $postAcceptError -eq 'NONE') {
+        if ($tokenAccepted -and $postAcceptError -eq 'NONE') {
         try {
             $r5StartInfo = [Diagnostics.ProcessStartInfo]::new()
             $r5StartInfo.FileName = $pwshPath
@@ -606,16 +689,54 @@ try {
             $r5StartInfo.Environment['R5_MODE'] = 'create'
             $r5Process = [Diagnostics.Process]::new()
             $r5Process.StartInfo = $r5StartInfo
+            $resolvedPwshPath = [IO.Path]::GetFullPath($r5StartInfo.FileName)
+            $pwshItem = Get-Item -LiteralPath $resolvedPwshPath -ErrorAction Stop
+            $pwshHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $resolvedPwshPath).Hash
+            $pwshVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($resolvedPwshPath).FileVersion
+            if ($resolvedPwshPath -cne $pwshPath -or $pwshItem.FullName -cne $pwshPath -or
+                $pwshItem.Length -ne $pwshExpectedBytes -or $pwshHash -cne $pwshExpectedHash -or
+                $pwshVersion -cne $pwshExpectedVersion) {
+                throw 'R5_PWSH_ACTION_TIME_PIN_DRIFT'
+            }
             $r5ChildAttempted++
             if (-not $r5Process.Start()) { throw 'R5_CHILD_START_FAILED' }
             $r5ChildStarted++
-            $null = $r5StartInfo.Environment.Remove('CLOUDFLARE_API_TOKEN')
-            $null = $r5StartInfo.Environment.Remove('CLOUDFLARE_ZONE_ID')
+            Clear-R5PrivateEnvironmentOnce
             $zoneId = $null
-            $r5Raw = $r5Process.StandardOutput.ReadToEnd()
-            $r5Err = $r5Process.StandardError.ReadToEnd()
-            $r5Process.WaitForExit()
+            $r5OutTask = $r5Process.StandardOutput.ReadToEndAsync()
+            $r5ErrTask = $r5Process.StandardError.ReadToEndAsync()
+            $r5WaitAttempted++
+            $r5ExitedWithinDeadline = $r5Process.WaitForExit($r5WallDeadlineMs)
+            $r5WaitFulfilled++
+            if (-not $r5ExitedWithinDeadline) {
+                $r5TimeoutObserved++
+                $r5TerminationAttempted++
+                try {
+                    $r5Process.Kill()
+                    $r5TerminationFulfilled++
+                }
+                catch {}
+                $r5ExitProofAttempted++
+                if ($r5Process.WaitForExit($r5ExitProofDeadlineMs)) {
+                    $r5ExitProofFulfilled++
+                    $r5ChildExited++
+                }
+                else {
+                    $r5Residual = 'EXACT_CHILD_EXIT_NOT_PROVEN'
+                    throw 'R5_TIMEOUT_EXIT_NOT_PROVEN'
+                }
+                Set-PostAcceptFailure 'R5_TIMEOUT_TERMINATED_NO_RETRY'
+                throw 'R5_WALL_DEADLINE_EXPIRED'
+            }
             $r5ChildExited++
+            if (-not [Threading.Tasks.Task]::WaitAll(@($r5OutTask,$r5ErrTask),$r5StreamDrainDeadlineMs)) {
+                $r5Residual = 'STREAM_CAPTURE_NOT_PROVEN'
+                throw 'R5_STREAM_DRAIN_UNCERTAIN'
+            }
+            $r5Raw = $r5OutTask.Result
+            $r5StdoutCaptureFulfilled++
+            $r5Err = $r5ErrTask.Result
+            $r5StderrCaptureFulfilled++
             $r5Exit = $r5Process.ExitCode
             $r5Lines = @($r5Raw -split "`r?`n" | Where-Object { $_ })
             if ($r5Lines.Count -ne 1 -or -not [string]::IsNullOrWhiteSpace($r5Err)) {
@@ -633,98 +754,142 @@ try {
             Write-Safe 'R5_RESULT=PASS'
         }
         catch {
-            $postAcceptError = 'R5_FAILED_OR_UNCERTAIN'
+            Set-PostAcceptFailure 'R5_FAILED_OR_UNCERTAIN'
             Write-Safe 'R5_RESULT=FAIL'
         }
         finally {
             if ($r5Process -and $r5ChildStarted -eq 1 -and $r5ChildExited -eq 0) {
-                $r5Process.WaitForExit()
-                $r5ChildExited++
+                if ($r5TerminationAttempted -eq 0) {
+                    $r5TerminationAttempted++
+                    try {
+                        $r5Process.Kill()
+                        $r5TerminationFulfilled++
+                    }
+                    catch {}
+                }
+                $r5ExitProofAttempted++
+                if ($r5Process.WaitForExit($r5ExitProofDeadlineMs)) {
+                    $r5ExitProofFulfilled++
+                    $r5ChildExited++
+                }
+                else {
+                    $r5Residual = 'EXACT_CHILD_EXIT_NOT_PROVEN'
+                    Set-PostAcceptFailure 'R5_EXIT_NOT_PROVEN'
+                }
             }
             if ($r5StartInfo) {
-                $null = $r5StartInfo.Environment.Remove('CLOUDFLARE_API_TOKEN')
-                $null = $r5StartInfo.Environment.Remove('CLOUDFLARE_ZONE_ID')
+                Clear-R5PrivateEnvironmentOnce
             }
-            if ($r5Process) { $r5Process.Dispose() }
+            if ($r5Process -and $r5ChildExited -eq 1) { $r5Process.Dispose() }
             $r5Process = $null
             $r5StartInfo = $null
+            $r5OutTask = $null
+            $r5ErrTask = $null
             $r5Raw = $null
             $r5Err = $null
             $r5State = $null
             $r5Lines = $null
             $r5Exit = $null
             $zoneId = $null
+            $resolvedPwshPath = $null
+            $pwshItem = $null
+            $pwshHash = $null
+            $pwshVersion = $null
+            $r5ExitedWithinDeadline = $null
+        }
         }
     }
+    catch {
+        Set-PostAcceptFailure 'POST_ACCEPT_OPERATION_UNEXPECTED_FAILURE'
+    }
+    finally {
 
     if ($maskedAccepted) {
-        Write-Safe 'REVOCATION_REQUIRED=PASS'
-        Write-Safe ("REVOCATION_ROW_NAME={0}" -f $tokenName)
-        Write-Safe 'REVOCATION_AUTHORITY=WAITING'
-        [Console]::Error.WriteLine('After separate chat confirmation, delete only the exact token row and prove refreshed name/row counts 0/0. Then press G here. Press D to deny. No automation may press either key.')
-        $revocationClock = [Diagnostics.Stopwatch]::StartNew()
-        $revocationDecision = 'TIMEOUT'
-        while ($revocationClock.Elapsed -lt $revocationDeadline) {
-            if (-not [Console]::KeyAvailable) {
-                [Threading.Thread]::Sleep(25)
-                continue
-            }
+        try {
+            Write-Safe 'REVOCATION_REQUIRED=PASS'
+            Write-Safe ("REVOCATION_ROW_NAME={0}" -f $tokenName)
+            Write-Safe 'REVOCATION_AUTHORITY=WAITING'
             try {
-                $revocationKey = [Console]::ReadKey($true)
-                $revocationKeyChar = $revocationKey.KeyChar
-                if ($revocationKey.Key -eq [ConsoleKey]::G) {
-                    $revocationDecision = 'GRANTED'
-                    break
-                }
-                if ($revocationKey.Key -eq [ConsoleKey]::D -or
-                    $revocationKey.Key -eq [ConsoleKey]::Escape) {
-                    $revocationDecision = 'DENIED'
-                    break
-                }
-            }
-            finally {
-                $revocationKeyChar = $null
-                $revocationKey = $null
-            }
-        }
-        $revocationClock.Stop()
-        Write-Safe ("REVOCATION_AUTHORITY={0}" -f $revocationDecision)
-        if ($revocationDecision -eq 'GRANTED' -and $maskedAccepted -and
-            -not [string]::IsNullOrWhiteSpace($token)) {
-            $revocationGranted = $true
-            try {
-                $authorization = "Bearer $token"
-                $headers = @{ Authorization = $authorization }
-                $invalidCheckAttempted++
-                try {
-                    $invalidResponse = Invoke-RestMethod -Method Get -Uri 'https://api.cloudflare.com/client/v4/user/tokens/verify' -Headers $headers -TimeoutSec 20
-                    $invalidCheckFulfilled++
-                }
-                catch {
-                    $statusCode = [int]$_.Exception.Response.StatusCode
-                    $invalidCheckFulfilled++
-                }
-                if ($statusCode -ne 401) { throw 'EXACT_TOKEN_INVALIDITY_NOT_401' }
-                $invalid401 = $true
-                Write-Safe 'INVALID_TOKEN_HTTP=401'
+                [Console]::Error.WriteLine('After separate chat confirmation, delete only the exact token row and prove refreshed name/row counts 0/0. Then press G here. Press D to deny. No automation may press either key.')
             }
             catch {
-                $postAcceptError = 'REVOCATION_INVALIDITY_NOT_PROVEN'
+                Set-PostAcceptFailure 'REVOCATION_PROMPT_OUTPUT_UNCERTAIN'
             }
-            finally {
-                if ($headers) { $headers.Authorization = $null }
-                $headers = $null
-                $authorization = $null
-                $invalidResponse = $null
-                $statusCode = $null
+            $revocationClock = [Diagnostics.Stopwatch]::StartNew()
+            $revocationDecision = 'TIMEOUT'
+            while ($revocationClock.Elapsed -lt $revocationDeadline) {
+                if (-not [Console]::KeyAvailable) {
+                    [Threading.Thread]::Sleep(25)
+                    continue
+                }
+                try {
+                    $revocationKey = [Console]::ReadKey($true)
+                    $revocationKeyChar = $revocationKey.KeyChar
+                    if ($revocationKey.Key -eq [ConsoleKey]::G) {
+                        $revocationDecision = 'GRANTED'
+                        break
+                    }
+                    if ($revocationKey.Key -eq [ConsoleKey]::D -or
+                        $revocationKey.Key -eq [ConsoleKey]::Escape) {
+                        $revocationDecision = 'DENIED'
+                        break
+                    }
+                }
+                finally {
+                    $revocationKeyChar = $null
+                    $revocationKey = $null
+                }
+            }
+            $revocationClock.Stop()
+            Write-Safe ("REVOCATION_AUTHORITY={0}" -f $revocationDecision)
+            if ($revocationDecision -eq 'GRANTED') {
+                $revocationGranted = $true
+                if (-not [string]::IsNullOrWhiteSpace($token)) {
+                    try {
+                        $authorization = "Bearer $token"
+                        $headers = @{ Authorization = $authorization }
+                        $invalidCheckAttempted++
+                        try {
+                            $invalidResponse = Invoke-RestMethod -Method Get -Uri 'https://api.cloudflare.com/client/v4/user/tokens/verify' -Headers $headers -TimeoutSec 20
+                            $invalidCheckFulfilled++
+                        }
+                        catch {
+                            $statusCode = [int]$_.Exception.Response.StatusCode
+                            $invalidCheckFulfilled++
+                        }
+                        if ($statusCode -ne 401) { throw 'EXACT_TOKEN_INVALIDITY_NOT_401' }
+                        $invalid401 = $true
+                        Write-Safe 'INVALID_TOKEN_HTTP=401'
+                    }
+                    catch {
+                        Set-PostAcceptFailure 'REVOCATION_INVALIDITY_NOT_PROVEN'
+                    }
+                    finally {
+                        if ($headers) { $headers.Authorization = $null }
+                        $headers = $null
+                        $authorization = $null
+                        $invalidResponse = $null
+                        $statusCode = $null
+                    }
+                }
+                else {
+                    Set-PostAcceptFailure 'REVOCATION_INVALIDITY_NOT_PROVEN_NO_USABLE_TOKEN'
+                    Write-Safe 'INVALID_TOKEN_HTTP=NOT_PROVEN_NO_USABLE_TOKEN'
+                }
+            }
+            else {
+                Set-PostAcceptFailure 'ACTIVE_TOKEN_REVOCATION_NOT_PROVEN'
+                Write-Safe 'CREDENTIAL_INCIDENT=ACTIVE_TOKEN_REVOCATION_NOT_PROVEN'
             }
         }
-        else {
-            $postAcceptError = 'ACTIVE_TOKEN_REVOCATION_NOT_PROVEN'
+        catch {
+            Set-PostAcceptFailure 'REVOCATION_HOLD_FAILED_OR_UNCERTAIN'
             Write-Safe 'CREDENTIAL_INCIDENT=ACTIVE_TOKEN_REVOCATION_NOT_PROVEN'
         }
     }
+    }
 
+    if ($safeOutputUncertain) { Set-PostAcceptFailure 'SAFE_OUTPUT_UNCERTAIN' }
     if ($r5Passed -and $revocationGranted -and $invalid401 -and $postAcceptError -eq 'NONE') {
         $terminal = 'EXACT_CORRECTION_PASS_TOKEN_REVOKED'
         $exitCode = 0
@@ -736,7 +901,7 @@ try {
 }
 catch {
     if ($maskedAccepted) {
-        $postAcceptError = 'POST_ACCEPT_UNEXPECTED_FAILURE_REVOCATION_NOT_PROVEN'
+        Set-PostAcceptFailure 'POST_ACCEPT_UNEXPECTED_FAILURE_AFTER_HOLD'
         Write-Safe 'CREDENTIAL_INCIDENT=ACTIVE_TOKEN_REVOCATION_NOT_PROVEN'
     }
 }
@@ -771,6 +936,8 @@ finally {
     $r5Raw = $null
     $r5Err = $null
     $r5State = $null
+    $r5OutTask = $null
+    $r5ErrTask = $null
     try {
         if ((Get-FileHash -Algorithm SHA256 -LiteralPath $r5Path).Hash -cne $r5ExpectedHash) {
             throw 'R5_DELETE_GUARD_FAILED'
@@ -796,9 +963,17 @@ finally {
     Write-Safe ("TOKEN_VERIFY={0}/{1}" -f $tokenVerifyAttempted,$tokenVerifyFulfilled)
     Write-Safe ("ZONE_LOOKUP={0}/{1}" -f $zoneLookupAttempted,$zoneLookupFulfilled)
     Write-Safe ("R5_CHILD={0}/{1}/{2}" -f $r5ChildAttempted,$r5ChildStarted,$r5ChildExited)
+    Write-Safe ("R5_WAIT={0}/{1} TIMEOUT={2}" -f $r5WaitAttempted,$r5WaitFulfilled,$r5TimeoutObserved)
+    Write-Safe ("R5_TERMINATION={0}/{1}" -f $r5TerminationAttempted,$r5TerminationFulfilled)
+    Write-Safe ("R5_EXIT_PROOF={0}/{1}" -f $r5ExitProofAttempted,$r5ExitProofFulfilled)
+    Write-Safe ("R5_STREAM_CAPTURE={0}/{1}" -f $r5StdoutCaptureFulfilled,$r5StderrCaptureFulfilled)
+    Write-Safe ("R5_PRIVATE_ENV_CLEAR={0}/{1}" -f $r5PrivateEnvClearAttempted,$r5PrivateEnvClearFulfilled)
+    Write-Safe ("R5_RESIDUAL={0}" -f $r5Residual)
     Write-Safe ("INVALID_CHECK={0}/{1}" -f $invalidCheckAttempted,$invalidCheckFulfilled)
     Write-Safe ("R5_SCRIPT_DELETE={0}/{1}" -f $r5DeleteAttempted,$r5DeleteFulfilled)
     Write-Safe ("OWNER_SCRIPT_DELETE={0}/{1}" -f $ownerDeleteAttempted,$ownerDeleteFulfilled)
+    Write-Safe ("POST_ACCEPT_ERROR={0}" -f $postAcceptError)
+    Write-Safe ("SAFE_OUTPUT_UNCERTAIN={0}" -f $safeOutputUncertain.ToString().ToUpperInvariant())
     Write-Safe ("CLEANUP_ERROR={0}" -f $cleanupError)
     Write-Safe ("OWNER_RESULT={0}" -f $terminal)
 }
@@ -806,20 +981,44 @@ finally {
 exit $exitCode
 ```
 
+The credential-bearing R5 child has one `180000 ms` wall wait, asynchronous
+stdout/stderr capture, a `5000 ms` post-exit stream-drain bound, and a `10000
+ms` exact-handle exit-proof wait. On timeout or a post-start exception, this
+independently reviewed contract and standing bounded cleanup authority permit
+at most one `Kill()` call on that retained exact handle only. It never uses a
+PID/name lookup, descendant/tree kill, second wait path, retry, or fallback.
+Failure to prove exit records `R5_RESIDUAL=EXACT_CHILD_EXIT_NOT_PROVEN`, clears
+the two start-info environment entries, conservatively classifies R5 uncertain,
+and still enters the common revocation hold.
+
 ## Launch and transfer sequence
 
 The sole owner prepares the scripts as above and uses the exact bundled pwsh
 with safe command-line arguments only:
 
 ```powershell
-$owner = Start-Process -FilePath 'C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe' -ArgumentList @('-NoLogo','-NoProfile','-File',$ownerScriptPath,'-ExpectedOwnerSha256','3EFA4F6287361EEC64BE04B0FF379368384C66684065759D68B1156A589D1C94','-R5ScriptPath',$r5ScriptPath) -RedirectStandardOutput $safeLogPath -PassThru
+$ownerWallDeadlineMs = 1800000
+$ownerExitProofDeadlineMs = 10000
+$ownerTerminationAttempted = 0
+$ownerTerminationFulfilled = 0
+$ownerExitProofAttempted = 0
+$ownerExitProofFulfilled = 0
+$ownerTimedOut = $false
+$owner = Start-Process -FilePath 'C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe' -ArgumentList @('-NoLogo','-NoProfile','-File',$ownerScriptPath,'-ExpectedOwnerSha256','27E4F7E447104BA6253682D082D54A0EBBE4AFBD843D7AA9806B82B6B8136BBB','-R5ScriptPath',$r5ScriptPath) -RedirectStandardOutput $safeLogPath -PassThru
 $expectedOwnerPid = $owner.Id
 ```
 
 No token or Zone ID is in arguments or the parent environment. Retain this
 exact handle and expected PID. Require the safe log's `OWNER_PID` to equal the
 retained PID and exact `OWNER_READY=PASS` plus `SECRET_PROMPT_READY=PASS`
-before enabling final Create.
+before enabling final Create. The owner's `1800000 ms` outer deadline exceeds
+the fixed `600 + 20 + 20 + 180 + 600 + 20` second prompt, verification, zone,
+R5, revocation, and invalidity budgets plus bounded cleanup margin. Independent
+review and the standing bounded cleanup authority permit at most one
+exact-retained-handle termination attempt after that deadline; no name/PID
+reacquisition, process enumeration, tree kill, or retry is allowed. An
+unproven exit leaves the exact handle retained and token/revocation state
+conservatively `NOT PROVEN`.
 
 At the mandatory confirmation checkpoint the user, not an agent:
 
@@ -836,11 +1035,15 @@ text/attribute read, evaluation, clipboard API, keyboard injection, CUA, or
 token-page inspection. The owner then clears/current-empty-checks Windows
 clipboard exactly once before any authenticated request.
 
-After R5 terminal, obtain the separate revocation confirmation. Delete only
-the exact fixed token row once, refresh and require exact name/row counts
-`0 / 0`, then the user presses `G` in the visible owner. The same process makes
-exactly one retained-token invalidity request and requires HTTP `401`. Denial
-or 600-second hold timeout performs no inferred revocation, reports an active
+On every post-accept result, independently of whether R5 started or reached a
+terminal, obtain the separate revocation confirmation only when the owner emits
+the exact three-line safe tuple `REVOCATION_REQUIRED=PASS`, the fixed row name,
+and `REVOCATION_AUTHORITY=WAITING`. Delete only the exact fixed token row once,
+refresh and require exact name/row counts `0 / 0`, then the user presses `G` in
+the visible owner. When a usable retained token exists, the same process makes
+exactly one invalidity request and requires HTTP `401`; without a usable token,
+row deletion remains allowed but HTTP `401` is `NOT PROVEN`. Denial or
+600-second hold timeout performs no inferred revocation, reports an active
 credential incident, clears named local references at the deadline, exits, and
 blocks all later Task 2 action.
 
@@ -848,7 +1051,25 @@ After the visible owner exits, the retained parent uses this exact
 credential-free block once. It does not infer success from exit alone:
 
 ```powershell
-$owner.WaitForExit()
+if (-not $owner.WaitForExit($ownerWallDeadlineMs)) {
+    $ownerTimedOut = $true
+    [Console]::Out.WriteLine('OWNER_WALL_DEADLINE=EXPIRED')
+    [Console]::Out.WriteLine('OWNER_TIMEOUT_STATE=TOKEN_AND_REVOCATION_NOT_PROVEN')
+    $ownerTerminationAttempted++
+    try {
+        $owner.Kill()
+        $ownerTerminationFulfilled++
+    }
+    catch {}
+    $ownerExitProofAttempted++
+    if ($owner.WaitForExit($ownerExitProofDeadlineMs)) {
+        $ownerExitProofFulfilled++
+    }
+    else {
+        [Console]::Out.WriteLine(("OWNER_TERMINATION={0}/{1} EXIT_PROOF={2}/{3} RESIDUAL=EXACT_OWNER_RUNNING_NOT_PROVEN" -f $ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled))
+        throw 'OWNER_TIMEOUT_EXIT_NOT_PROVEN_NO_RETRY'
+    }
+}
 $ownerExit = $owner.ExitCode
 $owner.Dispose()
 $owner = $null
@@ -871,6 +1092,7 @@ if (@(Get-ChildItem -LiteralPath $transferRoot -Force -ErrorAction Stop).Count -
     throw 'TEMP_ROOT_NOT_EMPTY'
 }
 Remove-Item -LiteralPath $transferRoot -Force -ErrorAction Stop
+[Console]::Out.WriteLine(("OWNER_TIMEOUT={0} TERMINATION={1}/{2} EXIT_PROOF={3}/{4}" -f $ownerTimedOut.ToString().ToUpperInvariant(),$ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled))
 [Console]::Out.WriteLine(("OWNER_EXIT={0} SAFE_LOG_BYTES={1} SAFE_LOG_SHA256={2} CLEANUP=PASS" -f $ownerExit,$safeLogLength,$safeLogHash))
 ```
 
@@ -881,7 +1103,13 @@ Remove-Item -LiteralPath $transferRoot -Force -ErrorAction Stop
 - agent/browser-API credential clipboard reads/writes `0 / 0`;
 - owner cleanup clipboard clear/read `1 / 1` maximum, no retry;
 - active-token verify `1`; exact-name zone lookup `1`; R5 child/POST
-  `1 / 1` maximum; R5 attributable rollback DELETE `0..1` internally;
+  `1 / 1` maximum; R5 wait `1/1`, wall timeout `0..1`, exact-handle
+  termination `0..1`, exit proof `0..1`, asynchronous stream capture `0..1 /`
+  `0..1`, private start-info environment clear `0/0` or `2/2`, and residual
+  state fixed; R5 attributable rollback DELETE `0..1` internally;
+- every SSH start/proof/rollback child has one `60000 ms` wall wait and at most
+  one exact-handle termination/`10000 ms` exit proof; the owner has one
+  `1800000 ms` wall wait and the same no-reacquisition termination boundary;
 - token rows created/deleted `1 / 1` maximum under separate confirmations;
 - invalid-token checks/refreshed row checks `1 / 1` maximum;
 - proxy starts/proofs/restarts `1 / 1 / 0`;
@@ -893,7 +1121,10 @@ submission; clipboard clear/read `1/1` and empty true; token verify `1/1`;
 zone lookup `1/1`; R5 child `1/1/1` and `R5_RESULT=PASS`; separate exact-row
 delete; refreshed counts `0/0`; invalid check `1/1` with HTTP `401`; R5/owner
 script deletion `1/1`; external owner exit and script absence; cleanup error
-`NONE`; terminal `OWNER_RESULT=EXACT_CORRECTION_PASS_TOKEN_REVOKED`.
+`NONE`; `POST_ACCEPT_ERROR=NONE`; `SAFE_OUTPUT_UNCERTAIN=FALSE`; R5 wait
+`1/1`, timeout `0`, termination/exit proof `0/0`, stream capture `1/1`, residual
+`NONE`, private environment clear `2/2`; owner timeout false; terminal
+`OWNER_RESULT=EXACT_CORRECTION_PASS_TOKEN_REVOKED`.
 
 Any other tuple is `FAIL / NOT PROVEN`, gate spent. If proxy proof passed but
 R5 did not pass, after proven token revocation/401 and owner exit the sole owner
@@ -917,12 +1148,14 @@ cleanup. There is no `Read-Host`, second secret prompt, line buffer, transcript,
 token environment in the owner, token file, token command-line value, or
 additional input-host buffer.
 
-The evidence claim is limited to named references cleared and owner/R5
-processes exited. It never claims managed-memory byte zeroization. `ZeroFreeBSTR`
-is called once for a nonzero BSTR; SecureString is disposed; all named managed
-references and R5 environment entries are cleared; both exact-hash scripts are
-guard-deleted; the parent proves child exit, safe-log redaction, script absence,
-then deletes only the exact safe log and empty GUID temp directory.
+On the exact success tuple, the evidence claim is limited to named references
+cleared and owner/R5 processes exited. It never claims managed-memory byte
+zeroization. `ZeroFreeBSTR` is called once for a nonzero BSTR; SecureString is
+disposed; all named managed references and R5 environment entries are cleared;
+both exact-hash scripts are guard-deleted; the parent proves child exit,
+safe-log redaction, script absence, then deletes only the exact safe log and
+empty GUID temp directory. Any failed exit proof instead records the fixed
+residual and makes no cleanup-success inference.
 
 ## Evidence contract
 
@@ -949,9 +1182,12 @@ Independent review must verify direct bytes/commits, strict UTF-8 no BOM,
 LF-only/one trailing LF, owner/R5 extraction bytes and hashes, PowerShell parse,
 exact pwsh pins, temp direct-child/deletion guards, per-iteration and outer
 reference clearing, no parent token env, exact R5 child private env, serial
-counter/order cardinality, 600-second monotonic deadlines, fixed redacted
-output schema, proxy 19-label contract, mandatory human checkpoints, and all
-prohibited-action counts.
+counter/order cardinality, `600`-second prompt/revocation deadlines, `180000`
+ms R5, `60000` ms SSH, and `1800000` ms owner wall deadlines, asynchronous
+stream drain before task results, absence of parameterless process waits and
+blocking synchronous stream drains, fixed redacted output schema, immediate pre-spawn pwsh
+path/bytes/hash/version binding, proxy 19-label contract, mandatory human
+checkpoints, and all prohibited-action counts.
 
 Parser/mocked fixtures execute no clipboard, browser, process, network,
 credential, Cloudflare, VM, proxy, R5, registry, or routing action. Review also

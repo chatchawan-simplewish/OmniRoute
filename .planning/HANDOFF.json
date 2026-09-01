@@ -1,36 +1,110 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-31T18:00:14+07:00",
+  "timestamp": "2026-09-01T17:27:32+07:00",
   "phase": "omniroute-secure-console-transfer",
   "phase_name": "OmniRoute secure console transfer and standard team API continuation",
-  "phase_dir": ".superpowers/sdd/2026-08-31-omniroute-secure-console-transfer",
+  "phase_dir": ".superpowers/sdd/2026-08-30-omniroute-standard-team-api",
   "plan": 1,
-  "task": 5,
+  "task": 4,
   "total_tasks": 8,
-  "status": "paused_at_human_approval_gate",
+  "status": "paused_at_reviewed_new_session_boundary",
   "completed_tasks": [
-    {"id": 1, "name": "Design and independently approve the secure-console transfer contract", "status": "done", "commit": "d22c02505"},
-    {"id": 2, "name": "Classify the rejected bridge, direct-v2 result, and retained-tab disposition without retry", "status": "done", "commit": "16e884393 bridge FAIL; cf5813b94 direct-v2 NOT PROVEN; d62ae9698 residual-only PASS"},
-    {"id": 3, "name": "Prepare and independently approve the replacement loopback non-secret clipboard preflight v3", "status": "done", "commit": "f7fd70cae brief; bdf427ad7 independent review PASS after pre-execution fix round 2"},
-    {"id": 4, "name": "Execute v3 once and independently classify it without retry", "status": "done_fail_closed", "commit": "ac4101401 execution report; 1749c51ad independent FAIL / BROWSER_UNCERTAIN / NOT PROVEN classification"}
+    {
+      "id": 1,
+      "name": "Commit and classify the reviewed V3 token-page readiness replacement",
+      "status": "done",
+      "commit": "5b221c05d3181a23eb754e3a99aebd1954686f80"
+    },
+    {
+      "id": 2,
+      "name": "Consume V3 once, stop on exact title precondition failure, and record the fail-closed incident",
+      "status": "done_fail_closed",
+      "commit": "172da50d2b841398c6e4c1d55942e3f6a75d38eb"
+    },
+    {
+      "id": 3,
+      "name": "Create and independently review the title-independent V4 semantic replacement",
+      "status": "done_static_pass",
+      "commit": "82971f2d7165325b616dab293e275cb7287d1914 brief; 7e2bf2341d88113536507298b3df8f1f25e8f417 Sol High PASS review"
+    }
   ],
   "remaining_tasks": [
-    {"id": 5, "name": "After fresh exact authority, execute the independently approved residual tab/clipboard disposition contract once and classify it", "status": "not_started"},
-    {"id": 6, "name": "After residual disposition, prepare/review a non-secret replacement transport contract and obtain a new exact execution gate", "status": "not_started"},
-    {"id": 7, "name": "Only after transport proof, prepare and independently approve the credential-owner live brief and request separate action-time credential authority", "status": "not_started"},
-    {"id": 8, "name": "Complete redacted evidence review, then resume standard-team API Tasks 2-5 through the final Sol High security audit", "status": "not_started"}
+    {
+      "id": 4,
+      "name": "Replace V4 retained-session adoption with a fresh-session Chrome/Profile reacquisition contract and independent Sol High review",
+      "status": "not_started"
+    },
+    {
+      "id": 5,
+      "name": "Create a non-self-referential execution classification and post-commit coordinator tuple for the fresh-session contract",
+      "status": "not_started"
+    },
+    {
+      "id": 6,
+      "name": "After Prox-01 and VM1205 are available, revalidate every local/VM/DNS/provider pin and consume the new browser/prestart gate once",
+      "status": "not_started"
+    },
+    {
+      "id": 7,
+      "name": "Prepare the reviewed Cloudflare form, then stop for mandatory final Create/native Copy/native masked Paste confirmation and later separate exact-row deletion confirmation",
+      "status": "not_started"
+    },
+    {
+      "id": 8,
+      "name": "Complete redacted evidence, cleanup, revocation proof, and remaining standard-team API work through final Sol High audit",
+      "status": "not_started"
+    }
   ],
   "blockers": [
-    {"description": "The v3 one-shot authority is consumed: Call 1 passed, Call 2 timed out without a terminal result, and Call 3 did not run. Browser/tab/server/clipboard residual state and transport remain NOT PROVEN.", "type": "human_action", "workaround": "Never retry or continue v3. Use only the separately reviewed residual disposition contract after fresh exact pinned authority."},
-    {"description": "The cleanup-only residual disposition contract is independently PASS but not authorized for execution.", "type": "human_action", "workaround": "Obtain exact authority pinned to brief 0d8f888a3 and review ad5f35ede, then execute once and fail closed on the first mismatch or uncertainty."}
+    {
+      "description": "V3 is consumed and failed. Its V3 binding is null/ineligible with state V3_ADOPTION_OR_READINESS_FAILED, and its invoked pre-Create disposition is also spent.",
+      "type": "technical",
+      "workaround": "Never retry, continue, or reinterpret V3. Use only a new independently reviewed contract."
+    },
+    {
+      "description": "The V4 brief and static review are PASS, but V4 requires retained same-task Node declarations that a new Codex task will not inherit.",
+      "type": "technical",
+      "workaround": "Before any browser use in the new task, create and independently review a fresh-session Chrome Profile Codex-Chrome-Bell-PC2 reacquisition contract. Do not execute V4 directly."
+    },
+    {
+      "description": "Prox-01 may be powered off during the pause, so VM1205 and live VM checks may be unavailable.",
+      "type": "human_action",
+      "workaround": "Offline handoff and contract work may continue. Power on Prox-01 and confirm VM1205 readiness before any live action-time VM/browser/provider gate."
+    }
   ],
   "human_actions_pending": [
-    {"action": "Approve exactly one execution of the committed v3 residual tab/clipboard disposition contract.", "context": "Approval must cover only brief commit 0d8f888a3, review commit ad5f35ede, brief SHA-256 7BA4B59F0B51A8F4F4E6AD527AFAA3748FAE0A6138440F5D9B3C433E31008349, and review SHA-256 81401F5BAD153F2B58CD9A2B5C2A4D39D5F52C058528EBC0649B17532144942A. It permits one count-only tab enumeration; no close for zero tabs; at most one close of the sole tab for exactly one tab; stop without close for more than one tab; and one clipboard clear/read only after proven zero tabs. It leaves listener/process residual NOT PROVEN and grants no preflight retry, credential, or routing authority.", "blocking": true},
-    {"action": "Later approve each credential creation/transmission, permission change, or deletion at action time.", "context": "The unattended request does not replace mandatory security confirmations.", "blocking": true}
+    {
+      "action": "Power on Prox-01 before the resumed task reaches live action-time VM1205 validation.",
+      "context": "No process started in this run depends on Prox-01, so it is safe to power off tonight. It must be available before live VM-dependent execution.",
+      "blocking": false
+    },
+    {
+      "action": "Later provide the mandatory combined final Create/native Copy/native masked Paste confirmation.",
+      "context": "Standing unattended authority does not bypass this explicitly retained external browser/secret-transfer confirmation.",
+      "blocking": true
+    },
+    {
+      "action": "Later provide a separate confirmation for exact Cloudflare token-row deletion.",
+      "context": "Revocation remains a distinct mandatory action-time checkpoint.",
+      "blocking": true
+    }
   ],
   "decisions": [
-    {"decision": "Use a one-use 127.0.0.1 ephemeral Node standard-library listener with a random exact path instead of data-URL navigation or the rejected terminal bridge.", "rationale": "It removes the failed navigation surface while keeping the non-secret proof bounded and local.", "phase": "omniroute-secure-console-transfer"},
-    {"decision": "Consume Call 3 eligibility and detach the persistent challenge before the sole child spawn; keep server uncertainty sticky across cleanup.", "rationale": "Independent review found both states were previously advisory and could permit retry or rehabilitate uncertainty. Fix round 1 closed both HIGH findings.", "phase": "omniroute-secure-console-transfer"}
+    {
+      "decision": "Do not use Cloudflare page-title text as the token-page identity gate.",
+      "rationale": "The exact reviewed V3 navigation succeeded but Cloudflare title drift caused a fail-closed precondition failure before any readiness or filter action. V4 instead binds exact navigation to unique token-search, aria-controls result-region, Create-control, paginator, total, rows, no-busy, and query-echo semantics.",
+      "phase": "omniroute-secure-console-transfer"
+    },
+    {
+      "decision": "Do not execute the statically PASS V4 contract in a new task.",
+      "rationale": "V4 deliberately depends on retained same-task Node bindings. A new task must first replace only that adoption boundary with a reviewed fresh-session profile contract.",
+      "phase": "omniroute-secure-console-transfer"
+    },
+    {
+      "decision": "Pause before execution classification.",
+      "rationale": "This leaves a clean reviewed design boundary with no reusable live authority and no background process to clean up before Prox-01 shutdown.",
+      "phase": "omniroute-secure-console-transfer"
+    }
   ],
   "uncommitted_files": [
     "open-sse/services/codexQuotaFetcher.ts",
@@ -46,6 +120,6 @@
     "tests/unit/db/agent-route-runs.test.ts",
     "tests/unit/services/agent-route.test.ts"
   ],
-  "next_action": "Do not inspect or mutate residual state until the user gives exact fresh authority pinned to residual brief 0d8f888a3 and review ad5f35ede. After approval, revalidate committed hashes/sizes, empty index, and the preserved twelve-file dirty baseline; then execute the cleanup-only contract exactly once with no retry or fallback and obtain independent Sol High classification.",
-  "context_notes": "Current branch codex/omniroute-agent-routing at ad5f35edef45be17a4f00c03702931bc9cd2a5dc before this handoff refresh. V3 execution report ac4101401 and classification 1749c51ad establish Call 1 PASS, Call 2 control timeout/kernel reset, no Call 3, consumed authority, and browser/tab/server/clipboard/transport NOT PROVEN. Residual brief 0d8f888a3 is 10876 bytes SHA-256 7BA4B59F0B51A8F4F4E6AD527AFAA3748FAE0A6138440F5D9B3C433E31008349. Residual review ad5f35ede is 6634 bytes SHA-256 81401F5BAD153F2B58CD9A2B5C2A4D39D5F52C058528EBC0649B17532144942A and PASS with zero findings. No live action occurred after the Call 2 timeout. Credential, permission, deletion, provider, Cloudflare, VM, proxy, key, token, OmniRoute routing, and live routing mutations remain unattempted and unauthorized."
+  "next_action": "In a new Codex task, read project-root AGENTS.md, .planning/HANDOFF.json, the V3 title incident, the V4 brief, and the V4 PASS review. Acknowledge every blocking constraint. Do not inspect Chrome or execute V4. First author and independently review a minimal fresh-session replacement that may attach only to Chrome Profile Codex-Chrome-Bell-PC2 and reacquire exactly one intended task tab without broad tab listing, retry, fallback, or provider mutation.",
+  "context_notes": "Safe pause at branch codex/omniroute-agent-routing HEAD 7e2bf2341d88113536507298b3df8f1f25e8f417. V4 brief commit 82971f2d7165325b616dab293e275cb7287d1914 is 54334 bytes SHA-256 89E52D8157677821FC44E84CFCABFC4AEB01A1F9CF23D0DDBCD31E56085B8EE8. V4 Sol High PASS review commit 7e2bf2341d88113536507298b3df8f1f25e8f417 is 7813 bytes SHA-256 547449928E647AE5E229A4ECAEEF4BFD9473410F494BE1B88E0197F9FD7ACADB, with authorizes_live_execution=false. Expected V4 source projection is A792CFD81D9ED03C341EAD7AC3A631435308FE59A7B286DE7308E14C13E74B57 over 10661 records, index 0, baseline 12. Current Chrome was logged in; V3 performed one navigation only, then failed before readiness/fill/read. No Cloudflare provider change, clipboard access, credential creation, proxy, listener, owner process, VM mutation, DNS change, or routing action occurred. No background server/watcher/process was started. Prox-01 is safe to power off."
 }

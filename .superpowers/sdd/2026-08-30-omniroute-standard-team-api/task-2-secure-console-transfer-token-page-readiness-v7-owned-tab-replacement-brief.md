@@ -20,9 +20,11 @@ Pinned static Chrome API documentation states:
 ## Selected minimal mechanism
 
 V7 creates one controller-owned task tab with exactly one
-`secureConsoleChromeV5.tabs.new()` call. It captures the returned exact
-handle before any shape or elapsed verdict, then uses only that handle for the
-fixed Cloudflare navigation and unchanged V5/V4 semantic-readiness body.
+`secureConsoleChromeV5.tabs.new()` call. Its fulfillment assignment writes the
+returned exact handle simultaneously to the local working variable and the
+durable top-level `secureConsoleV7RetainedTab` binding before any later
+statement or await. It then uses only that exact handle for the fixed
+Cloudflare navigation and unchanged V5/V4 semantic-readiness body.
 
 V7 does not call `browsers.get`, reconnect, `tabs.selected`, `tabs.list`,
 `tabs.get`, a second `tabs.new`, alternate-browser logic, selector fallback,
@@ -39,6 +41,12 @@ retains the exact handle only in `secureConsoleV7RetainedTab`, marks residue
 unconverged, leaves the V4 binding null/ineligible, and stops for a new reviewed
 disposition contract. It never hides a retained handle or substitutes another
 tab.
+
+After `tabs.new()` fulfills, interruption or timeout at any later await leaves
+`secureConsoleV7RetainedTab` pointing to that exact tab. Success transfers
+ownership to the durable V4 binding before clearing the V7 retained binding;
+successful failure cleanup closes the exact tab before clearing it. There is no
+post-creation interval in which the tab exists only in IIFE-local state.
 
 If `tabs.new()` rejects or fulfills without a usable handle, residue is
 explicitly unproven and V7 fails closed. A timeout, truncated output, tool
@@ -65,10 +73,10 @@ after the committed incident, V7 brief, independent Sol High PASS review,
 non-self-referential classification, post-commit tuple, and every action-time
 pin pass. The executable is complete only with its final LF.
 
-Executable bytes: `14103`.
+Executable bytes: `14216`.
 
 Executable SHA-256:
-`1683849B04EE4638BDC8764C69EB0DAB6ABC27233357E6D68C3C4E86BC735B45`.
+`315CC025B22734432F593A3BEBAA1AEAA173A36B509DC83658763408AD184BC0`.
 
 ```javascript
 let secureConsoleV7OwnedTabReacquisitionConsumed = false;
@@ -150,7 +158,7 @@ await (async () => {
     if (!predecessorStateExact) throw new Error("FreshSessionPredecessorStateError");
 
     counters.newAttempted++;
-    adopted = await secureConsoleChromeV5.tabs.new();
+    secureConsoleV7RetainedTab = adopted = await secureConsoleChromeV5.tabs.new();
     counters.newFulfilled++;
     createdHandleCaptured = typeof adopted === "object" && adopted !== null;
     if (!createdHandleCaptured) {
@@ -268,6 +276,7 @@ await (async () => {
           await adopted.close();
           cleanupFulfilled++;
           adopted = null;
+          secureConsoleV7RetainedTab = null;
           cleanupState = "CREATED_TAB_CLOSED";
           failureResidueConverged = true;
         } catch (cleanupError) {
@@ -293,6 +302,7 @@ await (async () => {
     secureConsoleOwnedTaskTabV4 = adopted;
     secureConsoleOwnedTaskTabV4Eligible = true;
     secureConsoleOwnedTaskTabV4State = "TOKEN_PAGE_SEMANTIC_READY_ELIGIBLE";
+    secureConsoleV7RetainedTab = null;
   } else {
     secureConsoleOwnedTaskTabV4 = null;
     secureConsoleOwnedTaskTabV4Eligible = false;

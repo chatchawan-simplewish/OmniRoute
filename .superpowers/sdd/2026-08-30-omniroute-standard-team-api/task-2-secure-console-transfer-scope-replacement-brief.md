@@ -26,7 +26,9 @@ revocation hold, cleanup rule, and terminal condition from:
 - launch-scope incident commit
   `029cf42275d2d61b6f69f38b7d94a1478702f135`;
 - first replacement FAIL review commit
-  `d77851c13ee8a0f2f54a214a9175aad1f4ee9285`.
+  `d77851c13ee8a0f2f54a214a9175aad1f4ee9285`;
+- fix-round FAIL review commit
+  `c6e6674cf508c2df11f3da15394007df030a7353`.
 
 The fixed Cloudflare token remains:
 
@@ -74,10 +76,15 @@ OmniRoute API-key page state. It emits only fixed counters, booleans, a safe
 error class, and a fixed terminal.
 
 The sole owner executes this exact JavaScript fence once in the same persistent
-Node session:
+Node session with one fixed outer tool-control deadline of `30000 ms`. No
+internal timer or race is added. Complete, untruncated receipt of its sole
+terminal plus completed tool status are both required; timeout, interruption,
+missing/truncated output, or uncertain completion spends the subgate.
 
 ```javascript
 let secureConsoleOwnedTaskTabV2 = null;
+let secureConsoleOwnedTaskTabV2Eligible = false;
+let secureConsoleOwnedTaskTabV2State = "UNADOPTED";
 await (async () => {
   const counters = {
     getAttempted: 0,
@@ -87,7 +94,6 @@ await (async () => {
     markerAttempted: 0,
     markerFulfilled: 0,
     writeAttempted: 0,
-    writeFulfilled: 0,
   };
   let result = "PRECONDITION_FAIL";
   let errorClass = "NONE";
@@ -95,6 +101,7 @@ await (async () => {
   let controllerOwnership = false;
   let tabShape = false;
   let targetState = false;
+  let adopted = null;
   const safeErrorClass = (error) => {
     const name = typeof error?.name === "string" ? error.name : "";
     return /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(name) ? name : "RetainedTabAdoptionError";
@@ -111,7 +118,7 @@ await (async () => {
 
     const retainedId = secureConsoleTaskTabV1.id;
     counters.getAttempted++;
-    const adopted = await secureConsoleChromeV1.tabs.get(retainedId);
+    adopted = await secureConsoleChromeV1.tabs.get(retainedId);
     counters.getFulfilled++;
     controllerOwnership =
       typeof adopted === "object" && adopted !== null &&
@@ -120,7 +127,6 @@ await (async () => {
       controllerOwnership &&
       typeof adopted.goto === "function" &&
       typeof adopted.title === "function" &&
-      typeof adopted.markHandoff === "function" &&
       typeof adopted.playwright?.getByRole === "function";
     if (!tabShape) throw new Error("RetainedTabOwnershipError");
 
@@ -138,10 +144,11 @@ await (async () => {
       markerCount === 1;
     if (!targetState) throw new Error("RetainedTabTargetStateError");
 
-    secureConsoleOwnedTaskTabV2 = adopted;
     result = "EXACT_RETAINED_TASK_TAB_ADOPTION_PASS";
   } catch (error) {
     secureConsoleOwnedTaskTabV2 = null;
+    secureConsoleOwnedTaskTabV2Eligible = false;
+    secureConsoleOwnedTaskTabV2State = "ADOPTION_FAILED_CANDIDATE_UNTOUCHED";
     errorClass = safeErrorClass(error);
   }
   counters.writeAttempted++;
@@ -158,28 +165,76 @@ await (async () => {
     markerAttempted: counters.markerAttempted,
     markerFulfilled: counters.markerFulfilled,
     writeAttempted: counters.writeAttempted,
-    writeFulfilled: counters.writeFulfilled + 1,
     errorClass,
   });
-  counters.writeFulfilled++;
+  if (result === "EXACT_RETAINED_TASK_TAB_ADOPTION_PASS") {
+    secureConsoleOwnedTaskTabV2 = adopted;
+    secureConsoleOwnedTaskTabV2Eligible = true;
+    secureConsoleOwnedTaskTabV2State = "ADOPTED_ELIGIBLE";
+  }
 })();
 ```
 
 Exact PASS requires result
 `EXACT_RETAINED_TASK_TAB_ADOPTION_PASS`, all four booleans `true`, counters
-`1/1` for get/title/marker/write, and `errorClass=NONE`. Any invocation,
+`1/1` for get/title/marker, `writeAttempted=1`, `errorClass=NONE`, complete
+untruncated terminal receipt, completed tool status, and the later private
+eligibility check exact `true`. Any invocation,
 rejection, missing output, counter mismatch, or other terminal spends this
 replacement before later action. No retry, fallback, second get, list,
 selected-tab lookup, reconnect, new tab, close, navigation, page serialization,
 URL read/output, screenshot, clipboard action, keyboard action, or mutation is
-permitted in this subgate.
+permitted in this subgate. A write or transport uncertainty cannot become
+eligible: the alias and eligibility are assigned only after `nodeRepl.write`
+returns. If output or completion is uncertain, the binding state is
+`NOT_PROVEN`; no later action or detachment cell is permitted without a new
+reviewed disposition.
 
 After PASS, only `secureConsoleOwnedTaskTabV2` may be used for the inherited
-serial read-only Cloudflare preconditions, form preparation, `markHandoff`, and
-the already reviewed user-native sequence. The agent performs no browser call
-after final Create. The user's inherited native generated-page close is the
-binding's terminal disposition; no later agent close, get, list, reacquisition,
-or metadata read is permitted.
+serial read-only Cloudflare preconditions, form preparation, and the already
+reviewed user-native sequence. `markHandoff` is not authorized by this
+replacement. The agent performs no browser call after final Create.
+
+On any exact proven pre-Create failure after adoption, execute the following
+fixed `10000 ms`-deadline, no-browser detachment cell once. It leaves the
+candidate tab retained and untouched while removing the new authority alias:
+
+```javascript
+secureConsoleOwnedTaskTabV2Eligible = false;
+secureConsoleOwnedTaskTabV2 = null;
+secureConsoleOwnedTaskTabV2State = "RETAINED_UNTOUCHED_PRECREATE_FAILURE";
+nodeRepl.write({
+  result: "EXACT_PRECREATE_BINDING_DETACH_PASS",
+  browserCalls: 0,
+  bindingEligible: secureConsoleOwnedTaskTabV2Eligible,
+  bindingNull: secureConsoleOwnedTaskTabV2 === null,
+  bindingState: secureConsoleOwnedTaskTabV2State,
+});
+```
+
+After the user reports completing the inherited native generated-page close,
+execute this fixed `10000 ms`-deadline, no-browser detachment cell once without
+any page/tab inspection:
+
+```javascript
+secureConsoleOwnedTaskTabV2Eligible = false;
+secureConsoleOwnedTaskTabV2 = null;
+secureConsoleOwnedTaskTabV2State = "USER_NATIVE_CLOSE_REPORTED_BINDING_DETACHED";
+nodeRepl.write({
+  result: "EXACT_POST_NATIVE_CLOSE_BINDING_DETACH_PASS",
+  browserCalls: 0,
+  bindingEligible: secureConsoleOwnedTaskTabV2Eligible,
+  bindingNull: secureConsoleOwnedTaskTabV2 === null,
+  bindingState: secureConsoleOwnedTaskTabV2State,
+});
+```
+
+Each detachment cell requires its complete fixed terminal and completed tool
+status. Neither cell proves tab closure. The pre-Create terminal explicitly
+classifies the tab retained/untouched; the post-native-close terminal records
+only the user's reported native action and JS alias detachment. No second get,
+list, reacquisition, alternate handle, agent close, or metadata read is
+permitted.
 
 ## Corrected retained-parent orchestration
 
@@ -210,20 +265,181 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $ownerScriptPath).Hash -cne '34
 [Console]::Out.WriteLine('EXACT_RETAINED_SCOPE_PREPARATION=PASS')
 ```
 
-Extract the unchanged `655`-byte launch fence, require SHA-256
-`995185FA04790564F4CDCA967E87CAB82EB97731D8458EF85CEF942D4606A293`,
-and dot-source it once into the same parent:
+The retained parent next executes this complete guarded launch wrapper exactly
+once. It extracts the unchanged `655`-byte launch fence and unchanged
+`2779`-byte final fence, pins both, and dot-sources the launch once. It also
+preloads the exact failure-disposition fence below before any start-capable
+operation. No exception text is emitted.
 
 ```powershell
-$launchTailForScope = $briefRawForScope.Substring($briefRawForScope.IndexOf('## Launch and transfer sequence'))
-$launchMatchForScope = [regex]::Match($launchTailForScope, '(?ms)^```powershell\n(?<code>.*?)^```$')
-if (-not $launchMatchForScope.Success) { throw 'LAUNCH_SCOPE_EXTRACTION_FAILED' }
-$launchBytesForScope = [Text.UTF8Encoding]::new($false).GetBytes($launchMatchForScope.Groups['code'].Value)
-$launchHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($launchBytesForScope))
-if ($launchBytesForScope.Length -ne 655 -or $launchHashForScope -cne '995185FA04790564F4CDCA967E87CAB82EB97731D8458EF85CEF942D4606A293') { throw 'LAUNCH_SCOPE_BYTE_PIN_FAILED' }
-. ([scriptblock]::Create($launchMatchForScope.Groups['code'].Value))
-if ($null -eq $owner -or $owner.Id -ne $expectedOwnerPid -or $null -eq $ownerClock) { throw 'LAUNCH_SCOPE_HANDLE_MISSING' }
-[Console]::Out.WriteLine('EXACT_RETAINED_SCOPE_OWNER_LAUNCHED=PASS')
+$scopeOwnerStartAttempted = 0
+$scopeOwnerStartFulfilled = 0
+$scopeOwnerHandleRetained = $false
+$scopeOwnerWaitAttempted = 0
+$scopeOwnerWaitFulfilled = 0
+$scopeOwnerFileCleanup = 0
+$scopeOwnerRootCleanup = 0
+$scopeProxyCleanup = 0
+$scopeOwnerResidual = 'NONE'
+$ownerTerminationAttempted = 0
+$ownerTerminationFulfilled = 0
+$ownerExitProofAttempted = 0
+$ownerExitProofFulfilled = 0
+$owner = $null
+$expectedOwnerPid = $null
+$ownerClock = $null
+
+function Invoke-ExactScopeProxyCleanup {
+    $remote = @'
+set -eu
+id="$(sudo docker inspect -f '{{.Id}}' team-api-proxy)"
+printf '%s' "$id" | grep -Eq '^[0-9a-f]{64}$'
+test "$(sudo docker inspect -f '{{.State.Status}}' team-api-proxy)" = running
+test "$(sudo docker inspect -f '{{.Image}}' team-api-proxy)" = sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+test "$(sudo docker inspect -f '{{json .HostConfig.PortBindings}}' team-api-proxy)" = '{}'
+test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 3
+! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
+sudo docker rm -f team-api-proxy >/dev/null
+test -z "$(sudo docker ps -aq -f name='^/team-api-proxy$')"
+test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 2
+! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
+printf 'EXACT_PROXY_CLEANUP=PASS\n'
+'@
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'C:\Windows\System32\OpenSSH\ssh.exe'
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($arg in @('-i','C:\Users\chatc\.ssh\codex-prox01-vms-ed25519','-o','BatchMode=yes','-o','ConnectTimeout=10','-o','ServerAliveInterval=5','-o','ServerAliveCountMax=3','belladmin@192.168.1.68',$remote)) {
+        $null = $startInfo.ArgumentList.Add($arg)
+    }
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    if (-not $process.Start()) { throw 'SCOPE_PROXY_CLEANUP_START_FAILED' }
+    $outTask = $process.StandardOutput.ReadToEndAsync()
+    $errTask = $process.StandardError.ReadToEndAsync()
+    if (-not $process.WaitForExit(60000)) {
+        try { $process.Kill() } catch {}
+        $null = $process.WaitForExit(10000)
+        throw 'SCOPE_PROXY_CLEANUP_TIMEOUT'
+    }
+    if (-not [Threading.Tasks.Task]::WaitAll(@($outTask,$errTask),5000)) { throw 'SCOPE_PROXY_CLEANUP_DRAIN_UNCERTAIN' }
+    $ok = $process.ExitCode -eq 0 -and $outTask.Result.Trim() -eq 'EXACT_PROXY_CLEANUP=PASS' -and [string]::IsNullOrWhiteSpace($errTask.Result)
+    $process.Dispose()
+    if (-not $ok) { throw 'SCOPE_PROXY_CLEANUP_NOT_PROVEN' }
+}
+
+function Remove-ExactScopePreparedFiles {
+    $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
+    $root = [IO.Path]::GetFullPath($transferRoot)
+    if ([IO.Path]::GetDirectoryName($root).TrimEnd('\') -cne $tempRoot) { throw 'SCOPE_TEMP_ROOT_GUARD_FAILED' }
+    foreach ($path in @($ownerScriptPath,$r5ScriptPath,$safeLogPath)) {
+        if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($path)) -cne $root) { throw 'SCOPE_TEMP_CHILD_GUARD_FAILED' }
+    }
+    if (Test-Path -LiteralPath $safeLogPath) { throw 'SCOPE_SAFE_LOG_UNEXPECTED' }
+    if (@(Get-ChildItem -LiteralPath $root -Force).Count -ne 2) { throw 'SCOPE_PREPARED_FILE_COUNT_DRIFT' }
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $ownerScriptPath).Hash -cne '347FCD60A41DF780CE4A94E4FC14C87E5059112068C689EF73636ABC5B0F0B6C' -or
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $r5ScriptPath).Hash -cne 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41') {
+        throw 'SCOPE_PREPARED_HASH_DRIFT'
+    }
+    Remove-Item -LiteralPath $ownerScriptPath -Force
+    Remove-Item -LiteralPath $r5ScriptPath -Force
+    if (@(Get-ChildItem -LiteralPath $root -Force).Count -ne 0) { throw 'SCOPE_TEMP_NOT_EMPTY' }
+    Remove-Item -LiteralPath $root -Force
+}
+
+try {
+    $launchTailForScope = $briefRawForScope.Substring($briefRawForScope.IndexOf('## Launch and transfer sequence'))
+    $launchMatchForScope = [regex]::Match($launchTailForScope, '(?ms)^```powershell\n(?<code>.*?)^```$')
+    if (-not $launchMatchForScope.Success) { throw 'LAUNCH_SCOPE_EXTRACTION_FAILED' }
+    $launchBytesForScope = [Text.UTF8Encoding]::new($false).GetBytes($launchMatchForScope.Groups['code'].Value)
+    $launchHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($launchBytesForScope))
+    if ($launchBytesForScope.Length -ne 655 -or $launchHashForScope -cne '995185FA04790564F4CDCA967E87CAB82EB97731D8458EF85CEF942D4606A293') { throw 'LAUNCH_SCOPE_BYTE_PIN_FAILED' }
+
+    $finalMatchesForScope = [regex]::Matches($launchTailForScope, '(?ms)^```powershell\n(?<code>.*?)^```$')
+    if ($finalMatchesForScope.Count -ne 2) { throw 'FINAL_SCOPE_EXTRACTION_COUNT_FAILED' }
+    $ownerFinalCodeForScope = $finalMatchesForScope[1].Groups['code'].Value
+    $ownerFinalBytesForScope = [Text.UTF8Encoding]::new($false).GetBytes($ownerFinalCodeForScope)
+    $ownerFinalHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($ownerFinalBytesForScope))
+    if ($ownerFinalBytesForScope.Length -ne 2779 -or $ownerFinalHashForScope -cne '9316DE2F7C84A89947E57C8563E9381E97D7C52F0DFFE56CA7E4DE616DD8F637') { throw 'FINAL_SCOPE_BYTE_PIN_FAILED' }
+
+    $replacementPathForScope = '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-secure-console-transfer-scope-replacement-brief.md'
+    $replacementRawForScope = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $replacementPathForScope),[Text.UTF8Encoding]::new($false,$true))
+    $dispositionTailForScope = $replacementRawForScope.Substring($replacementRawForScope.IndexOf('### Exact post-launch pre-accept failure disposition'))
+    $dispositionMatchForScope = [regex]::Match($dispositionTailForScope, '(?ms)^```powershell\n(?<code>.*?)^```$')
+    if (-not $dispositionMatchForScope.Success) { throw 'DISPOSITION_SCOPE_EXTRACTION_FAILED' }
+    $ownerPreacceptDispositionCodeForScope = $dispositionMatchForScope.Groups['code'].Value
+    $dispositionBytesForScope = [Text.UTF8Encoding]::new($false).GetBytes($ownerPreacceptDispositionCodeForScope)
+    $dispositionHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($dispositionBytesForScope))
+    if ($dispositionBytesForScope.Length -ne 2190 -or $dispositionHashForScope -cne '53AF93C906957FB11124674512B28088870128529AC5D6944B7C880E21415094') { throw 'DISPOSITION_SCOPE_BYTE_PIN_FAILED' }
+
+    $scopeOwnerStartAttempted++
+    . ([scriptblock]::Create($launchMatchForScope.Groups['code'].Value))
+    if ($null -eq $owner -or $owner.Id -ne $expectedOwnerPid -or $null -eq $ownerClock) { throw 'LAUNCH_SCOPE_HANDLE_MISSING' }
+    $scopeOwnerStartFulfilled++
+    $scopeOwnerHandleRetained = $true
+    [Console]::Out.WriteLine(('EXACT_RETAINED_SCOPE_OWNER_LAUNCHED=PASS START={0}/{1} HANDLE={2}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerHandleRetained.ToString().ToUpperInvariant()))
+}
+catch {
+    if ($scopeOwnerStartAttempted -eq 0) {
+        try {
+            Remove-ExactScopePreparedFiles
+            $scopeOwnerFileCleanup = 1
+            $scopeOwnerRootCleanup = 1
+            Invoke-ExactScopeProxyCleanup
+            $scopeProxyCleanup = 1
+            $scopeOwnerResidual = 'PRESTART_CLEANUP_PASS'
+        }
+        catch { $scopeOwnerResidual = 'PRESTART_CLEANUP_NOT_PROVEN' }
+        [Console]::Out.WriteLine(('EXACT_RETAINED_SCOPE_OWNER_LAUNCH=FAIL START={0}/{1} HANDLE=FALSE FILE_CLEANUP={2} ROOT_CLEANUP={3} PROXY_CLEANUP={4} RESIDUAL={5}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual))
+        throw 'RETAINED_SCOPE_PRESTART_FAILURE_NO_RETRY'
+    }
+    if ($owner -is [Diagnostics.Process] -and $null -ne $ownerClock) {
+        $scopeOwnerHandleRetained = $true
+        if ($null -eq $expectedOwnerPid) { $expectedOwnerPid = $owner.Id }
+        . ([scriptblock]::Create($ownerPreacceptDispositionCodeForScope))
+        throw 'RETAINED_SCOPE_POSTSTART_FAILURE_DISPOSED_NO_RETRY'
+    }
+    $scopeOwnerResidual = 'START_UNCERTAIN_NO_HANDLE'
+    [Console]::Out.WriteLine(('EXACT_RETAINED_SCOPE_OWNER_LAUNCH=FAIL START={0}/{1} HANDLE=FALSE WAIT=0/0 TERMINATION=0/0 EXIT_PROOF=0/0 FILE_CLEANUP=0 ROOT_CLEANUP=0 PROXY_CLEANUP=0 RESIDUAL={2}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerResidual))
+    throw 'RETAINED_SCOPE_START_UNCERTAIN_NO_HANDLE_NO_RETRY'
+}
+```
+
+### Exact post-launch pre-accept failure disposition
+
+This fence is pre-extracted and pinned before launch. On every later readiness
+or coordination failure before final Create for which the exact owner handle is
+retained, dot-source it exactly once in the same parent. It uses only the one
+inherited final remaining-budget wait/termination/exit-proof block and then the
+guarded proxy cleanup function above.
+
+```powershell
+$scopeOwnerWaitAttempted++
+try {
+    . ([scriptblock]::Create($ownerFinalCodeForScope))
+    $scopeOwnerWaitFulfilled++
+    if ((Test-Path -LiteralPath $ownerScriptPath -PathType Leaf) -or (Test-Path -LiteralPath $r5ScriptPath -PathType Leaf) -or (Test-Path -LiteralPath $safeLogPath -PathType Leaf)) { throw 'SCOPE_OWNER_FILES_REMAIN' }
+    $scopeOwnerFileCleanup = 1
+    if (Test-Path -LiteralPath $transferRoot) { throw 'SCOPE_OWNER_ROOT_REMAINS' }
+    $scopeOwnerRootCleanup = 1
+    Invoke-ExactScopeProxyCleanup
+    $scopeProxyCleanup = 1
+    $scopeOwnerResidual = 'NONE'
+    [Console]::Out.WriteLine(('EXACT_PREACCEPT_OWNER_DISPOSITION=PASS START={0}/{1} HANDLE={2} WAIT={3}/{4} TERMINATION={5}/{6} EXIT_PROOF={7}/{8} FILE_CLEANUP={9} ROOT_CLEANUP={10} PROXY_CLEANUP={11} RESIDUAL={12}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerHandleRetained.ToString().ToUpperInvariant(),$scopeOwnerWaitAttempted,$scopeOwnerWaitFulfilled,$ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual))
+}
+catch {
+    if ($null -ne $owner) {
+        try {
+            if (-not $owner.HasExited) { $scopeOwnerResidual = 'EXACT_OWNER_EXIT_NOT_PROVEN' }
+            else { $scopeOwnerResidual = 'POSTEXIT_CLEANUP_NOT_PROVEN' }
+        }
+        catch { $scopeOwnerResidual = 'EXACT_OWNER_STATE_NOT_PROVEN' }
+    }
+    elseif ($scopeOwnerResidual -eq 'NONE') { $scopeOwnerResidual = 'POSTEXIT_CLEANUP_NOT_PROVEN' }
+    [Console]::Out.WriteLine(('EXACT_PREACCEPT_OWNER_DISPOSITION=FAIL START={0}/{1} HANDLE={2} WAIT={3}/{4} TERMINATION={5}/{6} EXIT_PROOF={7}/{8} FILE_CLEANUP={9} ROOT_CLEANUP={10} PROXY_CLEANUP={11} RESIDUAL={12}' -f $scopeOwnerStartAttempted,$scopeOwnerStartFulfilled,$scopeOwnerHandleRetained.ToString().ToUpperInvariant(),$scopeOwnerWaitAttempted,$scopeOwnerWaitFulfilled,$ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual))
+    throw 'RETAINED_SCOPE_PREACCEPT_DISPOSITION_NOT_PROVEN_NO_RETRY'
+}
 ```
 
 No `&` child-scope invocation is permitted for either fence. No variable

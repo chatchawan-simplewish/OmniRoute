@@ -64,7 +64,8 @@ exactly `task-2-secure-console-transfer-token-page-readiness-replacement-brief.m
 `task-2-secure-console-transfer-token-page-readiness-replacement-fix1-sol-review.md`,
 `task-2-secure-console-transfer-token-page-readiness-replacement-fix2-sol-review.md`,
 `task-2-secure-console-transfer-token-page-readiness-replacement-fix3-sol-review.md`,
-and `task-2-secure-console-transfer-token-page-readiness-replacement-fix3-execution-classification.md`.
+`task-2-secure-console-transfer-token-page-readiness-replacement-fix4-sol-review.md`,
+and `task-2-secure-console-transfer-token-page-readiness-replacement-fix4-execution-classification.md`.
 No directory, glob, prefix, suffix, or other artifact is excluded.
 
 Reject paths containing control characters. Enumerate every tracked path with
@@ -77,7 +78,7 @@ bytes. Sort complete lines ordinally, concatenate without BOM or any other
 transformation, and hash those bytes. Required digest:
 `C4C9807FD5667E872BCBCFFD60FBF2AA71AEBC788AC744EFCD93FF18457C8E0F`.
 
-`git diff --cached --quiet` must succeed. After the six exclusions, exact
+`git diff --cached --quiet` must succeed. After the seven exclusions, exact
 `git status --porcelain=v1 --untracked-files=normal` is 12 records: modified
 `open-sse/services/codexQuotaFetcher.ts`, `src/app/api/v1/models/catalog.ts`,
 `src/lib/localDb.ts`, `tests/unit/api/models-agent-route-aliases.test.ts`, and
@@ -105,18 +106,25 @@ Fix2 brief `d56e2bb9443aebfae301ff0f883266dfa7946890` is `53932` bytes SHA-256
 `4041BB6B6B9A4AB0735BB7A1AA41953112BEE37CCDE0083EA4284AFEA9230666`;
 fix2 FAIL review `080f9bec66a3b8f94b93e59e0c5e5463d9695401` is `7249` bytes SHA-256
 `2233C0A1F71343FC253F2851EFAC46526EA841C2E6A625B5EA55399ED3BCCB71`.
-The fix3 brief commit must have `080f9bec...` as direct parent, its fix3 review
-must have the fix3 brief as direct parent, and the fix3 execution
-classification must have that review as direct parent. Classification pins
-only already-existing incident/brief/review objects above, the committed fix2
-brief and review direct bytes, the exact expected classification path, and the
-projection digest; it must not claim its own commit, byte length, or hash.
+Fix3 brief `3654c4219e5b87407ec571005a72d95238c65a2e` is `52584` bytes SHA-256
+`2284BD06896785F675B1D1F1A5AFFE062377923366954CE4497E19592A661C97`;
+actual fix3 FAIL review
+`.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-token-page-readiness-replacement-fix3-sol-review.md`
+at `a86b0277b8b8c8d66b546c434047264c9d9c67db` is `6686` bytes SHA-256
+`9333979A84C649BEBA1B6FB1A093C4FD491512CB2F5884212657CB81E2727AD8`.
+The fix4 brief commit must have `a86b0277...` as direct parent, its fix4 review
+must have the fix4 brief as direct parent, and the fix4 execution
+classification must have that review as direct parent. Classification records
+the full commits, exact paths, direct byte lengths, and SHA-256 values of the
+actual fix3 FAIL review above, committed fix4 brief, and committed fix4 review,
+plus the exact expected fix4 classification path and projection digest. It must
+not claim its own commit, byte length, hash, or blob identity.
 
 After classification is committed, the root owner records a separate
 action-time coordinator evidence tuple containing the classification commit,
 its direct parent, exact path, direct byte length, direct SHA-256, current HEAD,
 and projection digest. It is valid only when HEAD equals that classification
-commit, its parent equals the reviewed fix3-review commit, and all direct bytes
+commit, its parent equals the reviewed fix4-review commit, and all direct bytes
 reproduce. The tuple is not committed and does not pin its own identity. It
 must exist and revalidate immediately before browser use. Missing, non-direct,
 merged, substituted, self-referential, or unpinned ancestry blocks execution.
@@ -151,7 +159,7 @@ below and are part of this contract:
 
 | New V3 fence | Bytes | SHA-256 |
 | --- | ---: | --- |
-| adopt and token readiness | `10987` | `9000B5CBB1770DF58C307D1D3FED66844B0A6A2A239ED100D144C6C9DEBCAEA7` |
+| adopt and token readiness | `11761` | `3DD84179EED98D1FAE77BD48A62AE1B3C28EB30630931038E52B38BAD24F6DC9` |
 | fresh Cloudflare prestart reads | `19737` | `C9299E0BE4FFFB211B052C1F0E71D8DBEAFA89422EFA5BFC0BB88C380F65EE73` |
 | pre-Create detach | `2196` | `467F98589FD335AC6393B8BFEF64D7A3101EBE27C5BAA74E37A7FABA68AC5F60` |
 | post-native detach | `2201` | `55B407F463C351B64174800617E8B3F64B3CE98D60BAA1BEAEF1E6D3312B10A5` |
@@ -164,16 +172,18 @@ spent-V2 declarations, calls `secureConsoleChromeV1.tabs.get()` exactly once
 for the retained ID, performs exactly one navigation to
 `https://dash.cloudflare.com/profile/api-tokens`, then performs exactly one
 fixed `20000 ms` locator readiness wait for the fresh page's bound paginator,
-then one exact page-local token-name fill and one bounded result-transition
-wait before title/control/name/row checks.
+then proves the bound filter is initially empty, performs one exact page-local
+token-name fill, and uses bounded native waits for a query-bound result-region
+echo and its exact empty terminal before title/control/name/row checks.
 
 The search input's required `aria-controls` must identify exactly one result
-region. Fresh-navigation baseline is complete only with its exact paginator,
-row total, busy-free state, and either a complete nonempty page or authoritative
-global `0-0 of 0` terminal. From a nonempty baseline, a bounded native locator
-wait requires the exact empty status to become visible after the one fill; a
-globally empty baseline proves absence before the fill, so an unchanged empty
-marker is not load-bearing. Evaluate calls only take synchronous read snapshots.
+region. The initial empty-filter baseline is complete only with its exact
+paginator, row total, busy-free state, and either a complete nonempty page or
+authoritative global `0-0 of 0` terminal. After the one fill, the same unique
+region must expose exactly one visible exact query echo before its exact zero
+rows, no-busy, paginator-total terminal is accepted. Thus an unchanged empty
+marker alone cannot prove query completion. Evaluate calls only take
+synchronous read snapshots.
 
 ```javascript
 let secureConsoleOwnedTaskTabV3 = null;
@@ -212,6 +222,8 @@ await (async () => {
   let createControlCount = -1;
   let tokenNameCount = -1;
   let matchingRowCount = -1;
+  let tokenInitialFilterEmpty = false;
+  let tokenQueryEchoCount = -1;
   let tokenFilterComplete = false;
   let adopted = null;
   const safeErrorClass = (error) => {
@@ -270,6 +282,8 @@ await (async () => {
     counters.readinessAttempted++;
     await tokenPaginator.waitFor({ state: "visible", timeoutMs: 20000 });
     counters.readinessFulfilled++;
+    tokenInitialFilterEmpty = await tokenFilter.evaluate((input) => input.value === "");
+    if (!tokenInitialFilterEmpty) throw new Error("TokenInitialFilterStateError");
     const tokenBaseline = await tokenResultsRoot.evaluate((root) => {
       const pager = root.querySelector('[aria-label="Pagination"]');
       const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager?.textContent || "").replace(/\s+/g, " ").trim());
@@ -291,6 +305,12 @@ await (async () => {
     counters.fillAttempted++;
     await tokenFilter.fill("OmniRoute secure console R5 20260901");
     counters.fillFulfilled++;
+    const tokenQueryEcho = tokenResultsRoot.getByText("OmniRoute secure console R5 20260901", { exact: true });
+    counters.readinessAttempted++;
+    await tokenQueryEcho.waitFor({ state: "visible", timeoutMs: 20000 });
+    counters.readinessFulfilled++;
+    tokenQueryEchoCount = await tokenQueryEcho.count();
+    if (tokenQueryEchoCount !== 1) throw new Error("TokenQueryEchoCountError");
     const tokenEmptyStatus = tokenResultsRoot.getByRole("status").filter({ hasText: /^(?:no api tokens found|no tokens found)$/i });
     counters.readinessAttempted++;
     await tokenEmptyStatus.waitFor({ state: "visible", timeoutMs: 20000 });
@@ -309,7 +329,8 @@ await (async () => {
       const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
       return !busy && match !== null && Number(match[1]) === 0 && Number(match[2]) === 0 && Number(match[3]) === 0 && rows === 0 && statuses.length === 1 && next.length === 1 && previous.length === 1 && disabled(next[0]) && disabled(previous[0]);
     });
-    tokenFilterComplete = tokenValueExact && tokenTerminal && (tokenBaseline.terminalZero || tokenBaseline.completeNonempty);
+    tokenFilterComplete = tokenInitialFilterEmpty && tokenQueryEchoCount === 1 && tokenValueExact && tokenTerminal &&
+      (tokenBaseline.terminalZero || tokenBaseline.completeNonempty);
 
     counters.titleAttempted++;
     const title = await adopted.title();
@@ -321,13 +342,13 @@ await (async () => {
       await adopted.playwright.getByRole("link", { name: "Create Token", exact: true }).count();
     counters.createFulfilled++;
     counters.nameAttempted++;
-    tokenNameCount = await tokenResultsRoot.getByText("OmniRoute secure console R5 20260901", { exact: true }).count();
+    tokenNameCount = await tokenResultsRoot.locator("table tbody").getByText("OmniRoute secure console R5 20260901", { exact: true }).count();
     counters.nameFulfilled++;
     counters.rowAttempted++;
     matchingRowCount = await tokenResultsRoot.getByRole("row").filter({ hasText: "OmniRoute secure console R5 20260901" }).count();
     counters.rowFulfilled++;
     if (!titleExact || createControlCount !== 1 || tokenNameCount !== 0 || matchingRowCount !== 0 || !tokenFilterComplete ||
-        counters.readinessAttempted !== 2 || counters.readinessFulfilled !== 2 ||
+        counters.readinessAttempted !== 3 || counters.readinessFulfilled !== 3 ||
         counters.fillAttempted !== 1 || counters.fillFulfilled !== 1) {
       throw new Error("AuthenticatedTokenPageStateError");
     }
@@ -346,6 +367,8 @@ await (async () => {
     createControlCount,
     tokenNameCount,
     matchingRowCount,
+    tokenInitialFilterEmpty,
+    tokenQueryEchoCount,
     tokenFilterComplete,
     getAttempted: counters.getAttempted,
     getFulfilled: counters.getFulfilled,
@@ -381,10 +404,11 @@ await (async () => {
 })();
 ```
 
-Exact PASS requires the fixed PASS terminal; all declaration/ownership/title
-booleans and `tokenFilterComplete` true; Create count `1`; token-name/row `0/0`;
+Exact PASS requires the fixed PASS terminal; all declaration/ownership/title,
+initial-filter-empty, and `tokenFilterComplete` booleans true; query echo `1`;
+Create count `1`; token-name/row `0/0`;
 get, navigation, title, Create, name, and row counters all `1/1`; native
-locator readiness `2/2`; page-local search fill `1/1`;
+locator readiness `3/3`; page-local search fill `1/1`;
 write attempted `1`;
 `errorClass=NONE`; complete untruncated output; completed tool status; and the
 later private V3 alias/eligibility/state tuple exact. Alias assignment and

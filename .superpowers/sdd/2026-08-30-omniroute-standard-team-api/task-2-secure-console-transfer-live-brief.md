@@ -8,6 +8,14 @@ VM1205, proxy, Rulesets, evidence, deletion, permission, or routing action.
 
 ## Authoritative pins
 
+- Fix-round-2 base brief commit
+  `4b0f3d8c5116fce5a07a57595eb594d79b089154`: `60073` bytes, SHA-256
+  `19A99E2C8E7AB887E3EFDF00DF2E94BE322CB88D70396AF5755ACFACC47EB6F3`.
+- Fix-round-1 FAIL review commit
+  `be3bd4f17032d7332a62b0bfdb9f598eede9d8f7`: `11507` bytes, SHA-256
+  `4E784207BBF986E1ED1E619D429CAC79F84EB94587BD94F9A7F9A79B4E7EFD59`.
+  This fix round addresses exactly its two IMPORTANT findings and remains
+  unconsumable until a fresh independent Sol High PASS.
 - Fix-round base brief commit
   `5026b28140ad2431c1a5b77903845d174e4ed606`: `47893` bytes, SHA-256
   `5C413FE3D6757166F4CCC9C5E969488126E06BC67261ACF37E51B0570891476E`.
@@ -347,9 +355,9 @@ The complete credential-free owner script is the sole `powershell` fence under
 the next heading. Independent review pins its extracted strict UTF-8, LF-only,
 one-trailing-LF bytes as:
 
-- owner bytes: `22013`;
+- owner bytes: `22118`;
 - owner SHA-256:
-  `27E4F7E447104BA6253682D082D54A0EBBE4AFBD843D7AA9806B82B6B8136BBB`.
+  `347FCD60A41DF780CE4A94E4FC14C87E5059112068C689EF73636ABC5B0F0B6C`.
 
 Create one new GUID-named directory directly below the resolved Windows temp
 root. Extract the exact R5 fence following `### Deterministic R5 script` from
@@ -373,8 +381,8 @@ $ErrorActionPreference = 'Stop'
 $utf8 = [Text.UTF8Encoding]::new($false, $true)
 $briefPath = '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-secure-console-transfer-live-brief.md'
 $r5ReviewPath = '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-rulesets-api-incident-sol-review.md'
-$expectedOwnerBytes = 22013
-$expectedOwnerHash = '27E4F7E447104BA6253682D082D54A0EBBE4AFBD843D7AA9806B82B6B8136BBB'
+$expectedOwnerBytes = 22118
+$expectedOwnerHash = '347FCD60A41DF780CE4A94E4FC14C87E5059112068C689EF73636ABC5B0F0B6C'
 $expectedR5Bytes = 10890
 $expectedR5Hash = 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41'
 $expectedR5ReviewBytes = 32520
@@ -767,14 +775,16 @@ try {
                     }
                     catch {}
                 }
-                $r5ExitProofAttempted++
-                if ($r5Process.WaitForExit($r5ExitProofDeadlineMs)) {
-                    $r5ExitProofFulfilled++
-                    $r5ChildExited++
-                }
-                else {
-                    $r5Residual = 'EXACT_CHILD_EXIT_NOT_PROVEN'
-                    Set-PostAcceptFailure 'R5_EXIT_NOT_PROVEN'
+                if ($r5ExitProofAttempted -eq 0) {
+                    $r5ExitProofAttempted++
+                    if ($r5Process.WaitForExit($r5ExitProofDeadlineMs)) {
+                        $r5ExitProofFulfilled++
+                        $r5ChildExited++
+                    }
+                    else {
+                        $r5Residual = 'EXACT_CHILD_EXIT_NOT_PROVEN'
+                        Set-PostAcceptFailure 'R5_EXIT_NOT_PROVEN'
+                    }
                 }
             }
             if ($r5StartInfo) {
@@ -987,6 +997,9 @@ ms` exact-handle exit-proof wait. On timeout or a post-start exception, this
 independently reviewed contract and standing bounded cleanup authority permit
 at most one `Kill()` call on that retained exact handle only. It never uses a
 PID/name lookup, descendant/tree kill, second wait path, retry, or fallback.
+The child `finally` may enter its exit-proof branch only while
+`r5ExitProofAttempted` is zero; a failed timeout-branch proof therefore retains
+the exact handle/residual and cannot reach another wait.
 Failure to prove exit records `R5_RESIDUAL=EXACT_CHILD_EXIT_NOT_PROVEN`, clears
 the two start-info environment entries, conservatively classifies R5 uncertain,
 and still enters the common revocation hold.
@@ -1004,7 +1017,8 @@ $ownerTerminationFulfilled = 0
 $ownerExitProofAttempted = 0
 $ownerExitProofFulfilled = 0
 $ownerTimedOut = $false
-$owner = Start-Process -FilePath 'C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe' -ArgumentList @('-NoLogo','-NoProfile','-File',$ownerScriptPath,'-ExpectedOwnerSha256','27E4F7E447104BA6253682D082D54A0EBBE4AFBD843D7AA9806B82B6B8136BBB','-R5ScriptPath',$r5ScriptPath) -RedirectStandardOutput $safeLogPath -PassThru
+$ownerClock = [Diagnostics.Stopwatch]::StartNew()
+$owner = Start-Process -FilePath 'C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe' -ArgumentList @('-NoLogo','-NoProfile','-File',$ownerScriptPath,'-ExpectedOwnerSha256','347FCD60A41DF780CE4A94E4FC14C87E5059112068C689EF73636ABC5B0F0B6C','-R5ScriptPath',$r5ScriptPath) -RedirectStandardOutput $safeLogPath -PassThru
 $expectedOwnerPid = $owner.Id
 ```
 
@@ -1019,6 +1033,14 @@ exact-retained-handle termination attempt after that deadline; no name/PID
 reacquisition, process enumeration, tree kill, or retry is allowed. An
 unproven exit leaves the exact handle retained and token/revocation state
 conservatively `NOT PROVEN`.
+
+Retain `$ownerClock` with the exact process handle throughout coordination.
+Do not call a blocking process wait while observing the safe log tuple,
+requesting either mandatory chat confirmation, or waiting for the user's native
+actions. Those coordination steps use only nonblocking safe-log inspection and
+`$owner.HasExited`; before any further consuming step they must stop if the
+monotonic elapsed value has exhausted the fixed budget. Only the single final
+block below may perform the remaining-budget wait.
 
 At the mandatory confirmation checkpoint the user, not an agent:
 
@@ -1047,29 +1069,41 @@ row deletion remains allowed but HTTP `401` is `NOT PROVEN`. Denial or
 credential incident, clears named local references at the deadline, exits, and
 blocks all later Task 2 action.
 
-After the visible owner exits, the retained parent uses this exact
-credential-free block once. It does not infer success from exit alone:
+After nonblocking coordination has completed, or nonblocking observation shows
+the visible owner exited, the retained parent uses this exact credential-free
+block once. It does not infer success from exit alone:
 
 ```powershell
-if (-not $owner.WaitForExit($ownerWallDeadlineMs)) {
+$ownerElapsedMs = [int64]$ownerClock.ElapsedMilliseconds
+$ownerRemainingMs = [int64]$ownerWallDeadlineMs - $ownerElapsedMs
+[Console]::Out.WriteLine(("OWNER_ELAPSED_MS={0} OWNER_REMAINING_MS={1}" -f $ownerElapsedMs,$ownerRemainingMs))
+if ($ownerRemainingMs -le 0) {
     $ownerTimedOut = $true
+}
+elseif (-not $owner.WaitForExit([int]$ownerRemainingMs)) {
+    $ownerTimedOut = $true
+}
+if ($ownerTimedOut) {
     [Console]::Out.WriteLine('OWNER_WALL_DEADLINE=EXPIRED')
     [Console]::Out.WriteLine('OWNER_TIMEOUT_STATE=TOKEN_AND_REVOCATION_NOT_PROVEN')
-    $ownerTerminationAttempted++
-    try {
-        $owner.Kill()
-        $ownerTerminationFulfilled++
-    }
-    catch {}
-    $ownerExitProofAttempted++
-    if ($owner.WaitForExit($ownerExitProofDeadlineMs)) {
-        $ownerExitProofFulfilled++
-    }
-    else {
-        [Console]::Out.WriteLine(("OWNER_TERMINATION={0}/{1} EXIT_PROOF={2}/{3} RESIDUAL=EXACT_OWNER_RUNNING_NOT_PROVEN" -f $ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled))
-        throw 'OWNER_TIMEOUT_EXIT_NOT_PROVEN_NO_RETRY'
+    if (-not $owner.HasExited) {
+        $ownerTerminationAttempted++
+        try {
+            $owner.Kill()
+            $ownerTerminationFulfilled++
+        }
+        catch {}
+        $ownerExitProofAttempted++
+        if ($owner.WaitForExit($ownerExitProofDeadlineMs)) {
+            $ownerExitProofFulfilled++
+        }
+        else {
+            [Console]::Out.WriteLine(("OWNER_TERMINATION={0}/{1} EXIT_PROOF={2}/{3} RESIDUAL=EXACT_OWNER_RUNNING_NOT_PROVEN" -f $ownerTerminationAttempted,$ownerTerminationFulfilled,$ownerExitProofAttempted,$ownerExitProofFulfilled))
+            throw 'OWNER_TIMEOUT_EXIT_NOT_PROVEN_NO_RETRY'
+        }
     }
 }
+$ownerClock.Stop()
 $ownerExit = $owner.ExitCode
 $owner.Dispose()
 $owner = $null
@@ -1109,7 +1143,9 @@ Remove-Item -LiteralPath $transferRoot -Force -ErrorAction Stop
   state fixed; R5 attributable rollback DELETE `0..1` internally;
 - every SSH start/proof/rollback child has one `60000 ms` wall wait and at most
   one exact-handle termination/`10000 ms` exit proof; the owner has one
-  `1800000 ms` wall wait and the same no-reacquisition termination boundary;
+  launch-time monotonic `1800000 ms` lifetime budget, one wait of only its
+  computed positive remainder, and the same no-reacquisition termination
+  boundary;
 - token rows created/deleted `1 / 1` maximum under separate confirmations;
 - invalid-token checks/refreshed row checks `1 / 1` maximum;
 - proxy starts/proofs/restarts `1 / 1 / 0`;
@@ -1183,7 +1219,8 @@ LF-only/one trailing LF, owner/R5 extraction bytes and hashes, PowerShell parse,
 exact pwsh pins, temp direct-child/deletion guards, per-iteration and outer
 reference clearing, no parent token env, exact R5 child private env, serial
 counter/order cardinality, `600`-second prompt/revocation deadlines, `180000`
-ms R5, `60000` ms SSH, and `1800000` ms owner wall deadlines, asynchronous
+ms R5, `60000` ms SSH, and launch-time monotonic `1800000` ms owner lifetime,
+remaining-budget arithmetic, asynchronous
 stream drain before task results, absence of parameterless process waits and
 blocking synchronous stream drains, fixed redacted output schema, immediate pre-spawn pwsh
 path/bytes/hash/version binding, proxy 19-label contract, mandatory human

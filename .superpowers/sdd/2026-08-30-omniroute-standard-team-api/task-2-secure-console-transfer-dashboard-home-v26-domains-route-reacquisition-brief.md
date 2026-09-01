@@ -10,6 +10,12 @@ V25 live report commit `01a5977398cf5d653e1bfe81a76cd6cb32439454`:
 the dashboard resolves to an account-home path, the direct zone anchor is
 absent, and exactly one normalized Domains action exists.
 
+Fix round 1 closes HIGH `V26-001` from independent review commit
+`97235f0cfe7c27c68de65868e0a2f2b2a0ab8153`. The executable now parses the
+original account-home segment before the click and requires the Domains,
+zone-anchor, and final zone routes all to retain that same segment. The segment
+remains local and is never emitted.
+
 V26 creates one owned tab, navigates once to the fixed dashboard home,
 revalidates a complete fixed-key semantic signature, clicks exactly one visible
 Domains action, validates the account-bound Domains route, validates exactly
@@ -174,10 +180,13 @@ await (async () => {
     counters.homeUrlAttempted++;
     const homeUrl = new URL(await tab.url());
     counters.homeUrlFulfilled++;
+    const homePath = /^\/([0-9a-f]{32})\/home\/?$/.exec(homeUrl.pathname);
     if (homeUrl.protocol !== "https:" ||
-        homeUrl.hostname !== "dash.cloudflare.com") {
+        homeUrl.hostname !== "dash.cloudflare.com" ||
+        homePath === null) {
       throw new Error("DomainsRouteHomeNavigationError");
     }
+    const homeAccountSegment = homePath[1];
 
     const firstVisibleAnchor = tab.playwright.locator("a[href]:visible").first();
     if (typeof firstVisibleAnchor?.waitFor !== "function") {
@@ -302,9 +311,10 @@ await (async () => {
     domainsRouteExact =
       domainsUrl.protocol === "https:" &&
       domainsUrl.hostname === "dash.cloudflare.com" &&
-      domainsPath !== null;
+      domainsPath !== null &&
+      domainsPath[1] === homeAccountSegment;
     if (!domainsRouteExact) throw new Error("DomainsRouteTargetError");
-    const accountSegment = domainsPath[1];
+    const accountSegment = homeAccountSegment;
 
     counters.zoneCountAttempted++;
     zoneAnchorCount = await zoneAnchor.count();
@@ -425,6 +435,8 @@ await (async () => {
 
 Exact PASS requires the predecessor and controller ownership fields true; one
 new tab; one home navigation/URL/snapshot; complete validated home signature;
+an original account-home segment parsed before the click and retained by every
+subsequent Domains/zone route;
 exact Domains action count `1` and visibility true; click exactly `1 / 1`;
 exact account Domains route; visible zone wait and count `1`; one href read with
 same-account exact shape; one exact zone navigation/URL; visible zone marker
@@ -439,7 +451,8 @@ owned tab or retain that exact handle as residue evidence.
 
 Independent Sol High review must verify the V23 consumed-failed-clean and V25
 consumed-PASS-clean predecessors; V24 declaration absence; fixed target and
-same-account route binding; inherited V25 page signature and all-integer
+the `V26-001` fix binding every post-click route to the original pre-click
+account-home segment; inherited V25 page signature and all-integer
 completeness; unique visible action and zone cardinality; exact one-click and
 navigation bounds; fixed-value-only output; success retention and failure
 cleanup; no identifier/secret sink; no provider mutation; no retry; and both

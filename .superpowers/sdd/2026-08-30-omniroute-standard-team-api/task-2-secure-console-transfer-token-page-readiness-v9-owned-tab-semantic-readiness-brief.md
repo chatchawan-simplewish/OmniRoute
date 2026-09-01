@@ -45,7 +45,10 @@ After the fill, the input must exactly echo
 rows, the empty-token status must be unique, and both exact token-text and
 matching-row counts must be zero. Internal fingerprints and page text are
 never emitted. A listener installed before the fill must observe its input
-event and exact query value.
+event and exact query value. At that target-level input boundary it drains all
+queued observer records, resets the table-mutation count, and arms a new
+post-input generation before delegated application input handling. Only exact-
+table records delivered in that armed generation can satisfy causality.
 
 ## One-shot ownership and residue
 
@@ -68,10 +71,10 @@ Execute at most once only after commit, independent Sol High PASS review,
 non-self-referential classification, post-commit tuple, and fresh action-time
 pins. The executable is complete only with its final LF.
 
-Executable bytes: `22483`.
+Executable bytes: `22547`.
 
 Executable SHA-256:
-`288B6070C8843F787305FF6D11E91CBD3BB59FB86E97E8024BD59BA015D9DD4E`.
+`C596A5804DBA693B8B723B8F895B14963A5F75A84883254F9A88CC9BDB69D8B6`.
 
 ```javascript
 let secureConsoleV9ReadinessConsumed = false;
@@ -162,28 +165,29 @@ await (async () => {
         retainedIdentity.lastMutation = started;
         retainedIdentity.inputEventCount = 0;
         retainedIdentity.lastInputValue = null;
-        retainedIdentity.lastInputAt = 0;
         retainedIdentity.tableMutationCount = 0;
-        retainedIdentity.lastTableMutation = 0;
+        retainedIdentity.postInputGenerationArmed = false;
         retainedIdentity.baselineFingerprint = null;
         retainedIdentity.baselineRowCount = -1;
         retainedIdentity.inputListener = () => {
+          retainedIdentity.observer.takeRecords();
+          retainedIdentity.tableMutationCount = 0;
+          retainedIdentity.postInputGenerationArmed = true;
           retainedIdentity.inputEventCount++;
           retainedIdentity.lastInputValue = input.value;
-          retainedIdentity.lastInputAt = performance.now();
         };
         input.addEventListener("input", retainedIdentity.inputListener);
         retainedIdentity.observer = new MutationObserver((records) => {
           retainedIdentity.mutationCount++;
           retainedIdentity.lastMutation = performance.now();
           if (
+            retainedIdentity.postInputGenerationArmed === true &&
             records.some(
               (record) =>
                 record.target === exactTable || exactTable?.contains(record.target) === true,
             )
           ) {
             retainedIdentity.tableMutationCount++;
-            retainedIdentity.lastTableMutation = performance.now();
           }
         });
         retainedIdentity.observer.observe(exactRoot, {
@@ -237,8 +241,8 @@ await (async () => {
           inputEventObserved: retainedIdentity.inputEventCount > 0,
           inputEventValueExact: retainedIdentity.lastInputValue === expected,
           causalTableTransitionObserved:
+            retainedIdentity.postInputGenerationArmed === true &&
             retainedIdentity.tableMutationCount > 0 &&
-            retainedIdentity.lastTableMutation >= retainedIdentity.lastInputAt &&
             retainedIdentity.baselineRowCount > 0 &&
             retainedIdentity.baselineFingerprint !== contentFingerprint,
           pageTableCount: document.querySelectorAll("table").length,
@@ -274,7 +278,7 @@ await (async () => {
             retainedIdentity.mutationCount = 0;
             retainedIdentity.lastMutation = performance.now();
             retainedIdentity.tableMutationCount = 0;
-            retainedIdentity.lastTableMutation = 0;
+            retainedIdentity.postInputGenerationArmed = false;
           } else {
             observer.disconnect();
             input.removeEventListener("input", retainedIdentity.inputListener);

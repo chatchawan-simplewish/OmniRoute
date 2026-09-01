@@ -11,7 +11,7 @@ the dashboard resolves to an account-home path, the direct zone anchor is
 absent, and exactly one normalized Domains action exists.
 
 V26 is consumed failed-clean at incident commit
-`04bc5e46761db7c0760f4575ae6858924a471b75`. Its first URL read completed
+`04bc5e467caa057ab44ea49935a6b66c8e87a1b2`. Its first URL read completed
 before the account-home redirect had settled, so it stopped before the
 V25-proven visible-anchor wait/snapshot and before any click. V27 changes only
 that timing boundary: the initial URL check is host-only, then the existing

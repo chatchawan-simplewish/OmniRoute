@@ -37,8 +37,12 @@ The one page-local evaluation reports:
   API-token Create-like href-shape, and bounded data-marker counts.
 
 Raw strings used for comparison remain inside the page evaluator and are never
-returned. V10 PASS authorizes only offline interpretation and a new reviewed
-readiness contract.
+returned. The controller treats the evaluator result as untrusted: it requires
+one plain object with the exact 60-key allowlist, exact boolean types, safe
+integer types/ranges, and consistent found/missing ancestor tuples, then copies
+only those allowlisted fields into a new local object. A mismatch throws before
+diagnostic fulfillment or body completion. V10 PASS authorizes only offline
+interpretation and a new reviewed readiness contract.
 
 ## One-shot and no-residue contract
 
@@ -58,10 +62,10 @@ Execute at most once only after commit, independent Sol High PASS review,
 non-self-referential classification, post-commit tuple, and fresh action-time
 pins. The executable is complete only with its final LF.
 
-Executable bytes: `15369`.
+Executable bytes: `17840`.
 
 Executable SHA-256:
-`8A9B782AB7FCD3D0A2953D11AD6D6CEFD38EAD25697CD45F29A6869AF669A78B`.
+`502EC63F8B1871830C82992BCC3836D9B2EBBA83D849BEAF0271EF6171C4309F`.
 
 ```javascript
 let secureConsoleV10StructuralDiagnosticConsumed = false;
@@ -212,7 +216,7 @@ await (async () => {
     if (placeholderSearchCount !== 1) throw new Error("StructuralFilterCountError");
 
     counters.diagnosticAttempted++;
-    structure = await tokenFilter.evaluate((input) => {
+    const untrustedStructure = await tokenFilter.evaluate((input) => {
       const normalize = (value) => (value || "").replace(/\s+/g, " ").trim().toLowerCase();
       const statusText = new Set(["no api tokens found", "no tokens found", "no results"]);
       const actionSelector = 'button, a, [role="button"], [role="link"]';
@@ -359,6 +363,61 @@ await (async () => {
         dataCreateMarkerCount: document.querySelectorAll('[data-testid*="create" i], [data-test*="create" i]').length,
       };
     });
+    const expectedKeys = Object.keys(emptyStructure()).sort();
+    const booleanKeys = new Set([
+      "inputConnected", "inputVisible", "inputValueEmpty",
+      "firstAnyFound", "firstSingleFound", "firstTwoFound", "sectionFound",
+    ]);
+    const actualKeys =
+      typeof untrustedStructure === "object" && untrustedStructure !== null
+        ? Object.keys(untrustedStructure).sort()
+        : [];
+    const exactKeys =
+      actualKeys.length === expectedKeys.length &&
+      actualKeys.every((key, index) => key === expectedKeys[index]);
+    const plainObject =
+      typeof untrustedStructure === "object" &&
+      untrustedStructure !== null &&
+      Object.getPrototypeOf(untrustedStructure) === Object.prototype;
+    if (!plainObject || !exactKeys) throw new Error("StructuralResultShapeError");
+    for (const key of expectedKeys) {
+      const value = untrustedStructure[key];
+      if (booleanKeys.has(key)) {
+        if (typeof value !== "boolean") throw new Error("StructuralResultBooleanError");
+      } else {
+        const upper = key.endsWith("Depth") ? 32 : 1000000;
+        if (!Number.isSafeInteger(value) || value < -1 || value > upper) {
+          throw new Error("StructuralResultIntegerError");
+        }
+      }
+    }
+    for (const prefix of ["firstAny", "firstSingle", "firstTwo", "section"]) {
+      const found = untrustedStructure[`${prefix}Found`];
+      const depth = untrustedStructure[`${prefix}Depth`];
+      const metricKeys = [
+        "TableCount", "SearchCount", "StatusCount", "EmptyStatusCount",
+        "TbodyCount", "RowCount", "BusyCount", "CreateActionableCount",
+      ];
+      if (found) {
+        if (depth < 1 || metricKeys.some((suffix) => untrustedStructure[`${prefix}${suffix}`] < 0)) {
+          throw new Error("StructuralResultFoundTupleError");
+        }
+      } else if (
+        depth !== -1 ||
+        metricKeys.some((suffix) => untrustedStructure[`${prefix}${suffix}`] !== -1)
+      ) {
+        throw new Error("StructuralResultMissingTupleError");
+      }
+    }
+    const pageAndCandidateKeys = expectedKeys.filter(
+      (key) => !booleanKeys.has(key) && !key.endsWith("Depth") &&
+        !/^(firstAny|firstSingle|firstTwo|section)/.test(key),
+    );
+    if (pageAndCandidateKeys.some((key) => untrustedStructure[key] < 0)) {
+      throw new Error("StructuralResultCountSentinelError");
+    }
+    structure = {};
+    for (const key of expectedKeys) structure[key] = untrustedStructure[key];
     counters.diagnosticFulfilled++;
     result = "V10_STRUCTURAL_DIAGNOSTIC_BODY_COMPLETE";
   } catch (error) {

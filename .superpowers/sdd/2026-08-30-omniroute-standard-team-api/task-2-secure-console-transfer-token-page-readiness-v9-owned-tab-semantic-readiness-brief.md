@@ -23,28 +23,42 @@ use the clipboard, or mutate provider state. Static artifacts set
 ## Completeness replacement
 
 The unique placeholder search input is bound to the nearest ancestor containing
-exactly one table. The page must contain exactly two tables and no pagination,
-next, or previous controls. Before and after the sole fill, the scoped table
-must remain connected and unchanged for five consecutive 100 ms observations,
-with no `aria-busy=true` or progressbar marker. The initial input must be empty.
-After the fill, its value must exactly echo
-`OmniRoute secure console R5 20260901`, the scoped table must contain zero body
-rows, and both exact token-text and matching-row counts must be zero. These
-requirements replace only the disproved ARIA-controlled paginator proof; they
-do not weaken the complete-list or no-existing-token requirement.
+exactly one table. That exact root and table identity is retained across the
+sole fill. The page must reproduce the full relevant V8 signature: zero ARIA
+textbox/search-name matches, one placeholder input, no `aria-controls`, two
+page tables, no grid, no pagination/next/previous controls, and zero
+Create-token buttons. Preserving V4's unique Create-control semantic further
+requires exactly one exact Create-token link.
+
+An exact-root MutationObserver remains active from the completed baseline
+through the filtered terminal. Each proof requires at least 1200 ms elapsed,
+1000 ms mutation quiet, an unchanged internal row-content fingerprint,
+connected exact identities, no busy/progress marker, one physical `tbody`, and
+no row-count or common virtualizer marker inconsistent with the materialized
+rows. A zero-row baseline requires one recognized empty-token status; a
+nonempty baseline requires the filtered proof to observe a relevant mutation.
+After the fill, the input must exactly echo
+`OmniRoute secure console R5 20260901`, the exact table must have zero body
+rows, the empty-token status must be unique, and both exact token-text and
+matching-row counts must be zero. Internal fingerprints and page text are
+never emitted. A listener installed before the fill must observe its input
+event and exact query value; when baseline rows existed, the table mutation
+must occur causally after that input event.
 
 ## One-shot ownership and residue
 
 V9 has exactly one `tabs.new()`, one fixed `goto()`, one page-local `fill()`,
 and one failure-only `close()` call site. The created handle is assigned to
 local and durable top-level state in the fulfillment assignment before any
-later await. Exact PASS transfers that same handle to the V4 binding and clears
+later await. The Node tool awaits the outer async cell. Exact PASS transfers
+that same handle to the V4 binding and clears
 the V9 alias without closing it. Any failure closes only the exact created
 handle; rejected close retains that exact handle for a new reviewed
 disposition. Rejection, malformed output, timeout, truncation, tool error, or
 uncertainty consumes V9 and stops. No retry, fallback, alternate tab, selected,
 list, get, reconnect, manual selector, detach, or cleanup improvisation is
-authorized.
+authorized. Predecessor drift leaves every inherited V4 binding field untouched
+and reports only fixed-equality booleans.
 
 ## Executable cell
 
@@ -52,23 +66,33 @@ Execute at most once only after commit, independent Sol High PASS review,
 non-self-referential classification, post-commit tuple, and fresh action-time
 pins. The executable is complete only with its final LF.
 
-Executable bytes: `11825`.
+Executable bytes: `21505`.
 
 Executable SHA-256:
-`3E5C0310A0419D859485E8FE4752848D8D5C40D19DB6603BA1C55173FF7951E7`.
+`27DED59F00F4176195625A42477B28536D3448B7214BD4F989E095E092040CAF`.
 
 ```javascript
 let secureConsoleV9ReadinessConsumed = false;
 let secureConsoleV9RetainedTab = null;
-void (async () => {
+await (async () => {
   const gateWasFresh = secureConsoleV9ReadinessConsumed === false;
   secureConsoleV9ReadinessConsumed = true;
   const targetName = "OmniRoute secure console R5 20260901";
+  const inheritedV4BindingNull =
+    typeof secureConsoleOwnedTaskTabV4 !== "undefined" &&
+    secureConsoleOwnedTaskTabV4 === null;
+  const inheritedV4BindingIneligible =
+    typeof secureConsoleOwnedTaskTabV4Eligible === "boolean" &&
+    secureConsoleOwnedTaskTabV4Eligible === false;
+  const inheritedV4BindingStateExact =
+    typeof secureConsoleOwnedTaskTabV4State === "string" &&
+    secureConsoleOwnedTaskTabV4State === "V7_OWNED_TAB_REACQUISITION_OR_READINESS_FAILED_CLEAN";
   const counters = {
     newAttempted: 0, newFulfilled: 0,
     navigationAttempted: 0, navigationFulfilled: 0,
     urlAttempted: 0, urlFulfilled: 0,
     countAttempted: 0, countFulfilled: 0,
+    attributeAttempted: 0, attributeFulfilled: 0,
     settleAttempted: 0, settleFulfilled: 0,
     fillAttempted: 0, fillFulfilled: 0,
     closeAttempted: 0, closeFulfilled: 0,
@@ -82,10 +106,22 @@ void (async () => {
   let tabShape = false;
   let createdHandleCaptured = false;
   let navigationTargetExact = false;
+  let currentSearchNameCount = -1;
+  let anySearchNameCount = -1;
+  let allTextboxCount = -1;
+  let placeholderSearchCount = -1;
+  let createTokenButtonCount = -1;
+  let createTokenLinkCount = -1;
+  let createApiTokenButtonCount = -1;
+  let pageTableCount = -1;
+  let pageGridCount = -1;
+  let ariaControlsAbsent = false;
   let createControlCount = -1;
   let initialTokenNameCount = -1;
   let finalTokenNameCount = -1;
   let matchingRowCount = -1;
+  let baselineEmptyStatusCount = -1;
+  let filteredEmptyStatusCount = -1;
   let baseline = null;
   let filtered = null;
   let semanticSignature = false;
@@ -103,42 +139,135 @@ void (async () => {
     counters.countFulfilled++;
     return value;
   };
-  const settle = async (filter, expectedValue) => {
+  const settle = async (root, expectedValue, initializeIdentity) => {
     counters.settleAttempted++;
-    const proof = await filter.evaluate(async (input, expected) => {
+    const proof = await root.evaluate(async (exactRoot, args) => {
+      const { expected, initialize, minimumElapsedMs } = args;
       const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-      const snapshot = () => {
-        let root = input.parentElement;
-        while (root !== null && root !== document.body && root.querySelectorAll("table").length !== 1) {
-          root = root.parentElement;
+      const input = exactRoot.querySelector('input[placeholder*="search" i]');
+      const exactTable = exactRoot.querySelector("table");
+      const identityKey = "__omnirouteV9ExactResultIdentity";
+      if (initialize) {
+        if (Object.prototype.hasOwnProperty.call(globalThis, identityKey)) {
+          throw new Error("ReadinessIdentityCollisionError");
         }
-        const table = root !== null && root !== document.body ? root.querySelector("table") : null;
+        globalThis[identityKey] = { root: exactRoot, table: exactTable };
+      }
+      const retainedIdentity = globalThis[identityKey];
+      const started = performance.now();
+      if (initialize) {
+        retainedIdentity.mutationCount = 0;
+        retainedIdentity.lastMutation = started;
+        retainedIdentity.inputEventCount = 0;
+        retainedIdentity.lastInputValue = null;
+        retainedIdentity.lastInputAt = 0;
+        retainedIdentity.inputListener = () => {
+          retainedIdentity.inputEventCount++;
+          retainedIdentity.lastInputValue = input.value;
+          retainedIdentity.lastInputAt = performance.now();
+        };
+        input.addEventListener("input", retainedIdentity.inputListener);
+        retainedIdentity.observer = new MutationObserver(() => {
+          retainedIdentity.mutationCount++;
+          retainedIdentity.lastMutation = performance.now();
+        });
+        retainedIdentity.observer.observe(exactRoot, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+          attributes: true,
+        });
+      }
+      const observer = retainedIdentity?.observer;
+      if (typeof observer?.disconnect !== "function") {
+        throw new Error("ReadinessIdentityObserverError");
+      }
+      const fingerprint = () => {
+        if (exactTable === null) return "MISSING";
+        let hash = 2166136261;
+        const text = [...exactTable.querySelectorAll("tbody tr")]
+          .map((row) => (row.textContent || "").replace(/\s+/g, " ").trim())
+          .join("\n");
+        for (let index = 0; index < text.length; index++) {
+          hash ^= text.charCodeAt(index);
+          hash = Math.imul(hash, 16777619);
+        }
+        return `${text.length}:${hash >>> 0}`;
+      };
+      const snapshot = () => {
+        const rows = exactTable === null ? [] : [...exactTable.querySelectorAll("tbody tr")];
+        const tbody = exactTable?.querySelector("tbody") ?? null;
+        const ariaRowCount = exactTable?.getAttribute("aria-rowcount") ?? null;
+        const physicalRowsExact =
+          tbody !== null &&
+          tbody.children.length === rows.length &&
+          [...tbody.children].every((child) => child.tagName === "TR");
+        const nonVirtualized =
+          exactTable !== null &&
+          exactTable.querySelectorAll("tbody").length === 1 &&
+          physicalRowsExact === true &&
+          (ariaRowCount === null || Number(ariaRowCount) === rows.length) &&
+          exactRoot.querySelectorAll('[data-virtualized], [data-virtualizer], [aria-rowindex], tr[style*="transform" i]').length === 0;
         return {
-          inputConnected: input.isConnected === true,
-          inputVisible: input.getClientRects().length === 1,
-          inputValueExact: input.value === expected,
+          rootIdentityExact: retainedIdentity?.root === exactRoot,
+          tableIdentityExact:
+            retainedIdentity?.table === exactTable &&
+            exactRoot.querySelector("table") === exactTable,
+          rootConnected: exactRoot.isConnected === true,
+          tableConnected: exactTable?.isConnected === true,
+          inputConnected: input?.isConnected === true,
+          inputVisible: input?.getClientRects().length === 1,
+          inputValueExact: input?.value === expected,
+          inputEventObserved: retainedIdentity.inputEventCount > 0,
+          inputEventValueExact: retainedIdentity.lastInputValue === expected,
+          causalMutationObserved:
+            retainedIdentity.mutationCount > 0 &&
+            retainedIdentity.lastMutation >= retainedIdentity.lastInputAt,
           pageTableCount: document.querySelectorAll("table").length,
-          rootFound: root !== null && root !== document.body,
-          rootSearchCount: root === null ? -1 : root.querySelectorAll('input[placeholder*="search" i]').length,
-          rootTableCount: root === null ? -1 : root.querySelectorAll("table").length,
-          rowCount: table === null ? -1 : table.querySelectorAll("tbody tr").length,
-          busyCount: root === null ? -1 : root.querySelectorAll('[aria-busy="true"], [role="progressbar"]').length,
+          rootSearchCount: exactRoot.querySelectorAll('input[placeholder*="search" i]').length,
+          rootTableCount: exactRoot.querySelectorAll("table").length,
+          rowCount: rows.length,
+          busyCount: exactRoot.querySelectorAll('[aria-busy="true"], [role="progressbar"]').length,
           paginationCount: document.querySelectorAll('[aria-label="Pagination"], [aria-label="Next page"], [aria-label="Previous page"]').length,
+          nonVirtualized,
+          fingerprint: fingerprint(),
         };
       };
       let previous = JSON.stringify(snapshot());
-      let stable = 0;
       let current = JSON.parse(previous);
-      for (let index = 0; index < 40; index++) {
+      let contentStable = false;
+      for (let index = 0; index < 80; index++) {
         await pause(100);
         current = snapshot();
         const encoded = JSON.stringify(current);
-        stable = encoded === previous && current.busyCount === 0 ? stable + 1 : 0;
+        const elapsed = performance.now() - started;
+        const quietFor = performance.now() - retainedIdentity.lastMutation;
+        contentStable =
+          encoded === previous &&
+          elapsed >= minimumElapsedMs &&
+          quietFor >= 1000 &&
+          current.busyCount === 0;
         previous = encoded;
-        if (stable === 5) return { ...current, quiescent: true };
+        if (contentStable) {
+          const mutationCount = retainedIdentity.mutationCount;
+          if (initialize) {
+            retainedIdentity.mutationCount = 0;
+            retainedIdentity.lastMutation = performance.now();
+          } else {
+            observer.disconnect();
+            input.removeEventListener("input", retainedIdentity.inputListener);
+            delete globalThis[identityKey];
+          }
+          const { fingerprint: omitted, ...safe } = current;
+          return { ...safe, mutationCount, quiescent: true, contentStable: true };
+        }
       }
-      return { ...current, quiescent: false };
-    }, expectedValue);
+      observer.disconnect();
+      input?.removeEventListener("input", retainedIdentity.inputListener);
+      delete globalThis[identityKey];
+      const { fingerprint: omitted, ...safe } = current;
+      return { ...safe, mutationCount: retainedIdentity.mutationCount, quiescent: false, contentStable };
+    }, { expected: expectedValue, initialize: initializeIdentity, minimumElapsedMs: 1200 });
     counters.settleFulfilled++;
     return proof;
   };
@@ -192,47 +321,103 @@ void (async () => {
     navigationTargetExact = tokenUrl.href === "https://dash.cloudflare.com/profile/api-tokens";
     if (!navigationTargetExact) throw new Error("ReadinessNavigationTargetError");
 
+    const currentSearch = tab.playwright.getByRole("textbox", { name: /search api tokens/i });
+    currentSearchNameCount = await counted(currentSearch);
+    anySearchNameCount = await counted(tab.playwright.getByRole("textbox", { name: /search/i }));
+    allTextboxCount = await counted(tab.playwright.getByRole("textbox"));
     const tokenFilter = tab.playwright.locator('input[placeholder*="search" i]');
-    if (await counted(tokenFilter) !== 1) throw new Error("ReadinessFilterCountError");
-    baseline = await settle(tokenFilter, "");
+    placeholderSearchCount = await counted(tokenFilter);
+    createTokenButtonCount = await counted(
+      tab.playwright.getByRole("button", { name: "Create Token", exact: true }),
+    );
+    createTokenLinkCount = await counted(
+      tab.playwright.getByRole("link", { name: "Create Token", exact: true }),
+    );
+    createApiTokenButtonCount = await counted(
+      tab.playwright.getByRole("button", { name: /create api token/i }),
+    );
+    pageTableCount = await counted(tab.playwright.locator("table"));
+    pageGridCount = await counted(tab.playwright.locator('[role="grid"]'));
+    counters.attributeAttempted++;
+    const ariaControls = await tokenFilter.getAttribute("aria-controls");
+    counters.attributeFulfilled++;
+    ariaControlsAbsent = ariaControls === null;
+    const v8SignatureExact =
+      currentSearchNameCount === 0 &&
+      anySearchNameCount === 0 &&
+      allTextboxCount === 0 &&
+      placeholderSearchCount === 1 &&
+      createTokenButtonCount === 0 &&
+      createApiTokenButtonCount === 0 &&
+      pageTableCount === 2 &&
+      pageGridCount === 0 &&
+      ariaControlsAbsent === true;
+    if (!v8SignatureExact) throw new Error("ReadinessV8SignatureDriftError");
+    createControlCount = createTokenButtonCount + createTokenLinkCount;
+
+    const tokenRoot = tokenFilter.locator("xpath=ancestor::*[.//table][1]");
+    if (await counted(tokenRoot) !== 1) throw new Error("ReadinessRootCountError");
+    if (await counted(tokenRoot.locator("table")) !== 1) throw new Error("ReadinessRootTableCountError");
+    const emptyStatus = tab.playwright.getByText(
+      /^(no api tokens found|no tokens found|no results)$/i,
+    );
+    baseline = await settle(tokenRoot, "", true);
+    baselineEmptyStatusCount = await counted(emptyStatus);
     const baselineComplete =
       baseline.quiescent === true &&
+      baseline.contentStable === true &&
+      baseline.rootIdentityExact === true &&
+      baseline.tableIdentityExact === true &&
+      baseline.rootConnected === true &&
+      baseline.tableConnected === true &&
       baseline.inputConnected === true &&
       baseline.inputVisible === true &&
       baseline.inputValueExact === true &&
       baseline.pageTableCount === 2 &&
-      baseline.rootFound === true &&
       baseline.rootSearchCount === 1 &&
       baseline.rootTableCount === 1 &&
       baseline.rowCount >= 0 &&
       baseline.busyCount === 0 &&
-      baseline.paginationCount === 0;
+      baseline.paginationCount === 0 &&
+      baseline.nonVirtualized === true &&
+      (baseline.rowCount === 0
+        ? baselineEmptyStatusCount === 1
+        : baselineEmptyStatusCount === 0);
     if (!baselineComplete) throw new Error("ReadinessBaselineIncompleteError");
-    createControlCount =
-      await counted(tab.playwright.getByRole("button", { name: "Create Token", exact: true })) +
-      await counted(tab.playwright.getByRole("link", { name: "Create Token", exact: true }));
     initialTokenNameCount = await counted(tab.playwright.getByText(targetName, { exact: true }));
 
     counters.fillAttempted++;
     await tokenFilter.fill(targetName);
     counters.fillFulfilled++;
-    filtered = await settle(tokenFilter, targetName);
+    filtered = await settle(tokenRoot, targetName, false);
+    filteredEmptyStatusCount = await counted(emptyStatus);
     finalTokenNameCount = await counted(tab.playwright.getByText(targetName, { exact: true }));
     matchingRowCount = await counted(tab.playwright.getByRole("row").filter({ hasText: targetName }));
     const filteredComplete =
       filtered.quiescent === true &&
+      filtered.contentStable === true &&
+      filtered.rootIdentityExact === true &&
+      filtered.tableIdentityExact === true &&
+      filtered.rootConnected === true &&
+      filtered.tableConnected === true &&
       filtered.inputConnected === true &&
       filtered.inputVisible === true &&
       filtered.inputValueExact === true &&
+      filtered.inputEventObserved === true &&
+      filtered.inputEventValueExact === true &&
       filtered.pageTableCount === 2 &&
       filtered.rootFound === true &&
       filtered.rootSearchCount === 1 &&
       filtered.rootTableCount === 1 &&
       filtered.rowCount === 0 &&
       filtered.busyCount === 0 &&
-      filtered.paginationCount === 0;
+      filtered.paginationCount === 0 &&
+      filtered.nonVirtualized === true &&
+      filteredEmptyStatusCount === 1 &&
+      (baseline.rowCount === 0 || filtered.causalMutationObserved === true);
     semanticSignature =
       navigationTargetExact === true &&
+      v8SignatureExact === true &&
       createControlCount === 1 &&
       initialTokenNameCount === 0 &&
       finalTokenNameCount === 0 &&
@@ -254,9 +439,21 @@ void (async () => {
   }
 
   if (result !== "EXACT_V9_OWNED_TAB_SEMANTIC_READINESS_PASS") {
-    secureConsoleOwnedTaskTabV4 = null;
-    secureConsoleOwnedTaskTabV4Eligible = false;
-    if (tab !== null && tab !== undefined && typeof tab.close === "function") {
+    if (predecessorStateExact !== true) {
+      cleanupState = "PREDECESSOR_REJECTED_INHERITED_BINDING_UNTOUCHED";
+      failureResidueConverged =
+        counters.newAttempted === 0 &&
+        secureConsoleV9RetainedTab === null;
+    } else {
+      secureConsoleOwnedTaskTabV4 = null;
+      secureConsoleOwnedTaskTabV4Eligible = false;
+    }
+    if (
+      predecessorStateExact === true &&
+      tab !== null &&
+      tab !== undefined &&
+      typeof tab.close === "function"
+    ) {
       counters.closeAttempted++;
       try {
         await tab.close();
@@ -272,11 +469,15 @@ void (async () => {
         secureConsoleOwnedTaskTabV4State = "V9_OWNED_TAB_READINESS_FAILED_RETAINED";
         if (errorClass === "NONE") errorClass = safeErrorClass(cleanupError);
       }
-    } else if (tab !== null && tab !== undefined) {
+    } else if (predecessorStateExact === true && tab !== null && tab !== undefined) {
       cleanupState = "MALFORMED_EXACT_HANDLE_RETAINED";
       failureResidueConverged = false;
       secureConsoleOwnedTaskTabV4State = "V9_MALFORMED_EXACT_HANDLE_RETAINED";
-    } else if (counters.newAttempted === 1 && counters.newFulfilled === 0) {
+    } else if (
+      predecessorStateExact === true &&
+      counters.newAttempted === 1 &&
+      counters.newFulfilled === 0
+    ) {
       cleanupState = "NEW_REJECTED_RESIDUE_UNPROVEN";
       failureResidueConverged = false;
       secureConsoleOwnedTaskTabV4State = "V9_NEW_REJECTED_RESIDUE_UNPROVEN";
@@ -292,28 +493,55 @@ void (async () => {
     tabShape,
     createdHandleCaptured,
     navigationTargetExact,
+    currentSearchNameCount,
+    anySearchNameCount,
+    allTextboxCount,
+    placeholderSearchCount,
+    createTokenButtonCount,
+    createTokenLinkCount,
+    createApiTokenButtonCount,
+    pageTableCount,
+    pageGridCount,
+    ariaControlsAbsent,
     createControlCount,
     initialTokenNameCount,
     finalTokenNameCount,
     matchingRowCount,
     baselineQuiescent: baseline?.quiescent === true,
+    baselineContentStable: baseline?.contentStable === true,
+    baselineRootIdentityExact: baseline?.rootIdentityExact === true,
+    baselineTableIdentityExact: baseline?.tableIdentityExact === true,
+    baselineRootConnected: baseline?.rootConnected === true,
+    baselineTableConnected: baseline?.tableConnected === true,
     baselineInputEmpty: baseline?.inputValueExact === true,
     baselinePageTableCount: baseline?.pageTableCount ?? -1,
-    baselineRootFound: baseline?.rootFound === true,
     baselineRootSearchCount: baseline?.rootSearchCount ?? -1,
     baselineRootTableCount: baseline?.rootTableCount ?? -1,
     baselineRowCount: baseline?.rowCount ?? -1,
     baselineBusyCount: baseline?.busyCount ?? -1,
     baselinePaginationCount: baseline?.paginationCount ?? -1,
+    baselineNonVirtualized: baseline?.nonVirtualized === true,
+    baselineEmptyStatusCount,
     filteredQuiescent: filtered?.quiescent === true,
+    filteredContentStable: filtered?.contentStable === true,
+    filteredRootIdentityExact: filtered?.rootIdentityExact === true,
+    filteredTableIdentityExact: filtered?.tableIdentityExact === true,
+    filteredRootConnected: filtered?.rootConnected === true,
+    filteredTableConnected: filtered?.tableConnected === true,
     filteredQueryEchoExact: filtered?.inputValueExact === true,
+    filteredInputEventObserved: filtered?.inputEventObserved === true,
+    filteredInputEventValueExact: filtered?.inputEventValueExact === true,
     filteredPageTableCount: filtered?.pageTableCount ?? -1,
-    filteredRootFound: filtered?.rootFound === true,
     filteredRootSearchCount: filtered?.rootSearchCount ?? -1,
     filteredRootTableCount: filtered?.rootTableCount ?? -1,
     filteredRowCount: filtered?.rowCount ?? -1,
     filteredBusyCount: filtered?.busyCount ?? -1,
     filteredPaginationCount: filtered?.paginationCount ?? -1,
+    filteredNonVirtualized: filtered?.nonVirtualized === true,
+    filteredCausalMutationObserved:
+      baseline !== null &&
+      (baseline.rowCount === 0 || filtered?.causalMutationObserved === true),
+    filteredEmptyStatusCount,
     semanticSignature,
     ownershipTransferred,
     cleanupState,
@@ -322,6 +550,9 @@ void (async () => {
     ...counters,
     errorClass,
     consumed: secureConsoleV9ReadinessConsumed,
+    inheritedV4BindingNull,
+    inheritedV4BindingIneligible,
+    inheritedV4BindingStateExact,
     v4BindingPresent: secureConsoleOwnedTaskTabV4 !== null,
     v4BindingEligible: secureConsoleOwnedTaskTabV4Eligible === true,
     v4BindingStateExact:

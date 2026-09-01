@@ -408,56 +408,105 @@ printf 'EXACT_PROXY_CLEANUP=PASS\n'
     if (-not $started) {
         $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_START_FAILED'
         $script:scopeProxyChildDisposeAttempted++
-        $script:scopeProxyCleanupProcess.Dispose()
+        try { $script:scopeProxyCleanupProcess.Dispose() }
+        catch {
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_START_FAILED_DISPOSE_NOT_PROVEN'
+            throw 'SCOPE_PROXY_CLEANUP_START_FAILED_DISPOSE_NOT_PROVEN'
+        }
         $script:scopeProxyChildDisposeFulfilled++
         $script:scopeProxyCleanupProcess = $null
         throw 'SCOPE_PROXY_CLEANUP_START_FAILED'
     }
     $script:scopeProxyChildStartFulfilled++
-    $script:scopeProxyCleanupOutTask = $script:scopeProxyCleanupProcess.StandardOutput.ReadToEndAsync()
-    $script:scopeProxyCleanupErrTask = $script:scopeProxyCleanupProcess.StandardError.ReadToEndAsync()
+    try {
+        $script:scopeProxyCleanupOutTask = $script:scopeProxyCleanupProcess.StandardOutput.ReadToEndAsync()
+        $script:scopeProxyCleanupErrTask = $script:scopeProxyCleanupProcess.StandardError.ReadToEndAsync()
+    }
+    catch {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_STREAM_TASK_START_NOT_PROVEN'
+        throw 'SCOPE_PROXY_CLEANUP_STREAM_TASK_START_NOT_PROVEN'
+    }
     $script:scopeProxyChildWaitAttempted++
-    if (-not $script:scopeProxyCleanupProcess.WaitForExit(60000)) {
+    try { $scopeProxyChildExited = $script:scopeProxyCleanupProcess.WaitForExit(60000) }
+    catch {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_WAIT_NOT_PROVEN'
+        throw 'SCOPE_PROXY_CLEANUP_WAIT_NOT_PROVEN'
+    }
+    $scopeProxyChildTimedOut = $false
+    if (-not $scopeProxyChildExited) {
         $script:scopeProxyChildTerminationAttempted++
         try {
             $script:scopeProxyCleanupProcess.Kill()
             $script:scopeProxyChildTerminationFulfilled++
         }
-        catch {}
-        $script:scopeProxyChildExitProofAttempted++
-        if ($script:scopeProxyCleanupProcess.WaitForExit(10000)) {
-            $script:scopeProxyChildExitProofFulfilled++
-            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_TIMEOUT_EXIT_PROVEN'
-            throw 'SCOPE_PROXY_CLEANUP_TIMEOUT_EXIT_PROVEN'
+        catch {
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_TERMINATION_NOT_PROVEN'
+            throw 'SCOPE_PROXY_CLEANUP_TERMINATION_NOT_PROVEN'
         }
-        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_EXIT_NOT_PROVEN'
-        throw 'SCOPE_PROXY_CLEANUP_TIMEOUT_EXIT_NOT_PROVEN'
+        $script:scopeProxyChildExitProofAttempted++
+        try { $scopeProxyChildExitProven = $script:scopeProxyCleanupProcess.WaitForExit(10000) }
+        catch {
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_EXIT_PROOF_NOT_PROVEN'
+            throw 'SCOPE_PROXY_CLEANUP_EXIT_PROOF_NOT_PROVEN'
+        }
+        if (-not $scopeProxyChildExitProven) {
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_EXIT_NOT_PROVEN'
+            throw 'SCOPE_PROXY_CLEANUP_TIMEOUT_EXIT_NOT_PROVEN'
+        }
+        $script:scopeProxyChildExitProofFulfilled++
+        $scopeProxyChildTimedOut = $true
     }
-    $script:scopeProxyChildWaitFulfilled++
+    else { $script:scopeProxyChildWaitFulfilled++ }
     $script:scopeProxyChildDrainAttempted++
-    if (-not [Threading.Tasks.Task]::WaitAll(@($script:scopeProxyCleanupOutTask,$script:scopeProxyCleanupErrTask),5000)) {
-        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DRAIN_NOT_PROVEN'
-        throw 'SCOPE_PROXY_CLEANUP_DRAIN_UNCERTAIN'
+    try { $scopeProxyChildDrained = [Threading.Tasks.Task]::WaitAll(@($script:scopeProxyCleanupOutTask,$script:scopeProxyCleanupErrTask),5000) }
+    catch {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DRAIN_WAIT_NOT_PROVEN'
+        throw 'SCOPE_PROXY_CLEANUP_DRAIN_WAIT_NOT_PROVEN'
+    }
+    if (-not $scopeProxyChildDrained) {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DRAIN_TIMEOUT'
+        throw 'SCOPE_PROXY_CLEANUP_DRAIN_TIMEOUT'
+    }
+    try {
+        $scopeProxyChildStdout = $script:scopeProxyCleanupOutTask.Result
+        $scopeProxyChildStderr = $script:scopeProxyCleanupErrTask.Result
+        $scopeProxyChildExitCode = $script:scopeProxyCleanupProcess.ExitCode
+    }
+    catch {
+        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DRAIN_RESULT_NOT_PROVEN'
+        throw 'SCOPE_PROXY_CLEANUP_DRAIN_RESULT_NOT_PROVEN'
     }
     $script:scopeProxyChildDrainFulfilled++
-    $ok = $script:scopeProxyCleanupProcess.ExitCode -eq 0 -and $script:scopeProxyCleanupOutTask.Result.Trim() -eq 'EXACT_PROXY_CLEANUP=PASS' -and [string]::IsNullOrWhiteSpace($script:scopeProxyCleanupErrTask.Result)
-    if (-not $ok) {
-        $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_TERMINAL_NOT_PROVEN'
-        $script:scopeProxyChildDisposeAttempted++
-        $script:scopeProxyCleanupProcess.Dispose()
-        $script:scopeProxyChildDisposeFulfilled++
-        $script:scopeProxyCleanupProcess = $null
-        $script:scopeProxyCleanupOutTask = $null
-        $script:scopeProxyCleanupErrTask = $null
-        throw 'SCOPE_PROXY_CLEANUP_NOT_PROVEN'
+    if ($scopeProxyChildTimedOut) {
+        $scopeProxyChildTerminalResidual = 'PROXY_CLEANUP_CHILD_TIMEOUT_EXIT_PROVEN'
     }
+    elseif ($scopeProxyChildExitCode -ne 0 -or $scopeProxyChildStdout.Trim() -ne 'EXACT_PROXY_CLEANUP=PASS' -or -not [string]::IsNullOrWhiteSpace($scopeProxyChildStderr)) {
+        $scopeProxyChildTerminalResidual = 'PROXY_CLEANUP_CHILD_TERMINAL_NOT_PROVEN'
+    }
+    else { $scopeProxyChildTerminalResidual = 'NONE' }
+    $script:scopeProxyChildResidual = $scopeProxyChildTerminalResidual
     $script:scopeProxyChildDisposeAttempted++
-    $script:scopeProxyCleanupProcess.Dispose()
+    try { $script:scopeProxyCleanupProcess.Dispose() }
+    catch {
+        if ($scopeProxyChildTerminalResidual -eq 'NONE') {
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DISPOSE_NOT_PROVEN_AFTER_PASS'
+        }
+        elseif ($scopeProxyChildTimedOut) {
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DISPOSE_NOT_PROVEN_AFTER_TIMEOUT_EXIT'
+        }
+        else {
+            $script:scopeProxyChildResidual = 'PROXY_CLEANUP_CHILD_DISPOSE_NOT_PROVEN_AFTER_TERMINAL_FAILURE'
+        }
+        throw 'SCOPE_PROXY_CLEANUP_DISPOSE_NOT_PROVEN'
+    }
     $script:scopeProxyChildDisposeFulfilled++
     $script:scopeProxyCleanupProcess = $null
     $script:scopeProxyCleanupOutTask = $null
     $script:scopeProxyCleanupErrTask = $null
-    $script:scopeProxyChildResidual = 'NONE'
+    if ($scopeProxyChildTerminalResidual -eq 'PROXY_CLEANUP_CHILD_TIMEOUT_EXIT_PROVEN') {
+        throw 'SCOPE_PROXY_CLEANUP_TIMEOUT_EXIT_PROVEN'
+    }
+    if ($scopeProxyChildTerminalResidual -ne 'NONE') { throw 'SCOPE_PROXY_CLEANUP_NOT_PROVEN' }
 }
 
 function Remove-ExactScopePreparedFiles {
@@ -609,9 +658,16 @@ The guarded proxy-cleanup SSH child separately records start, wait,
 termination, exit-proof, stream-drain, and dispose attempted/fulfilled counters,
 retains its exact process plus output/error tasks until proven drain and safe
 disposal, and reports `PROXY_CLEANUP_CHILD_RESIDUAL`. Timeout permits one
-exact-handle kill and one checked exit-proof wait only. Exit-not-proven,
-start-uncertain, or drain-not-proven retains the exact handle/tasks, forbids a
-second wait/kill/cleanup invocation or process lookup, and stops.
+exact-handle kill and one checked exit-proof wait only. Every proven exit,
+including timeout/kill, receives the single bounded drain attempt and one safe
+dispose attempt. Wait, termination, exit-proof, drain-wait, drain-result, and
+disposal exceptions set distinct non-`NONE` residuals before failure.
+Start-uncertain, termination-not-proven, exit-not-proven, drain-not-proven, or
+dispose-not-proven retains the exact available handle/tasks and stops. A
+timeout-exit-proven or terminal-mismatch
+path disposes and clears bindings only after drain and disposal are proven,
+then fails with its fixed residual. No second wait, kill, drain, dispose,
+cleanup invocation, lookup, retry, or fallback is permitted.
 
 The parent increments start attempted immediately before dot-sourcing the exact
 launch fence. It increments start fulfilled and sets handle retained only after

@@ -62,7 +62,8 @@ strings, are `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/` plus
 exactly `task-2-secure-console-transfer-token-page-readiness-replacement-brief.md`,
 `task-2-secure-console-transfer-token-page-readiness-replacement-sol-review.md`,
 `task-2-secure-console-transfer-token-page-readiness-replacement-fix1-sol-review.md`,
-and `task-2-secure-console-transfer-token-page-readiness-replacement-fix1-execution-classification.md`.
+`task-2-secure-console-transfer-token-page-readiness-replacement-fix2-sol-review.md`,
+and `task-2-secure-console-transfer-token-page-readiness-replacement-fix2-execution-classification.md`.
 No directory, glob, prefix, suffix, or other artifact is excluded.
 
 Reject paths containing control characters. Enumerate every tracked path with
@@ -75,7 +76,7 @@ bytes. Sort complete lines ordinally, concatenate without BOM or any other
 transformation, and hash those bytes. Required digest:
 `C4C9807FD5667E872BCBCFFD60FBF2AA71AEBC788AC744EFCD93FF18457C8E0F`.
 
-`git diff --cached --quiet` must succeed. After the four exclusions, exact
+`git diff --cached --quiet` must succeed. After the five exclusions, exact
 `git status --porcelain=v1 --untracked-files=normal` is 12 records: modified
 `open-sse/services/codexQuotaFetcher.ts`, `src/app/api/v1/models/catalog.ts`,
 `src/lib/localDb.ts`, `tests/unit/api/models-agent-route-aliases.test.ts`, and
@@ -95,12 +96,25 @@ initial brief `5620b33b26b5f6770c2fbe797116ab09629ab3b1` is `31326` bytes SHA-25
 `5F5A30CB619F6828D79AF90BF377DC3DADE7B86E34A43C781247929C0E67C5E8`;
 initial FAIL review `db8da1890e519997b2063cbf4c9bd947d9e43bd6` is `7648` bytes SHA-256
 `A2F43F0CA40582BC36F0AEB8BED1CE6C6662E981ED7C926EC66C94FC4136B0AE`.
-The fix1 brief commit must have `db8da189...` as parent, its fix1 review must
-have the fix1 brief as parent, and the execution classification must have that
-review as parent. Classification must record full commit, exact path, byte
-length, and SHA-256 for itself, the fix1 brief, and fix1 review, and re-pin all
-three known objects above. Missing, non-direct, merged, substituted, or
-unpinned ancestry blocks execution.
+Fix1 brief `cbb2209a375b8f17b8745513f7e43bde3f0b377a` is `42057` bytes SHA-256
+`A901FAB22A750DB64ACBE38148EB67A961BCE5C600700C3FA33EF129B93474C4`;
+fix1 FAIL review `bfc203bfe1ad49086c11f53b413d1cc8971b18c6` is `9773` bytes SHA-256
+`E16F0448A0A414875ED4C50E55963A01F8CAA7A4EEBAE6C8906F548679256965`.
+The fix2 brief commit must have `bfc203...` as direct parent, its fix2 review
+must have the fix2 brief as direct parent, and the fix2 execution
+classification must have that review as direct parent. Classification pins
+only already-existing incident/brief/review objects above, the committed fix2
+brief and review direct bytes, the exact expected classification path, and the
+projection digest; it must not claim its own commit, byte length, or hash.
+
+After classification is committed, the root owner records a separate
+action-time coordinator evidence tuple containing the classification commit,
+its direct parent, exact path, direct byte length, direct SHA-256, current HEAD,
+and projection digest. It is valid only when HEAD equals that classification
+commit, its parent equals the reviewed fix2-review commit, and all direct bytes
+reproduce. The tuple is not committed and does not pin its own identity. It
+must exist and revalidate immediately before browser use. Missing, non-direct,
+merged, substituted, self-referential, or unpinned ancestry blocks execution.
 
 ## Exact executable pins
 
@@ -132,8 +146,8 @@ below and are part of this contract:
 
 | New V3 fence | Bytes | SHA-256 |
 | --- | ---: | --- |
-| adopt and token readiness | `7623` | `67E81CCD09F3F25B38EA3CB1A41DBA30A8A2A5281E19B5D1D9DDC1B1F0016926` |
-| fresh Cloudflare prestart reads | `15903` | `8CAA901030E178725709F173984315D2F90802CB173670D9551031A3E9C23837` |
+| adopt and token readiness | `11813` | `B508877FBBA9546C8C7655FDFF989D13CE982C9F0B4CE027C64A521D707A6765` |
+| fresh Cloudflare prestart reads | `20834` | `A61097CDB9902C1CB3F59D5F455F7CC84305CF0E3AC33656CFCDD76523A403EE` |
 | pre-Create detach | `2196` | `467F98589FD335AC6393B8BFEF64D7A3101EBE27C5BAA74E37A7FABA68AC5F60` |
 | post-native detach | `2201` | `55B407F463C351B64174800617E8B3F64B3CE98D60BAA1BEAEF1E6D3312B10A5` |
 
@@ -144,8 +158,16 @@ with one fixed outer tool deadline of `60000 ms`. It validates the exact V1 and
 spent-V2 declarations, calls `secureConsoleChromeV1.tabs.get()` exactly once
 for the retained ID, performs exactly one navigation to
 `https://dash.cloudflare.com/profile/api-tokens`, then performs exactly one
-fixed `20000 ms` locator readiness wait after an exact page-local token-name
-filter and before title/control/name/row checks.
+fixed `20000 ms` locator readiness wait for the fresh page's bound paginator,
+then one exact page-local token-name fill and one bounded result-transition
+wait before title/control/name/row checks.
+
+The search input's required `aria-controls` must identify exactly one result
+region. Fresh-navigation baseline is complete only with its exact paginator,
+row total, busy-free state, and either a complete nonempty page or authoritative
+global `0-0 of 0` terminal. A nonempty baseline must mutate to the exact
+query-empty terminal after the one fill; a globally empty baseline proves
+absence before the fill, so no unchanged empty marker is load-bearing.
 
 ```javascript
 let secureConsoleOwnedTaskTabV3 = null;
@@ -162,6 +184,8 @@ await (async () => {
     navigationFulfilled: 0,
     readinessAttempted: 0,
     readinessFulfilled: 0,
+    fillAttempted: 0,
+    fillFulfilled: 0,
     titleAttempted: 0,
     titleFulfilled: 0,
     createAttempted: 0,
@@ -231,14 +255,69 @@ await (async () => {
     counters.navigationFulfilled++;
     const tokenFilter = adopted.playwright.getByRole("textbox", { name: /search api tokens/i });
     if (await tokenFilter.count() !== 1) throw new Error("TokenFilterCountError");
-    await tokenFilter.fill("OmniRoute secure console R5 20260901");
-    const tokenResultsRoot = adopted.playwright.locator("main");
+    const tokenRegionId = await tokenFilter.getAttribute("aria-controls");
+    if (typeof tokenRegionId !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,127}$/.test(tokenRegionId)) throw new Error("TokenRegionBindingError");
+    const tokenResultsRoot = adopted.playwright.locator(`#${tokenRegionId}`);
     if (await tokenResultsRoot.count() !== 1) throw new Error("TokenResultsRootCountError");
-    const readinessMarker = tokenResultsRoot.getByText(/^(?:no api tokens found|no tokens found)$/i);
-    if (await readinessMarker.count() !== 1) throw new Error("TokenFilteredResultMarkerCountError");
+    const tokenPaginator = tokenResultsRoot.locator('[aria-label="Pagination"]');
+    if (await tokenPaginator.count() !== 1) throw new Error("TokenPaginatorCountError");
     counters.readinessAttempted++;
-    await readinessMarker.waitFor({ state: "visible", timeoutMs: 20000 });
+    await tokenPaginator.waitFor({ state: "visible", timeoutMs: 20000 });
     counters.readinessFulfilled++;
+    const tokenBaseline = await tokenResultsRoot.evaluate((root) => {
+      const pager = root.querySelector('[aria-label="Pagination"]');
+      const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager?.textContent || "").replace(/\s+/g, " ").trim());
+      const rows = root.querySelectorAll("table tbody tr").length;
+      const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
+      const statuses = [...root.querySelectorAll('[role="status"]')].filter((item) => /^(?:no api tokens found|no tokens found)$/i.test((item.textContent || "").trim()));
+      const buttons = pager === null ? [] : [...pager.querySelectorAll("button")];
+      const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
+      const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
+      const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
+      if (busy || match === null || next.length !== 1 || previous.length !== 1) return { terminalZero: false, completeNonempty: false };
+      const start = Number(match[1]), end = Number(match[2]), total = Number(match[3]);
+      return {
+        terminalZero: start === 0 && end === 0 && total === 0 && rows === 0 && statuses.length === 1 && disabled(next[0]) && disabled(previous[0]),
+        completeNonempty: start === 1 && end === rows && total >= rows && rows > 0 && statuses.length === 0 && disabled(previous[0]) && disabled(next[0]) === (end >= total),
+      };
+    });
+    if (!tokenBaseline.terminalZero && !tokenBaseline.completeNonempty) throw new Error("TokenBaselineIncompleteError");
+    if (tokenBaseline.completeNonempty) await tokenFilter.evaluate((input, args) => {
+      const root = document.getElementById(args.regionId);
+      if (root === null) throw new Error("TokenRegionMissingError");
+      const state = { mutations: 0, input, resolve: null, reject: null, observer: null, timer: null };
+      state.promise = new Promise((resolve, reject) => { state.resolve = resolve; state.reject = reject; });
+      const check = () => {
+        const pager = root.querySelector('[aria-label="Pagination"]');
+        const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager?.textContent || "").replace(/\s+/g, " ").trim());
+        const rows = root.querySelectorAll("table tbody tr").length;
+        const statuses = [...root.querySelectorAll('[role="status"]')].filter((item) => /^(?:no api tokens found|no tokens found)$/i.test((item.textContent || "").trim()));
+        const buttons = pager === null ? [] : [...pager.querySelectorAll("button")];
+        const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
+        const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
+        const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
+        const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
+        if (state.mutations > 0 && input.value === args.expected && !busy && match !== null && Number(match[1]) === 0 && Number(match[2]) === 0 && Number(match[3]) === 0 && rows === 0 && statuses.length === 1 && next.length === 1 && previous.length === 1 && disabled(next[0]) && disabled(previous[0])) {
+          state.observer.disconnect(); clearTimeout(state.timer); state.resolve(true);
+        }
+      };
+      state.observer = new MutationObserver(() => { state.mutations++; check(); });
+      state.observer.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
+      state.timer = setTimeout(() => { state.observer.disconnect(); state.reject(new Error("TokenResultTransitionTimeout")); }, 20000);
+      root.__secureConsoleTokenTransitionV3 = state;
+    }, { regionId: tokenRegionId, expected: "OmniRoute secure console R5 20260901" });
+    counters.fillAttempted++;
+    await tokenFilter.fill("OmniRoute secure console R5 20260901");
+    counters.fillFulfilled++;
+    tokenFilterComplete = tokenBaseline.terminalZero
+      ? await tokenFilter.evaluate((input) => input.value === "OmniRoute secure console R5 20260901")
+      : await tokenResultsRoot.evaluate(async (root) => {
+          const state = root.__secureConsoleTokenTransitionV3;
+          if (typeof state !== "object" || state === null) return false;
+          const complete = await state.promise;
+          delete root.__secureConsoleTokenTransitionV3;
+          return complete === true;
+        });
 
     counters.titleAttempted++;
     const title = await adopted.title();
@@ -250,21 +329,13 @@ await (async () => {
       await adopted.playwright.getByRole("link", { name: "Create Token", exact: true }).count();
     counters.createFulfilled++;
     counters.nameAttempted++;
-    tokenNameCount = await adopted.playwright.getByText("OmniRoute secure console R5 20260901", { exact: true }).count();
+    tokenNameCount = await tokenResultsRoot.getByText("OmniRoute secure console R5 20260901", { exact: true }).count();
     counters.nameFulfilled++;
     counters.rowAttempted++;
-    matchingRowCount = await adopted.playwright.getByRole("row").filter({ hasText: "OmniRoute secure console R5 20260901" }).count();
+    matchingRowCount = await tokenResultsRoot.getByRole("row").filter({ hasText: "OmniRoute secure console R5 20260901" }).count();
     counters.rowFulfilled++;
-    const tokenFilterValueExact = await tokenFilter.evaluate((element) => element.value === "OmniRoute secure console R5 20260901");
-    const tokenCompletion = await tokenResultsRoot.evaluate((root) => {
-      const enabledNextCount = [...root.querySelectorAll("button,a,[role='button']")].filter((item) =>
-        /^next(?: page)?$/i.test((item.getAttribute("aria-label") || item.textContent || "").trim()) &&
-        !item.hasAttribute("disabled") && item.getAttribute("aria-disabled") !== "true",
-      ).length;
-      return { busyCount: root.querySelectorAll('[aria-busy="true"]').length, enabledNextCount };
-    });
-    tokenFilterComplete = tokenFilterValueExact && tokenCompletion.busyCount === 0 && tokenCompletion.enabledNextCount === 0;
-    if (!titleExact || createControlCount !== 1 || tokenNameCount !== 0 || matchingRowCount !== 0 || !tokenFilterComplete) {
+    if (!titleExact || createControlCount !== 1 || tokenNameCount !== 0 || matchingRowCount !== 0 || !tokenFilterComplete ||
+        counters.fillAttempted !== 1 || counters.fillFulfilled !== 1) {
       throw new Error("AuthenticatedTokenPageStateError");
     }
     result = "EXACT_V3_TOKEN_PAGE_READINESS_PASS";
@@ -289,6 +360,8 @@ await (async () => {
     navigationFulfilled: counters.navigationFulfilled,
     readinessAttempted: counters.readinessAttempted,
     readinessFulfilled: counters.readinessFulfilled,
+    fillAttempted: counters.fillAttempted,
+    fillFulfilled: counters.fillFulfilled,
     titleAttempted: counters.titleAttempted,
     titleFulfilled: counters.titleFulfilled,
     createAttempted: counters.createAttempted,
@@ -317,7 +390,8 @@ await (async () => {
 
 Exact PASS requires the fixed PASS terminal; all declaration/ownership/title
 booleans and `tokenFilterComplete` true; Create count `1`; token-name/row `0/0`; get, navigation, readiness,
-title, Create, name, and row counters all `1/1`; write attempted `1`;
+title, Create, name, and row counters all `1/1`; page-local search fill `1/1`;
+write attempted `1`;
 `errorClass=NONE`; complete untruncated output; completed tool status; and the
 later private V3 alias/eligibility/state tuple exact. Alias assignment and
 eligibility occur only after `nodeRepl.write` returns. Any timeout,
@@ -326,8 +400,10 @@ spends this cell and permits no detachment or later action.
 
 This cell permits no tabs list, browser/controller reconnect or selection,
 new tab, alternate tab, second get, second navigation, reload, close,
-`markHandoff`, page serialization, screenshot, clipboard, keyboard, form
-mutation, or metadata output.
+`markHandoff`, page serialization, screenshot, clipboard, keyboard,
+persistent/provider Create/edit mutation, or metadata output. The single exact
+page-local search-filter fill is authorized and makes no provider-persistent
+change; no other form fill is authorized.
 
 ## Fresh Cloudflare prestart read cell
 
@@ -338,6 +414,17 @@ and final token-row state. Each page transition has one fixed `20000 ms`
 visible-locator readiness wait. Private hrefs, account/zone identifiers,
 titles, page text, and DOM content are never output.
 
+Every search filter must bind by required `aria-controls` to one exact result
+region. A fresh-navigation clear is accepted only after the bound paginator
+readiness and a completed region baseline; each reused-filter clear must arm
+and observe a new region mutation to that baseline. An authoritative busy-free
+`0-0 of 0`, zero-row, exact-status,
+terminal-paginator baseline proves global absence; otherwise the prior empty
+status must leave for a completed nonempty baseline. The query fill then must
+cause a new region mutation to the exact query-empty terminal. Thus an already
+visible marker never proves a new query. Rate state uses the same exact
+panel-bound paginator/row/busy terminal without a broad page scan.
+
 ```javascript
 await (async () => {
   const counters = {
@@ -347,6 +434,8 @@ await (async () => {
     clickFulfilled: 0,
     readinessAttempted: 0,
     readinessFulfilled: 0,
+    fillAttempted: 0,
+    fillFulfilled: 0,
     writeAttempted: 0,
   };
   let result = "PRECONDITION_FAIL";
@@ -392,44 +481,91 @@ await (async () => {
     await locator.waitFor({ state: "visible", timeoutMs: 20000 });
     counters.readinessFulfilled++;
   };
-  const filteredZero = async (filter, query, targetLocators) => {
+  const filteredZero = async (filter, query, targetTexts, emptyTexts, freshBaseline) => {
     if (await filter.count() !== 1) throw new Error("FilterCountError");
-    const resultsRoot = secureConsoleOwnedTaskTabV3.playwright.locator("main");
-    if (await resultsRoot.count() !== 1) throw new Error("FilterResultsRootCountError");
-    await filter.fill("");
-    const emptyMarker = resultsRoot.getByText(/^(?:no results|no .* found)$/i);
-    const baseline = await resultsRoot.evaluate((root) => {
-      const visible = (element) => {
-        const style = getComputedStyle(element);
-        const box = element.getBoundingClientRect();
-        return style.visibility !== "hidden" && style.display !== "none" && box.width > 0 && box.height > 0;
+    const regionId = await filter.getAttribute("aria-controls");
+    if (typeof regionId !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,127}$/.test(regionId)) throw new Error("FilterRegionBindingError");
+    const resultsRoot = secureConsoleOwnedTaskTabV3.playwright.locator(`#${regionId}`);
+    if (await resultsRoot.count() !== 1) throw new Error("FilterRegionCountError");
+    await readyOne(resultsRoot.locator('[aria-label="Pagination"]'));
+    const arm = async (expected, mode) => {
+      await filter.evaluate((input, args) => {
+        const root = document.getElementById(args.regionId);
+        if (root === null) throw new Error("FilterRegionMissingError");
+        const old = root.__secureConsoleFilterTransitionV3;
+        if (typeof old === "object" && old !== null) { old.observer?.disconnect(); clearTimeout(old.timer); }
+        const state = { mutations: 0, input, resolve: null, reject: null, observer: null, timer: null };
+        state.promise = new Promise((resolve, reject) => { state.resolve = resolve; state.reject = reject; });
+        const check = () => {
+          const pagerList = [...root.querySelectorAll('[aria-label="Pagination"]')];
+          if (pagerList.length !== 1) return;
+          const pager = pagerList[0];
+          const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager.textContent || "").replace(/\s+/g, " ").trim());
+          const rows = root.querySelectorAll("table tbody tr").length;
+          const statuses = [...root.querySelectorAll('[role="status"]')].filter((item) => args.emptyTexts.includes((item.textContent || "").trim()));
+          const buttons = [...pager.querySelectorAll("button")];
+          const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
+          const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
+          const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
+          const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
+          if (state.mutations < 1 || input.value !== args.expected || busy || match === null || next.length !== 1 || previous.length !== 1) return;
+          const start = Number(match[1]), end = Number(match[2]), total = Number(match[3]);
+          const terminalZero = start === 0 && end === 0 && total === 0 && rows === 0 && statuses.length === 1 && disabled(next[0]) && disabled(previous[0]);
+          const completeNonempty = start === 1 && end === rows && total >= rows && rows > 0 && statuses.length === 0 && disabled(previous[0]) && disabled(next[0]) === (end >= total);
+          if ((args.mode === "baseline" && (terminalZero || completeNonempty)) || (args.mode === "zero" && terminalZero)) {
+            state.observer.disconnect(); clearTimeout(state.timer); state.resolve({ terminalZero, completeNonempty });
+          }
+        };
+        state.observer = new MutationObserver(() => { state.mutations++; check(); });
+        state.observer.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
+        state.timer = setTimeout(() => { state.observer.disconnect(); state.reject(new Error("FilterResultTransitionTimeout")); }, 20000);
+        root.__secureConsoleFilterTransitionV3 = state;
+      }, { regionId, expected, mode, emptyTexts });
+    };
+    const finish = async () => resultsRoot.evaluate(async (root) => {
+      const state = root.__secureConsoleFilterTransitionV3;
+      if (typeof state !== "object" || state === null) throw new Error("FilterTransitionStateError");
+      const proof = await state.promise;
+      delete root.__secureConsoleFilterTransitionV3;
+      return proof;
+    });
+    const readBaseline = async () => resultsRoot.evaluate((root, expectedEmptyTexts) => {
+      const pagerList = [...root.querySelectorAll('[aria-label="Pagination"]')];
+      if (pagerList.length !== 1) return { terminalZero: false, completeNonempty: false };
+      const pager = pagerList[0];
+      const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager.textContent || "").replace(/\s+/g, " ").trim());
+      const rows = root.querySelectorAll("table tbody tr").length;
+      const statuses = [...root.querySelectorAll('[role="status"]')].filter((item) => expectedEmptyTexts.includes((item.textContent || "").trim()));
+      const buttons = [...pager.querySelectorAll("button")];
+      const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
+      const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
+      const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
+      const busy = root.matches('[aria-busy="true"]') || root.querySelector('[aria-busy="true"]') !== null;
+      if (busy || match === null || next.length !== 1 || previous.length !== 1) return { terminalZero: false, completeNonempty: false };
+      const start = Number(match[1]), end = Number(match[2]), total = Number(match[3]);
+      return {
+        terminalZero: start === 0 && end === 0 && total === 0 && rows === 0 && statuses.length === 1 && disabled(next[0]) && disabled(previous[0]),
+        completeNonempty: start === 1 && end === rows && total >= rows && rows > 0 && statuses.length === 0 && disabled(previous[0]) && disabled(next[0]) === (end >= total),
       };
-      const emptyCount = [...root.querySelectorAll("*")].filter((element) =>
-        visible(element) && /^(?:no results|no .* found)$/i.test((element.textContent || "").trim()),
-      ).length;
-      const dataRowCount = root.querySelectorAll("table tbody tr").length;
-      const enabledNextCount = [...root.querySelectorAll("button,a,[role='button']")].filter((item) =>
-        /^next(?: page)?$/i.test((item.getAttribute("aria-label") || item.textContent || "").trim()) &&
-        !item.hasAttribute("disabled") && item.getAttribute("aria-disabled") !== "true",
-      ).length;
-      return { emptyCount, dataRowCount, enabledNextCount };
-    });
-    const baselineCompleteEmpty = baseline.emptyCount === 1 && baseline.dataRowCount === 0 && baseline.enabledNextCount === 0;
-    if (!baselineCompleteEmpty && baseline.emptyCount !== 0) throw new Error("FilterBaselineAmbiguousError");
+    }, emptyTexts);
+    if (!freshBaseline) await arm("", "baseline");
+    counters.fillAttempted++;
+    await filter.fill("");
+    counters.fillFulfilled++;
+    const baseline = freshBaseline ? await readBaseline() : await finish();
+    if (baseline.terminalZero !== true && baseline.completeNonempty !== true) throw new Error("FilterBaselineIncompleteError");
+    if (baseline.completeNonempty) await arm(query, "zero");
+    counters.fillAttempted++;
     await filter.fill(query);
-    await readyOne(emptyMarker);
-    const current = await filter.evaluate((element, expected) => element.value === expected, query);
-    if (!current) throw new Error("FilterValueFreshnessError");
-    const completion = await resultsRoot.evaluate((root) => {
-      const enabledNextCount = [...root.querySelectorAll("button,a,[role='button']")].filter((item) =>
-        /^next(?: page)?$/i.test((item.getAttribute("aria-label") || item.textContent || "").trim()) &&
-        !item.hasAttribute("disabled") && item.getAttribute("aria-disabled") !== "true",
-      ).length;
-      return { busyCount: root.querySelectorAll('[aria-busy="true"]').length, enabledNextCount };
-    });
-    if (completion.busyCount !== 0 || completion.enabledNextCount !== 0) throw new Error("FilteredResultsIncompleteError");
+    counters.fillFulfilled++;
+    if (baseline.completeNonempty) {
+      const completion = await finish();
+      if (completion.terminalZero !== true) throw new Error("FilteredResultsIncompleteError");
+    } else if (!await filter.evaluate((input, expected) => input.value === expected, query)) {
+      throw new Error("FilterValueFreshnessError");
+    }
     const counts = [];
-    for (const target of targetLocators) counts.push(await target.count());
+    for (const text of targetTexts) counts.push(await resultsRoot.getByRole("row").filter({ hasText: text }).count());
     if (counts.some((count) => count !== 0)) throw new Error("FilteredTargetPresentError");
     return counts;
   };
@@ -474,7 +610,9 @@ await (async () => {
     [dnsTargetCount] = await filteredZero(
       secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search dns records/i }),
       "ai-api-omniroute.mysw.me",
-      [secureConsoleOwnedTaskTabV3.playwright.getByRole("row").filter({ hasText: "ai-api-omniroute.mysw.me" })],
+      ["ai-api-omniroute.mysw.me"],
+      ["No DNS records found", "No records found"],
+      true,
     );
     dnsFilterComplete = true;
 
@@ -493,32 +631,35 @@ await (async () => {
     const ratePanel = secureConsoleOwnedTaskTabV3.playwright.locator(`#${ratePanelId}`);
     await readyOne(ratePanel);
     const rateTable = ratePanel.locator("table");
-    await readyOne(rateTable);
     if (await rateTable.count() !== 1) throw new Error("RateTableCountError");
+    const ratePaginator = ratePanel.locator('[aria-label="Pagination"]');
+    await readyOne(ratePaginator);
     const rateProof = await rateTable.evaluate((table, panelId) => {
       const rows = [...table.querySelectorAll("tbody tr")];
       const text = table.innerText || "";
       const scope = document.getElementById(panelId);
       const panelBound = scope !== null && scope.querySelectorAll("table").length === 1 && scope.querySelector("table") === table;
-      if (!panelBound) return { dataRowCount: -1, targetDescriptionCount: -1, targetHostCount: -1, enabledNextCount: -1, panelBound: false };
-      const nextControls = [...scope.querySelectorAll("button,a,[role='button']")].filter((item) =>
-        /^next(?: page)?$/i.test((item.getAttribute("aria-label") || item.textContent || "").trim()),
-      );
-      const enabledNextCount = nextControls.filter((item) =>
-        !item.hasAttribute("disabled") && item.getAttribute("aria-disabled") !== "true",
-      ).length;
+      const pagers = panelBound ? [...scope.querySelectorAll('[aria-label="Pagination"]')] : [];
+      const pager = pagers.length === 1 ? pagers[0] : null;
+      const match = /^(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)$/.exec((pager?.textContent || "").replace(/\s+/g, " ").trim());
+      const buttons = pager === null ? [] : [...pager.querySelectorAll("button")];
+      const next = buttons.filter((item) => item.getAttribute("aria-label") === "Next page");
+      const previous = buttons.filter((item) => item.getAttribute("aria-label") === "Previous page");
+      const disabled = (item) => item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true";
+      const busy = scope?.matches('[aria-busy="true"]') || scope?.querySelector('[aria-busy="true"]') !== null;
+      const paginationComplete = match !== null && Number(match[1]) === 1 && Number(match[2]) === rows.length && Number(match[3]) === rows.length && next.length === 1 && previous.length === 1 && disabled(next[0]) && disabled(previous[0]) && !busy;
       return {
         dataRowCount: rows.length,
         targetDescriptionCount: (text.match(/OmniRoute team API 20 per 10s/g) || []).length,
         targetHostCount: (text.match(/ai-api-omniroute\.mysw\.me/g) || []).length,
-        enabledNextCount,
+        paginationComplete,
         panelBound,
       };
     }, ratePanelId);
     rateDataRowCount = rateProof.dataRowCount;
     rateTargetDescriptionCount = rateProof.targetDescriptionCount;
     rateTargetHostCount = rateProof.targetHostCount;
-    rateCompletenessProven = rateProof.panelBound === true && rateProof.enabledNextCount === 0;
+    rateCompletenessProven = rateProof.panelBound === true && rateProof.paginationComplete === true;
     if (rateDataRowCount !== 1 || rateTargetDescriptionCount !== 0 || rateTargetHostCount !== 0 || !rateCompletenessProven) {
       throw new Error("RateRuleStateError");
     }
@@ -550,12 +691,8 @@ await (async () => {
     await clickOne(tunnelsLink);
     await readyOne(secureConsoleOwnedTaskTabV3.playwright.getByText(/create.*tunnel/i));
     const tunnelFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search tunnels/i });
-    [tunnelTargetNameCount] = await filteredZero(tunnelFilter, "omniroute-team-tunnel", [
-      secureConsoleOwnedTaskTabV3.playwright.getByRole("row").filter({ hasText: "omniroute-team-tunnel" }),
-    ]);
-    [tunnelTargetHostCount] = await filteredZero(tunnelFilter, "ai-api-omniroute.mysw.me", [
-      secureConsoleOwnedTaskTabV3.playwright.getByRole("row").filter({ hasText: "ai-api-omniroute.mysw.me" }),
-    ]);
+    [tunnelTargetNameCount] = await filteredZero(tunnelFilter, "omniroute-team-tunnel", ["omniroute-team-tunnel"], ["No tunnels found"], true);
+    [tunnelTargetHostCount] = await filteredZero(tunnelFilter, "ai-api-omniroute.mysw.me", ["ai-api-omniroute.mysw.me"], ["No tunnels found"], false);
     tunnelFiltersComplete = true;
 
     const accessButton = secureConsoleOwnedTaskTabV3.playwright.getByRole("button", { name: "Access", exact: true });
@@ -566,32 +703,31 @@ await (async () => {
     await clickOne(applicationsLink);
     await readyOne(secureConsoleOwnedTaskTabV3.playwright.getByText(/add an application|add application/i));
     const accessFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search applications/i });
-    [accessTargetHostCount] = await filteredZero(accessFilter, "ai-api-omniroute.mysw.me", [
-      secureConsoleOwnedTaskTabV3.playwright.getByRole("row").filter({ hasText: "ai-api-omniroute.mysw.me" }),
-    ]);
-    [accessTargetNameCount] = await filteredZero(accessFilter, "OmniRoute team API", [
-      secureConsoleOwnedTaskTabV3.playwright.getByRole("row").filter({ hasText: "OmniRoute team API" }),
-    ]);
+    [accessTargetHostCount] = await filteredZero(accessFilter, "ai-api-omniroute.mysw.me", ["ai-api-omniroute.mysw.me"], ["No applications found"], true);
+    [accessTargetNameCount] = await filteredZero(accessFilter, "OmniRoute team API", ["OmniRoute team API"], ["No applications found"], false);
     accessFiltersComplete = true;
 
     await navigate("https://dash.cloudflare.com/profile/api-tokens");
     const tokenFilter = secureConsoleOwnedTaskTabV3.playwright.getByRole("textbox", { name: /search api tokens/i });
-    [tokenRowCount] = await filteredZero(tokenFilter, "OmniRoute secure console R5 20260901", [
-      secureConsoleOwnedTaskTabV3.playwright.getByRole("row").filter({ hasText: "OmniRoute secure console R5 20260901" }),
-    ]);
+    [tokenRowCount] = await filteredZero(tokenFilter, "OmniRoute secure console R5 20260901", ["OmniRoute secure console R5 20260901"], ["No API tokens found", "No tokens found"], true);
     tokenFilterComplete = true;
     tokenTitleExact = await secureConsoleOwnedTaskTabV3.title() === "API Tokens | Cloudflare";
     tokenCreateControlCount =
       await secureConsoleOwnedTaskTabV3.playwright.getByRole("button", { name: "Create Token", exact: true }).count() +
       await secureConsoleOwnedTaskTabV3.playwright.getByRole("link", { name: "Create Token", exact: true }).count();
-    tokenNameCount = await secureConsoleOwnedTaskTabV3.playwright.getByText("OmniRoute secure console R5 20260901", { exact: true }).count();
+    const tokenRegionId = await tokenFilter.getAttribute("aria-controls");
+    if (typeof tokenRegionId !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{0,127}$/.test(tokenRegionId)) throw new Error("FinalTokenRegionBindingError");
+    const tokenResultRegion = secureConsoleOwnedTaskTabV3.playwright.locator(`#${tokenRegionId}`);
+    if (await tokenResultRegion.count() !== 1) throw new Error("FinalTokenRegionCountError");
+    tokenNameCount = await tokenResultRegion.getByText("OmniRoute secure console R5 20260901", { exact: true }).count();
     if (!tokenTitleExact || tokenCreateControlCount !== 1 || tokenNameCount !== 0 || tokenRowCount !== 0 ||
         !dnsFilterComplete || !rateCompletenessProven || !tunnelFiltersComplete || !accessFiltersComplete || !tokenFilterComplete) {
       throw new Error("FinalTokenPageStateError");
     }
     if (counters.navigationAttempted !== 4 || counters.navigationFulfilled !== 4 ||
         counters.clickAttempted !== 9 || counters.clickFulfilled !== 9 ||
-        counters.readinessAttempted !== 21 || counters.readinessFulfilled !== 21) {
+        counters.readinessAttempted !== 21 || counters.readinessFulfilled !== 21 ||
+        counters.fillAttempted !== 12 || counters.fillFulfilled !== 12) {
       throw new Error("BrowserCounterError");
     }
     result = "EXACT_V3_CLOUDFLARE_PRESTART_READS_PASS";
@@ -610,6 +746,8 @@ await (async () => {
     clickFulfilled: counters.clickFulfilled,
     readinessAttempted: counters.readinessAttempted,
     readinessFulfilled: counters.readinessFulfilled,
+    fillAttempted: counters.fillAttempted,
+    fillFulfilled: counters.fillFulfilled,
     dnsTargetCount,
     dnsFilterComplete,
     rateDataRowCount,
@@ -639,6 +777,7 @@ await (async () => {
 
 Exact PASS requires declarations/precondition and private account binding true;
 navigation `4/4`; clicks `9/9`, each preceded by count one; readiness `21/21`;
+page-local search fills `12/12` (six clear/query pairs only);
 DNS target `0` with exact filter complete; rate unique-table data rows `1`,
 target description/host `0/0`, and no enabled next page; Tunnel name/host
 `0/0` with both filters complete; Access host/name `0/0` with both filters
@@ -648,6 +787,10 @@ exact filter complete; write attempted `1`;
 later private consumed/state tuple exact. The cell sets consumed/state only
 after `nodeRepl.write` returns. Any discrepancy spends the replacement and
 routes, after proven full completion only, to the pre-Create detach cell.
+
+These twelve fills are the only additional browser mutations in this cell and
+are confined to the six bound page-local search inputs. No Create, edit,
+delete, provider-persistent, or other form mutation is authorized.
 
 No browser action may occur between this PASS and the inherited form sequence
 except the serial read-only/form-preparation operations already authorized by

@@ -20,9 +20,11 @@ in the same fulfillment assignment, navigates only to the fixed public token
 URL, collects only bounded counts and booleans, and closes that exact tab before
 a diagnostic PASS.
 
-Permitted outputs are counts for semantic locators and booleans for fixed URL
-equality and `aria-controls` presence/syntax. V8 emits no tab ID, title,
-attribute value, URL text, page text, DOM, HTML, screenshot, token value,
+Permitted outputs are counts for semantic locators, sanitized fixed status
+labels, and booleans for fixed URL equality, exact inherited-state equality,
+and `aria-controls` presence/syntax. V8 emits no raw inherited binding state,
+tab ID, title, attribute value, URL text, page text, DOM, HTML, screenshot,
+token value,
 account/zone/rule/token ID, cookie, storage, password, session, or clipboard
 content.
 
@@ -60,10 +62,10 @@ Execute at most once only after commit, independent Sol High PASS review,
 non-self-referential classification, post-commit tuple, and fresh action-time
 pins. The executable is complete only with its final LF.
 
-Executable bytes: `8492`.
+Executable bytes: `8624`.
 
 Executable SHA-256:
-`B3D3B3D4FE35C95BCF83DA107E8157B69F0A4F92218EB0CF83E6172FACDD5D8D`.
+`94C0D41F0CD108BA077536FCA742BC3EF6ED326ADE52EF262A69473B09617A41`.
 
 ```javascript
 let secureConsoleV8DiagnosticConsumed = false;
@@ -136,6 +138,7 @@ await (async () => {
       secureConsoleV8GateWasFresh === true &&
       secureConsoleV7OwnedTabReacquisitionConsumed === true &&
       secureConsoleV7RetainedTab === null &&
+      secureConsoleV4AdoptionConsumed === true &&
       secureConsoleOwnedTaskTabV4 === null &&
       secureConsoleOwnedTaskTabV4Eligible === false &&
       secureConsoleOwnedTaskTabV4State === "V7_OWNED_TAB_REACQUISITION_OR_READINESS_FAILED_CLEAN" &&
@@ -275,8 +278,9 @@ await (async () => {
     errorClass,
     consumed: secureConsoleV8DiagnosticConsumed,
     v4BindingNull: secureConsoleOwnedTaskTabV4 === null,
-    v4BindingEligible: secureConsoleOwnedTaskTabV4Eligible,
-    v4BindingState: secureConsoleOwnedTaskTabV4State,
+    v4BindingIneligible: secureConsoleOwnedTaskTabV4Eligible === false,
+    v4BindingStateExact:
+      secureConsoleOwnedTaskTabV4State === "V7_OWNED_TAB_REACQUISITION_OR_READINESS_FAILED_CLEAN",
   });
 })();
 ```

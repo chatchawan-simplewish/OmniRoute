@@ -13,7 +13,13 @@ Status: `EXACT_RETAINED_CHROME_RECOVERY_ZERO_TABS`.
   `B1DFE57AEBE04180C57FDDF99F80DAF246F3ACD8EC087B1EBCB0C4D224638F54`
 - Git/index/baseline before consumption: exact
   `f2defb1e8ebf015ac48e7e82fc18e8c83b530746`, `0 / 12`
-- owner manually closed the known blank tab and confirmed no tab was opened
+- immediately before the manual-close request, the owner stated: `I close all
+  tab, left a blank tab`; this directly identified the blank tab as the sole
+  remaining visible tab
+- the owner then replied exactly `Blank tab closed; no tab opened`; combined
+  with the preceding sole-tab statement, this directly confirms both that the
+  last visible tab was closed and that automation opened no tab before the
+  recovery cell
 
 ## Exact one-shot result
 

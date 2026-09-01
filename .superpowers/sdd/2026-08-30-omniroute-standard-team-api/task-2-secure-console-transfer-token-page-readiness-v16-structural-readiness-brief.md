@@ -77,8 +77,10 @@ from V4 and the reviewed secure-console chain. In particular:
 
 The sole Sol High owner runs this exact cell once in the same persistent Node
 session with fixed outer deadline `60000 ms`. The bounded page-local terminal
-wait is `20000 ms` with `100 ms` observation intervals. Observation is not a
-retry: the filter is filled once and no page or provider action is repeated.
+wait is `20000 ms` with `100 ms` observation intervals, a `2000 ms` minimum
+elapsed interval, and a `1000 ms` mutation/fingerprint quiet interval after a
+private pre-fill/post-fill section fingerprint transition. Observation is not
+a retry: the filter is filled once and no page or provider action is repeated.
 
 ```javascript
 let secureConsoleOwnedTaskTabV16 = null;
@@ -120,6 +122,8 @@ await (async () => {
   });
   const emptyTerminal = () => ({
     terminalObserved: false,
+    transitionObserved: false, minimumElapsedSatisfied: false,
+    quietWindowSatisfied: false,
     inputConnected: false, inputVisible: false, inputValueExact: false,
     queryInputExactCount: -1, sectionFound: false, sectionDepth: -1,
     pageTableCount: -1, pageGridCount: -1, pagePaginationCount: -1,
@@ -147,11 +151,27 @@ await (async () => {
     return actual.length === wanted.length &&
       actual.every((key, index) => key === wanted[index]);
   };
-  const exactTypes = (value, booleanKeys, integerKeys) =>
-    booleanKeys.every((key) => typeof value[key] === "boolean") &&
-    integerKeys.every((key) => Number.isSafeInteger(value[key]));
-  const integerRangeExact = (value, integerKeys) =>
-    integerKeys.every((key) => value[key] >= -1 && value[key] <= 1000000);
+  const trustedProjection = (value, booleanKeys, integerKeys, wideIntegerKeys = []) => {
+    const expectedKeys = [...booleanKeys, ...integerKeys, ...wideIntegerKeys];
+    if (!exactKeys(value, expectedKeys)) return null;
+    const projected = {};
+    for (const key of booleanKeys) {
+      const item = value[key];
+      if (typeof item !== "boolean") return null;
+      projected[key] = item;
+    }
+    for (const key of integerKeys) {
+      const item = value[key];
+      if (!Number.isSafeInteger(item) || item < -1 || item > 1000000) return null;
+      projected[key] = item;
+    }
+    for (const key of wideIntegerKeys) {
+      const item = value[key];
+      if (!Number.isSafeInteger(item) || item < 0 || item > 0xffffffff) return null;
+      projected[key] = item;
+    }
+    return projected;
+  };
   let result = "PRECONDITION_FAIL";
   let declarationShape = false;
   let predecessorStateExact = false;
@@ -162,6 +182,7 @@ await (async () => {
   let placeholderSearchCount = -1;
   let baselineValidated = false;
   let baselineSemanticExact = false;
+  let baselineFingerprint = -1;
   let terminalValidated = false;
   let terminalSemanticExact = false;
   let tokenQueryEchoCount = -1;
@@ -254,7 +275,7 @@ await (async () => {
       throw new Error("ReadinessFilterShapeError");
     }
     counters.waitAttempted++;
-    await tokenFilter.waitFor({ state: "visible", timeout: 10000 });
+    await tokenFilter.waitFor({ state: "visible", timeoutMs: 10000 });
     counters.waitFulfilled++;
     counters.countAttempted++;
     placeholderSearchCount = await tokenFilter.count();
@@ -293,6 +314,15 @@ await (async () => {
       const statuses = section === null ? [] : [...section.querySelectorAll('[role="status"]')];
       const rows = section === null ? [] : [...section.querySelectorAll("tbody tr")];
       const actions = section === null ? [] : [...section.querySelectorAll(actionSelector)];
+      const fingerprintSource = [
+        ...rows.map((row) => `${row.getClientRects().length > 0 ? 1 : 0}:${normalize(row.textContent)}`),
+        ...statuses.map((item) => `s:${item.getClientRects().length > 0 ? 1 : 0}:${normalize(item.textContent)}`),
+      ].join("\u001f");
+      let sectionFingerprint = 2166136261;
+      for (let index = 0; index < fingerprintSource.length; index++) {
+        sectionFingerprint ^= fingerprintSource.charCodeAt(index);
+        sectionFingerprint = Math.imul(sectionFingerprint, 16777619) >>> 0;
+      }
       return {
         inputConnected: input.isConnected === true,
         inputVisible: input.getClientRects().length === 1,
@@ -315,6 +345,7 @@ await (async () => {
           const text = normalize(item.textContent);
           return text === "create token" || text === "create api token" || text === "create";
         }).length,
+        sectionFingerprint,
       };
     });
     counters.baselineFulfilled++;
@@ -329,12 +360,18 @@ await (async () => {
       "sectionCreateActionableCount",
     ];
     const baselineExpectedKeys = [...baselineBooleanKeys, ...baselineIntegerKeys];
-    baselineValidated =
-      exactKeys(untrustedBaseline, baselineExpectedKeys) &&
-      exactTypes(untrustedBaseline, baselineBooleanKeys, baselineIntegerKeys) &&
-      integerRangeExact(untrustedBaseline, baselineIntegerKeys);
+    const trustedBaseline = trustedProjection(
+      untrustedBaseline,
+      baselineBooleanKeys,
+      baselineIntegerKeys,
+      ["sectionFingerprint"],
+    );
+    baselineValidated = trustedBaseline !== null;
     if (!baselineValidated) throw new Error("ReadinessBaselineValidationError");
-    baseline = { ...untrustedBaseline };
+    baselineFingerprint = trustedBaseline.sectionFingerprint;
+    baseline = Object.fromEntries(
+      baselineExpectedKeys.map((key) => [key, trustedBaseline[key]]),
+    );
     baselineSemanticExact =
       baseline.inputConnected === true &&
       baseline.inputVisible === true &&
@@ -361,7 +398,7 @@ await (async () => {
     counters.fillFulfilled++;
 
     counters.terminalAttempted++;
-    const untrustedTerminal = await tokenFilter.evaluate(async (input) => {
+    const untrustedTerminal = await tokenFilter.evaluate(async (input, prefillFingerprint) => {
       const target = "omniroute secure console r5 20260901";
       const normalize = (value) => (value || "").replace(/\s+/g, " ").trim().toLowerCase();
       const statusText = new Set(["no api tokens found", "no tokens found", "no results"]);
@@ -384,8 +421,18 @@ await (async () => {
         const visibleRows = rows.filter((row) => row.getClientRects().length > 0);
         const emptyRows = rows.filter((row) => statusText.has(normalize(row.textContent)));
         const visibleCandidateRows = visibleRows.filter((row) => !statusText.has(normalize(row.textContent)));
-        return {
-          terminalObserved: false,
+        const fingerprintSource = [
+          ...rows.map((row) => `${row.getClientRects().length > 0 ? 1 : 0}:${normalize(row.textContent)}`),
+          ...statuses.map((item) => `s:${item.getClientRects().length > 0 ? 1 : 0}:${normalize(item.textContent)}`),
+        ].join("\u001f");
+        let fingerprint = 2166136261;
+        for (let index = 0; index < fingerprintSource.length; index++) {
+          fingerprint ^= fingerprintSource.charCodeAt(index);
+          fingerprint = Math.imul(fingerprint, 16777619) >>> 0;
+        }
+        return { section, fingerprint, value: {
+          terminalObserved: false, transitionObserved: false,
+          minimumElapsedSatisfied: false, quietWindowSatisfied: false,
           inputConnected: input.isConnected === true,
           inputVisible: input.getClientRects().length === 1,
           inputValueExact: normalize(input.value) === target,
@@ -407,7 +454,7 @@ await (async () => {
           sectionEmptyRowCount: section === null ? -1 : emptyRows.length,
           sectionBusyCount: section === null ? -1 : section.querySelectorAll('[aria-busy="true"], [role="progressbar"]').length,
           matchingRowCount: section === null ? -1 : rows.filter((row) => normalize(row.textContent).includes(target)).length,
-        };
+        } };
       };
       const terminalShape = (value) => {
         const rowShape =
@@ -436,18 +483,72 @@ await (async () => {
           value.matchingRowCount === 0 &&
           rowShape;
       };
-      const deadline = Date.now() + 20000;
+      const startedAt = performance.now();
+      const deadline = startedAt + 20000;
       let observed = snapshot();
-      while (!terminalShape(observed) && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        observed = snapshot();
+      let observedSection = observed.section;
+      let lastFingerprint = observed.fingerprint;
+      let lastFingerprintChangeAt = startedAt;
+      let lastMutationAt = startedAt;
+      let transitionObserved = observed.fingerprint !== prefillFingerprint;
+      const observer = new MutationObserver(() => {
+        lastMutationAt = performance.now();
+      });
+      const observeSection = (section) => {
+        observer.disconnect();
+        if (section !== null) {
+          observer.observe(section, {
+            attributes: true, childList: true, characterData: true, subtree: true,
+          });
+        }
+      };
+      observeSection(observedSection);
+      try {
+        while (true) {
+          const now = performance.now();
+          const minimumElapsedSatisfied = now - startedAt >= 2000;
+          const quietWindowSatisfied =
+            now - Math.max(lastFingerprintChangeAt, lastMutationAt) >= 1000;
+          if (transitionObserved && terminalShape(observed.value) &&
+              minimumElapsedSatisfied && quietWindowSatisfied) break;
+          if (now >= deadline) break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          const next = snapshot();
+          const sampledAt = performance.now();
+          if (next.fingerprint !== lastFingerprint) {
+            lastFingerprint = next.fingerprint;
+            lastFingerprintChangeAt = sampledAt;
+          }
+          if (next.section !== observedSection) {
+            observedSection = next.section;
+            lastMutationAt = sampledAt;
+            observeSection(observedSection);
+          }
+          observed = next;
+          transitionObserved ||= observed.fingerprint !== prefillFingerprint;
+        }
+        const finishedAt = performance.now();
+        const minimumElapsedSatisfied = finishedAt - startedAt >= 2000;
+        const quietWindowSatisfied =
+          finishedAt - Math.max(lastFingerprintChangeAt, lastMutationAt) >= 1000;
+        return {
+          ...observed.value,
+          terminalObserved:
+            transitionObserved && terminalShape(observed.value) &&
+            minimumElapsedSatisfied && quietWindowSatisfied,
+          transitionObserved,
+          minimumElapsedSatisfied,
+          quietWindowSatisfied,
+        };
+      } finally {
+        observer.disconnect();
       }
-      return { ...observed, terminalObserved: terminalShape(observed) };
-    });
+    }, baselineFingerprint);
     counters.terminalFulfilled++;
     const terminalBooleanKeys = [
-      "terminalObserved", "inputConnected", "inputVisible", "inputValueExact",
-      "sectionFound",
+      "terminalObserved", "transitionObserved", "minimumElapsedSatisfied",
+      "quietWindowSatisfied", "inputConnected", "inputVisible",
+      "inputValueExact", "sectionFound",
     ];
     const terminalIntegerKeys = [
       "queryInputExactCount", "sectionDepth", "pageTableCount", "pageGridCount",
@@ -457,13 +558,14 @@ await (async () => {
       "sectionVisibleCandidateRowCount", "sectionEmptyRowCount",
       "sectionBusyCount", "matchingRowCount",
     ];
-    const terminalExpectedKeys = [...terminalBooleanKeys, ...terminalIntegerKeys];
-    terminalValidated =
-      exactKeys(untrustedTerminal, terminalExpectedKeys) &&
-      exactTypes(untrustedTerminal, terminalBooleanKeys, terminalIntegerKeys) &&
-      integerRangeExact(untrustedTerminal, terminalIntegerKeys);
+    const trustedTerminal = trustedProjection(
+      untrustedTerminal,
+      terminalBooleanKeys,
+      terminalIntegerKeys,
+    );
+    terminalValidated = trustedTerminal !== null;
     if (!terminalValidated) throw new Error("ReadinessTerminalValidationError");
-    terminal = { ...untrustedTerminal };
+    terminal = trustedTerminal;
     const terminalRowShapeExact =
       terminal.sectionRowCount === 0 ||
       (terminal.sectionRowCount === 5 && terminal.sectionVisibleRowCount === 0) ||
@@ -471,6 +573,9 @@ await (async () => {
         terminal.sectionVisibleCandidateRowCount === 0);
     terminalSemanticExact =
       terminal.terminalObserved === true &&
+      terminal.transitionObserved === true &&
+      terminal.minimumElapsedSatisfied === true &&
+      terminal.quietWindowSatisfied === true &&
       terminal.inputConnected === true &&
       terminal.inputVisible === true &&
       terminal.inputValueExact === true &&
@@ -493,8 +598,14 @@ await (async () => {
       terminalRowShapeExact;
     if (!terminalSemanticExact) throw new Error("ReadinessTerminalSemanticError");
 
+    const tokenQueryEcho = tokenSection.getByText("OmniRoute secure console R5 20260901", { exact: true });
+    if (typeof tokenQueryEcho?.waitFor !== "function" ||
+        typeof tokenQueryEcho?.count !== "function") {
+      throw new Error("ReadinessQueryEchoShapeError");
+    }
     counters.queryAttempted++;
-    tokenQueryEchoCount = await tokenSection.getByText("OmniRoute secure console R5 20260901", { exact: true }).count();
+    await tokenQueryEcho.waitFor({ state: "visible", timeoutMs: 10000 });
+    tokenQueryEchoCount = await tokenQueryEcho.count();
     counters.queryFulfilled++;
     counters.createAttempted++;
     createControlCount =
@@ -511,6 +622,9 @@ await (async () => {
       baseline.inputValueEmpty === true &&
       terminal.inputValueExact === true &&
       terminal.queryInputExactCount === 1 &&
+      terminal.transitionObserved === true &&
+      terminal.minimumElapsedSatisfied === true &&
+      terminal.quietWindowSatisfied === true &&
       tokenQueryEchoCount === 1 &&
       terminal.terminalObserved === true;
     tokenSemanticSignature =
@@ -536,7 +650,15 @@ await (async () => {
     cleanupState = "SUCCESS_TAB_RETAINED";
     residueConverged = true;
     result = "EXACT_V16_TOKEN_PAGE_SEMANTIC_READINESS_PASS";
-  } else if (tab !== null) {
+  } else if (counters.newAttempted === 1 && counters.newFulfilled === 0) {
+    cleanupState = "NEW_REJECTED_RESIDUE_UNPROVEN";
+    residueConverged = false;
+    secureConsoleOwnedTaskTabV16State = "V16_READINESS_FAILED_RESIDUE_UNPROVEN";
+  } else if (counters.newFulfilled === 1 && createdHandleCaptured === false) {
+    cleanupState = "NEW_FULFILLED_WITHOUT_HANDLE_RESIDUE_UNPROVEN";
+    residueConverged = false;
+    secureConsoleOwnedTaskTabV16State = "V16_READINESS_FAILED_RESIDUE_UNPROVEN";
+  } else if (tab !== null && tab !== undefined) {
     if (typeof tab.close !== "function") {
       cleanupState = "MALFORMED_EXACT_HANDLE_RETAINED";
       residueConverged = false;
@@ -562,14 +684,6 @@ await (async () => {
         secureConsoleOwnedTaskTabV16State = "V16_READINESS_FAILED_TAB_RETAINED";
       }
     }
-  } else if (counters.newAttempted === 1 && counters.newFulfilled === 0) {
-    cleanupState = "NEW_REJECTED_RESIDUE_UNPROVEN";
-    residueConverged = false;
-    secureConsoleOwnedTaskTabV16State = "V16_READINESS_FAILED_RESIDUE_UNPROVEN";
-  } else if (counters.newFulfilled === 1 && createdHandleCaptured === false) {
-    cleanupState = "NEW_FULFILLED_WITHOUT_HANDLE_RESIDUE_UNPROVEN";
-    residueConverged = false;
-    secureConsoleOwnedTaskTabV16State = "V16_READINESS_FAILED_RESIDUE_UNPROVEN";
   } else {
     cleanupState = "NO_TAB_CREATED";
     residueConverged = true;
@@ -631,9 +745,12 @@ consumed true; and the unchanged V4 null/ineligible/state tuple.
 
 The terminal row shape accepts only one of three equivalent complete filtered
 representations: no rows; the five baseline rows retained but all hidden; or
-one exact allowlisted empty-state row with no visible candidate row. Any status
-marker must be zero or one and every such marker must have an exact allowlisted
-empty-state meaning. No arbitrary page text is accepted or output.
+one exact allowlisted empty-state row with no visible candidate row. It also
+requires a private pre-fill/post-fill section fingerprint transition, at least
+`2000 ms` elapsed, at least `1000 ms` without a scoped DOM mutation or private
+fingerprint change, and an exact visible query echo. Any status marker must be
+zero or one and every such marker must have an exact allowlisted empty-state
+meaning. No arbitrary page text or fingerprint is output.
 
 Any non-PASS spends V16. If the exact created handle closes successfully, the
 failure state is clean and null. A malformed handle, close rejection, new-tab

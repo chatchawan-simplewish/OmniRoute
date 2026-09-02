@@ -22,8 +22,12 @@ Design 3 is selected under the standing preapproval. It changes one component
 boundary, avoids replaying the unproven evaluator, and does not acquire or emit
 a whole-page snapshot. Each outer count has an explicit attempted/fulfilled
 pair and a fixed `postStage`, so a rejection identifies the exact boundary.
-The page-returned data is limited to non-negative counts and is projected
-through the existing exact-key validator.
+Every returned count is validated immediately as a safe integer in
+`0..1000000` before the next probe, then projected again through the existing
+exact-key validator. Fresh private URL reads bracket the probe sequence and
+require exact origin, empty credentials/port, the same account/zone prefix, and
+exact pre/post URL continuity. The counts are sequential route-bounded evidence,
+not an atomic page-state snapshot.
 
 V33 is diagnostic-only. It opens one exact new tab through the existing
 `secureConsoleChromeV5` binding, loads account home, repeats V32's proven
@@ -31,7 +35,8 @@ private observed-href validation/navigation, and counts only:
 
 - body and anchor presence;
 - accessible exact `API Tokens` links and buttons;
-- fixed `/api-tokens` href shapes, including profile/account forms;
+- raw `/api-tokens` href-attribute candidate shapes, including literal
+  relative profile/account forms;
 - exact `Manage Account`, `My Profile`, and `Profile` text; and
 - busy/progress indicators.
 
@@ -61,13 +66,14 @@ await (async () => {
     zoneNavigationAttempted: 0, zoneNavigationFulfilled: 0,
     zoneWaitAttempted: 0, zoneWaitFulfilled: 0,
     zoneUrlAttempted: 0, zoneUrlFulfilled: 0,
+    postUrlAttempted: 0, postUrlFulfilled: 0,
     postSnapshotAttempted: 0, postSnapshotFulfilled: 0,
     bodyCountAttempted: 0, bodyCountFulfilled: 0,
     allAnchorCountAttempted: 0, allAnchorCountFulfilled: 0,
     roleApiTokensLinkCountAttempted: 0, roleApiTokensLinkCountFulfilled: 0,
-    apiTokensHrefCountAttempted: 0, apiTokensHrefCountFulfilled: 0,
-    profileApiTokensHrefCountAttempted: 0, profileApiTokensHrefCountFulfilled: 0,
-    accountApiTokensHrefCountAttempted: 0, accountApiTokensHrefCountFulfilled: 0,
+    rawApiTokensHrefCandidateCountAttempted: 0, rawApiTokensHrefCandidateCountFulfilled: 0,
+    rawRelativeProfileApiTokensHrefCandidateCountAttempted: 0, rawRelativeProfileApiTokensHrefCandidateCountFulfilled: 0,
+    rawRelativeAccountApiTokensHrefCandidateCountAttempted: 0, rawRelativeAccountApiTokensHrefCandidateCountFulfilled: 0,
     roleApiTokensButtonCountAttempted: 0, roleApiTokensButtonCountFulfilled: 0,
     manageAccountTextCountAttempted: 0, manageAccountTextCountFulfilled: 0,
     myProfileTextCountAttempted: 0, myProfileTextCountFulfilled: 0,
@@ -79,6 +85,11 @@ await (async () => {
   const safeErrorClass = (error) => {
     const name = typeof error?.name === "string" ? error.name : "Error";
     return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name) ? name : "Error";
+  };
+  const requireSafeCount = (value) => {
+    if (!Number.isSafeInteger(value) || value < 0 || value > 1000000) {
+      throw new Error("OuterLocatorUnsafeCountError");
+    }
   };
   const plainRecord = (value) => {
     if (typeof value !== "object" || value === null) return false;
@@ -113,11 +124,12 @@ await (async () => {
   ];
   const postBooleanKeys = [
     "hostExact", "zonePathExact", "zonePathPrefix", "accountHomePath",
+    "routeContinuous",
   ];
   const postIntegerKeys = [
     "bodyCount", "allAnchorCount", "roleApiTokensLinkCount",
-    "apiTokensHrefCount", "profileApiTokensHrefCount",
-    "accountApiTokensHrefCount", "roleApiTokensButtonCount",
+    "rawApiTokensHrefCandidateCount", "rawRelativeProfileApiTokensHrefCandidateCount",
+    "rawRelativeAccountApiTokensHrefCandidateCount", "roleApiTokensButtonCount",
     "manageAccountTextCount", "myProfileTextCount", "profileTextCount",
     "busyCount",
   ];
@@ -132,6 +144,8 @@ await (async () => {
   let preShapeExact = false;
   let observedZoneUrlValidated = false;
   let zoneUrlValidated = false;
+  let postUrlValidated = false;
+  let routeContinuous = false;
   let postSnapshotValidated = false;
   let postSnapshotComplete = false;
   let preSnapshot = null;
@@ -351,6 +365,9 @@ await (async () => {
       settledZoneParsed !== null &&
       settledZoneParsed.protocol === "https:" &&
       settledZoneParsed.hostname === "dash.cloudflare.com" &&
+      settledZoneParsed.port === "" &&
+      settledZoneParsed.username === "" &&
+      settledZoneParsed.password === "" &&
       new RegExp(
         "^/" + accountSegment + "/mysw\\.me(?:/|$)",
       ).test(settledZoneParsed.pathname);
@@ -362,11 +379,13 @@ await (async () => {
     counters.bodyCountAttempted++;
     const bodyCount = await tab.playwright.locator("body").count();
     counters.bodyCountFulfilled++;
+    requireSafeCount(bodyCount);
 
     postStage = "ALL_ANCHOR_COUNT";
     counters.allAnchorCountAttempted++;
     const allAnchorCount = await tab.playwright.locator("a[href]").count();
     counters.allAnchorCountFulfilled++;
+    requireSafeCount(allAnchorCount);
 
     postStage = "ROLE_API_TOKENS_LINK_COUNT";
     counters.roleApiTokensLinkCountAttempted++;
@@ -375,26 +394,30 @@ await (async () => {
       { name: "API Tokens", exact: true },
     ).count();
     counters.roleApiTokensLinkCountFulfilled++;
+    requireSafeCount(roleApiTokensLinkCount);
 
     postStage = "API_TOKENS_HREF_COUNT";
-    counters.apiTokensHrefCountAttempted++;
-    const apiTokensHrefCount =
+    counters.rawApiTokensHrefCandidateCountAttempted++;
+    const rawApiTokensHrefCandidateCount =
       await tab.playwright.locator('a[href*="/api-tokens"]').count();
-    counters.apiTokensHrefCountFulfilled++;
+    counters.rawApiTokensHrefCandidateCountFulfilled++;
+    requireSafeCount(rawApiTokensHrefCandidateCount);
 
     postStage = "PROFILE_API_TOKENS_HREF_COUNT";
-    counters.profileApiTokensHrefCountAttempted++;
-    const profileApiTokensHrefCount = await tab.playwright.locator(
+    counters.rawRelativeProfileApiTokensHrefCandidateCountAttempted++;
+    const rawRelativeProfileApiTokensHrefCandidateCount = await tab.playwright.locator(
       'a[href="/profile/api-tokens"], a[href="/profile/api-tokens/"]',
     ).count();
-    counters.profileApiTokensHrefCountFulfilled++;
+    counters.rawRelativeProfileApiTokensHrefCandidateCountFulfilled++;
+    requireSafeCount(rawRelativeProfileApiTokensHrefCandidateCount);
 
     postStage = "ACCOUNT_API_TOKENS_HREF_COUNT";
-    counters.accountApiTokensHrefCountAttempted++;
-    const accountApiTokensHrefCount = await tab.playwright.locator(
+    counters.rawRelativeAccountApiTokensHrefCandidateCountAttempted++;
+    const rawRelativeAccountApiTokensHrefCandidateCount = await tab.playwright.locator(
       'a[href^="/' + accountSegment + '/"][href*="/api-tokens"]',
     ).count();
-    counters.accountApiTokensHrefCountFulfilled++;
+    counters.rawRelativeAccountApiTokensHrefCandidateCountFulfilled++;
+    requireSafeCount(rawRelativeAccountApiTokensHrefCandidateCount);
 
     postStage = "ROLE_API_TOKENS_BUTTON_COUNT";
     counters.roleApiTokensButtonCountAttempted++;
@@ -403,6 +426,7 @@ await (async () => {
       { name: "API Tokens", exact: true },
     ).count();
     counters.roleApiTokensButtonCountFulfilled++;
+    requireSafeCount(roleApiTokensButtonCount);
 
     postStage = "MANAGE_ACCOUNT_TEXT_COUNT";
     counters.manageAccountTextCountAttempted++;
@@ -411,18 +435,21 @@ await (async () => {
       { exact: true },
     ).count();
     counters.manageAccountTextCountFulfilled++;
+    requireSafeCount(manageAccountTextCount);
 
     postStage = "MY_PROFILE_TEXT_COUNT";
     counters.myProfileTextCountAttempted++;
     const myProfileTextCount =
       await tab.playwright.getByText("My Profile", { exact: true }).count();
     counters.myProfileTextCountFulfilled++;
+    requireSafeCount(myProfileTextCount);
 
     postStage = "PROFILE_TEXT_COUNT";
     counters.profileTextCountAttempted++;
     const profileTextCount =
       await tab.playwright.getByText("Profile", { exact: true }).count();
     counters.profileTextCountFulfilled++;
+    requireSafeCount(profileTextCount);
 
     postStage = "BUSY_COUNT";
     counters.busyCountAttempted++;
@@ -430,28 +457,54 @@ await (async () => {
       '[aria-busy="true"], [role="progressbar"]',
     ).count();
     counters.busyCountFulfilled++;
+    requireSafeCount(busyCount);
+    postStage = "POST_URL";
+    counters.postUrlAttempted++;
+    const postProbeUrl = await tab.url();
+    counters.postUrlFulfilled++;
+    let postProbeParsed = null;
+    try {
+      postProbeParsed = new URL(postProbeUrl);
+    } catch {}
+    postUrlValidated =
+      postProbeParsed !== null &&
+      postProbeParsed.protocol === "https:" &&
+      postProbeParsed.hostname === "dash.cloudflare.com" &&
+      postProbeParsed.port === "" &&
+      postProbeParsed.username === "" &&
+      postProbeParsed.password === "" &&
+      new RegExp(
+        "^/" + accountSegment + "/mysw\\.me(?:/|$)",
+      ).test(postProbeParsed.pathname);
+    routeContinuous =
+      postUrlValidated === true &&
+      postProbeUrl === settledZoneUrl;
+    if (!postUrlValidated || !routeContinuous) {
+      throw new Error("ZoneRoutePostProbeUrlError");
+    }
     counters.postSnapshotFulfilled++;
 
     postStage = "PROJECT_RESULT";
     postSnapshot = trustedRecord(
       {
-        hostExact: settledZoneParsed.protocol === "https:" &&
-          settledZoneParsed.hostname === "dash.cloudflare.com",
+        hostExact: postProbeParsed.protocol === "https:" &&
+          postProbeParsed.hostname === "dash.cloudflare.com",
         zonePathExact: new RegExp(
           "^/" + accountSegment + "/mysw\\.me/?$",
-        ).test(settledZoneParsed.pathname),
+        ).test(postProbeParsed.pathname),
         zonePathPrefix: new RegExp(
           "^/" + accountSegment + "/mysw\\.me(?:/|$)",
-        ).test(settledZoneParsed.pathname),
+        ).test(postProbeParsed.pathname),
         accountHomePath: new RegExp(
           "^/" + accountSegment + "/home/?$",
-        ).test(settledZoneParsed.pathname),
+        ).test(postProbeParsed.pathname),
+        routeContinuous,
         bodyCount,
         allAnchorCount,
         roleApiTokensLinkCount,
-        apiTokensHrefCount,
-        profileApiTokensHrefCount,
-        accountApiTokensHrefCount,
+        rawApiTokensHrefCandidateCount,
+        rawRelativeProfileApiTokensHrefCandidateCount,
+        rawRelativeAccountApiTokensHrefCandidateCount,
         roleApiTokensButtonCount,
         manageAccountTextCount,
         myProfileTextCount,
@@ -464,9 +517,12 @@ await (async () => {
     postSnapshotValidated = postSnapshot !== null;
     postSnapshotComplete =
       postSnapshotValidated &&
+      postUrlValidated === true &&
+      routeContinuous === true &&
       postSnapshot.hostExact === true &&
       postSnapshot.zonePathPrefix === true &&
       postSnapshot.accountHomePath === false &&
+      postSnapshot.routeContinuous === true &&
       postSnapshot.bodyCount === 1 &&
       postSnapshot.allAnchorCount > 0 &&
       postSnapshot.busyCount === 0;
@@ -522,6 +578,8 @@ await (async () => {
     preShapeExact,
     observedZoneUrlValidated,
     zoneUrlValidated,
+    postUrlValidated,
+    routeContinuous,
     postSnapshotValidated,
     postSnapshotComplete,
     postStage,
@@ -568,10 +626,12 @@ spent, and stop. Never retry or continue V33.
 
 ## Evidence interpretation
 
-A clean V33 PASS proves only the fixed route/locator signature counts. A
-positive unique API-token link signature may support a separately reviewed
-exact-locator navigation successor. A zero API-token signature with a positive
-account/profile signature may support a separately reviewed exact activation
-diagnostic. Any incomplete probe or unsafe count stops the lane. V33 itself
-never activates or mutates anything.
-
+A clean V33 PASS proves only endpoint-bracketed route continuity and the fixed
+outer locator counts. The three raw href-attribute candidate counts are not
+same-origin pathname validation and must never be used as destination proof.
+A positive candidate may support only a separately reviewed successor that
+privately reads and validates one exact destination before navigation. A zero
+candidate with a positive accessible account/profile signature may support a
+separately reviewed exact activation diagnostic. Any incomplete probe, unsafe
+count, or route mismatch stops at its originating fixed stage. V33 itself never
+activates or mutates anything.

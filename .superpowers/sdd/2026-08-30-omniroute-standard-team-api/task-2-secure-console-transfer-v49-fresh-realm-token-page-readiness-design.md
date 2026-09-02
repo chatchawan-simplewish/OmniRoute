@@ -6,11 +6,23 @@ V47 is consumed and failed cleanly at trusted-listing validation. Its exact
 historical rejecting condition remains **NOT PROVEN**. V47 must never be
 retried, continued, reused, reinterpreted, or relaxed.
 
-V48 is consumed and completed its read-only listing-shape diagnostic. Its
-sanitized evidence shows that every V47 trusted-listing semantic predicate
-passes against the currently observed rank-zero record shape. V48 did not
-claim a tab and cannot authorize adoption. V48 must never be retried,
-continued, reused, reinterpreted, or relaxed.
+V48 is consumed. Its first fixed sanitized diagnostic payload shows that every
+V47 trusted-listing semantic predicate passed against the observed rank-zero
+record shape. That payload was produced before any cleanup query, contains no
+raw listing or secret data, and records zero claim, navigation, DOM, clipboard,
+or provider-mutation attempts; it is acceptable only as non-authorizing design
+input for V49.
+
+V48's first permitted state-only cleanup expression then failed locally with a
+`ReferenceError` because it referenced a nonexistent global counter variable.
+A second corrected state-only expression was run before the realm reset. That
+two-query cleanup deviation did not invoke a browser API or mutate provider
+state, but it departed from V48's reviewed one-query cleanup procedure. The
+second query is transparent, non-authorizing incident evidence only and is not
+precedent for retry, correction, or continuation. V49 relies only on the first
+fixed sanitized diagnostic payload plus the eventual confirmed realm reset.
+V48 did not claim a tab and cannot authorize adoption. V48 must never be
+retried, continued, reused, reinterpreted, or relaxed.
 
 V49 is a new, independent one-shot gate. It is the smallest clean reissue of
 the reviewed V47 attachment and token-page semantic-readiness contract. It
@@ -70,8 +82,9 @@ V49 preserves the final V47 predicates proved by V48:
   depth, zero own symbols, only documented allowed own keys, safe own
   enumerable data descriptors, and no accessors;
 - the required `id` is a bounded safe non-control string;
-- every optional documented field is either absent/undefined or a bounded safe
-  non-control string according to the V47 field contract;
+- each optional documented key may be absent, but every present optional value
+  must be a bounded non-empty control-free string; a present optional key whose
+  value is `undefined` is rejected by the strict V47 all-values predicate;
 - if `url` is present, the cached safe string parses with the cached standard
   `URL` constructor to HTTPS, exact hostname `dash.cloudflare.com`, empty port,
   empty username, and empty password; and
@@ -140,8 +153,9 @@ rethrows without inspecting the thrown value and without a second write.
 
 After any failed or uncertain result, only one fixed state-only cleanup proof is
 allowed, followed by immediate realm reset and one sanitized incident artifact.
-No V49 retry, continuation, fallback, reuse, reinterpretation, or verdict
-relaxation is permitted.
+If that one proof fails, no corrected or second query is allowed; reset the
+realm and record the uncertainty. No V49 retry, continuation, fallback, reuse,
+reinterpretation, or verdict relaxation is permitted.
 
 ## Verification and independent review gate
 
@@ -149,9 +163,10 @@ Before live execution, V49 requires:
 
 1. one exact executable and one smallest pure fixture;
 2. syntax PASS and a fixed `V49_PURE_FIXTURES_PASS` result covering predecessor
-   contamination, trusted-listing structural and URL failures, async token-page
-   readiness, counter completeness, output privacy, failure cleanup, and exact
-   PASS retention;
+   contamination, trusted-listing structural and URL failures, an absent
+   optional key that may pass, a present-`undefined` optional key that fails
+   before claim, async token-page readiness, counter completeness, output
+   privacy, one-proof-only failure cleanup, and exact PASS retention;
 3. a committed direct-byte/hash review package proving the implementation is
    limited to the declared V47-to-V49 mechanical delta;
 4. independent `gpt-5.6-sol` High review with zero unresolved Critical, HIGH,

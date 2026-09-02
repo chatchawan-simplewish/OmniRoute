@@ -26,8 +26,8 @@ or used as fallback, including if V43 fails.
   `13E56326548D660B111DDC63857BFD33250A548F7D094FA4131EEBB694D24B01`.
 - Inert fixture:
   `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v43-pure-fixtures.mjs`
-  / `40500` bytes / SHA-256
-  `DCDAD2355DFF7C715E360D20A42F55D50082C1EF614A70C98A4ECE92F8C36145`.
+  / `45511` bytes / SHA-256
+  `4BAE1CE107930217EF5E171D6FD9704AC6D4EE87C9D6FAE365C57CC88FD496A5`.
 - The fixture terminal must report `V43_PURE_FIXTURES_PASS`, its directly
   computed brief bytes/SHA-256, executable `39193` bytes/SHA-256
   `13E56326548D660B111DDC63857BFD33250A548F7D094FA4131EEBB694D24B01`,

@@ -127,6 +127,68 @@ const nullRecord = Object.assign(Object.create(null), {
 });
 assert.equal(trustedListing([nullRecord]).urlCloudflare, true);
 
+const makeListing = (first) => [first];
+const validRecord = (overrides = {}) => ({
+  id: "task-tab",
+  url: listingTargetUrl,
+  ...overrides,
+});
+const rankZeroSymbolRecord = validRecord();
+rankZeroSymbolRecord[Symbol("unexpected")] = true;
+class ListingRecord {
+  constructor() {
+    this.id = "task-tab";
+    this.url = listingTargetUrl;
+  }
+}
+const nonEnumerableFieldRecord = validRecord();
+Object.defineProperty(nonEnumerableFieldRecord, "id", {
+  value: "task-tab",
+  enumerable: false,
+  configurable: true,
+});
+const nonEnumerableSlot = [];
+Object.defineProperty(nonEnumerableSlot, "0", {
+  value: validRecord(),
+  enumerable: false,
+  configurable: true,
+});
+nonEnumerableSlot.length = 1;
+const oversizedListing = [];
+oversizedListing.length = 1001;
+const fieldBoundaryListings = [
+  ["id-empty", makeListing(validRecord({ id: "" }))],
+  ["id-over-limit", makeListing(validRecord({ id: "i".repeat(513) }))],
+  ["id-control", makeListing(validRecord({ id: "task\u0000tab" }))],
+  ["id-non-string", makeListing(validRecord({ id: 7 }))],
+  ["url-empty", makeListing(validRecord({ url: "" }))],
+  ["url-over-limit", makeListing(validRecord({ url: "u".repeat(16385) }))],
+  ["url-control", makeListing(validRecord({ url: `${listingTargetUrl}\u007f` }))],
+  ["url-non-string", makeListing(validRecord({ url: 7 }))],
+  ["optional-empty", makeListing(validRecord({ title: "" }))],
+  ["optional-over-limit", makeListing(validRecord({ title: "t".repeat(4097) }))],
+  ["optional-control", makeListing(validRecord({ title: "bad\u001ftitle" }))],
+  ["optional-non-string", makeListing(validRecord({ title: 7 }))],
+];
+const rejectedListings = [
+  ["non-array", {}],
+  ["over-bounded-maximum", oversizedListing],
+  ["rank-zero-symbol", makeListing(rankZeroSymbolRecord)],
+  ["rank-zero-class", makeListing(new ListingRecord())],
+  ["rank-zero-primitive", ["task-tab"]],
+  ["non-enumerable-field", makeListing(nonEnumerableFieldRecord)],
+  ["non-enumerable-slot", nonEnumerableSlot],
+  ...fieldBoundaryListings,
+  ["invalid-url-parse", makeListing(validRecord({ url: "not a URL" }))],
+  ["http-scheme", makeListing(validRecord({ url: "http://dash.cloudflare.com/x" }))],
+  ["explicit-port", makeListing(validRecord({ url: "https://dash.cloudflare.com:8443/x" }))],
+  ["username", makeListing(validRecord({ url: "https://user@dash.cloudflare.com/x" }))],
+  ["password", makeListing(validRecord({ url: "https://user:pass@dash.cloudflare.com/x" }))],
+];
+for (const [name, listing] of rejectedListings) {
+  assert.equal(trustedListing(listing), null, name);
+}
+
 const importSource = `const imported = await import(
         "file:///C:/Users/chatc/.codex/plugins/cache/openai-bundled/chrome/26.831.20005/scripts/browser-client.mjs"
       );`;
@@ -405,6 +467,12 @@ const makeFixture = ({
     },
     async url() {
       fixture.urlCalls++;
+      if (fixture.failStage === "accountUrlThrow" && fixture.gotoCalls === 1) {
+        fail("accountUrlThrow");
+      }
+      if (fixture.failStage === "tokenUrlThrow" && fixture.gotoCalls === 2) {
+        fail("tokenUrlThrow");
+      }
       if (fixture.failStage === "accountUrl" && fixture.gotoCalls === 1) {
         return "https://dash.cloudflare.com/not-an-account/home";
       }
@@ -684,6 +752,9 @@ for (const prelude of [
   "let secureConsoleOwnedTaskTabV40 = null;\n",
   "let secureConsoleChromeV39 = {};\n",
   "let secureConsoleOwnedTaskTabV35Eligible = false;\n",
+  "let secureConsoleOwnedTaskTabV35State = \"DIRTY\";\n",
+  "let secureConsoleSetupBrowserRuntimeV41 = {};\n",
+  "let secureConsoleAgentV35 = {};\n",
   "let secureConsoleCloudflareReadsV42Consumed = false;\n",
 ]) {
   const contaminated = await run({}, prelude);
@@ -713,7 +784,14 @@ for (const [before, after] of [
   ["let secureConsoleOwnedTaskTabV43Eligible = false;", "let secureConsoleOwnedTaskTabV43Eligible = true;"],
   ["let secureConsoleOwnedTaskTabV43State = \"UNADOPTED\";", "let secureConsoleOwnedTaskTabV43State = \"DIRTY\";"],
   ["let secureConsoleOwnedTaskTabV43PreCreateDetachConsumed = false;", "let secureConsoleOwnedTaskTabV43PreCreateDetachConsumed = true;"],
+  ["let secureConsoleOwnedTaskTabV43PostNativeDetachConsumed = false;", "let secureConsoleOwnedTaskTabV43PostNativeDetachConsumed = true;"],
   ["let secureConsoleCloudflareReadsV43Consumed = false;", "let secureConsoleCloudflareReadsV43Consumed = true;"],
+  ["let secureConsoleSetupBrowserRuntimeV43Attachment = null;", "let secureConsoleSetupBrowserRuntimeV43Attachment = {};"],
+  ["let secureConsoleAgentV43Attachment = null;", "let secureConsoleAgentV43Attachment = {};"],
+  ["let secureConsoleChromeV43Attachment = null;", "let secureConsoleChromeV43Attachment = {};"],
+  ["let secureConsoleOwnedTaskTabV43Attachment = null;", "let secureConsoleOwnedTaskTabV43Attachment = {};"],
+  ["let secureConsoleOwnedTaskTabV43AttachmentEligible = false;", "let secureConsoleOwnedTaskTabV43AttachmentEligible = true;"],
+  ["let secureConsoleV43AttachmentState = \"UNCREATED\";", "let secureConsoleV43AttachmentState = \"DIRTY\";"],
 ]) {
   const altered = instrumented.replace(before, after);
   assert.notEqual(altered, instrumented);
@@ -763,6 +841,7 @@ const expectedAttachmentFailure = (stage) => {
     controllerShape: "claim",
     tabShape: "claim",
     accountUrl: null,
+    accountUrlThrow: null,
   }[stage] ?? stage;
   const fulfilledInvalid = new Set([
     "moduleShape", "agentShape", "chromeShape", "documentationInvalid",
@@ -773,7 +852,7 @@ const expectedAttachmentFailure = (stage) => {
   for (const [attempted, fulfilled, failureStage] of attachmentCounterPairs) {
     if (stopped) continue;
     expected[attempted] = 1;
-    const stopsHere = stage === "accountUrl"
+    const stopsHere = ["accountUrl", "accountUrlThrow"].includes(stage)
       ? attempted === "urlAttempted"
       : failureStage === operation;
     if (stopsHere) {
@@ -803,12 +882,27 @@ assert.deepEqual(
   listingFailureCounters,
 );
 assert.deepEqual(select(listingRejected.output, readinessCounterKeys), zeroReadiness);
+for (const [name, listing] of rejectedListings) {
+  const rejected = await run({ listingValue: listing });
+  assert.equal(rejected.caught, null, name);
+  assert.equal(rejected.fixture.claimCalls, 0, name);
+  assert.equal(rejected.output.consumed, true, name);
+  assert.equal(rejected.output.bindingEligible, false, name);
+  assert.equal(rejected.output.failureCleanupComplete, true, name);
+  assert.deepEqual(
+    select(rejected.output.attachment, attachmentCounterKeys),
+    listingFailureCounters,
+    name,
+  );
+  assert.deepEqual(select(rejected.output, readinessCounterKeys), zeroReadiness, name);
+}
 
 for (const stage of [
   "import", "moduleShape", "setup", "agentShape", "connect", "chromeShape",
   "documentation", "documentationInvalid", "sessionName", "enumeration",
   "listingShape", "claim", "controllerShape", "tabShape",
-  "accountNavigation", "accountWait", "accountUrl", "accountSignature",
+  "accountNavigation", "accountWait", "accountUrl", "accountUrlThrow",
+  "accountSignature",
 ]) {
   const failed = await run({ failStage: stage });
   assert.equal(failed.caught, null, stage);
@@ -816,6 +910,7 @@ for (const stage of [
   assert.equal(failed.output.attachment.errorClass, "Error", stage);
   assert.equal(failed.output.failureCleanupComplete, true, stage);
   assert.equal(failed.output.bindingEligible, false, stage);
+  assert.equal(failed.output.consumed, true, stage);
   assert.deepEqual(
     select(failed.output.attachment, attachmentCounterKeys),
     expectedAttachmentFailure(stage),
@@ -838,6 +933,10 @@ const expectedReadinessFailure = (stage) => {
   }
   expected.navigationFulfilled = 1;
   expected.urlAttempted = 1;
+  if (stage === "tokenUrlThrow") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
   expected.urlFulfilled = 1;
   if ([
     "tokenUrl", "tokenSignature", "regionBinding", "controlledRoot",
@@ -904,7 +1003,7 @@ const expectedReadinessFailure = (stage) => {
   return expected;
 };
 for (const stage of [
-  "tokenNavigation", "tokenUrl", "tokenSignature", "regionBinding",
+  "tokenNavigation", "tokenUrl", "tokenUrlThrow", "tokenSignature", "regionBinding",
   "controlledRoot", "paginatorShape", "readinessWait",
   "initialFilterInvalid", "baselineInvalid", "tokenFill", "queryEchoWait",
   "queryEchoCount", "emptyStatusWait", "emptyStatusCount",
@@ -917,6 +1016,7 @@ for (const stage of [
   assert.equal(failed.output.errorClass, "Error", stage);
   assert.equal(failed.output.failureCleanupComplete, true, stage);
   assert.equal(failed.output.bindingEligible, false, stage);
+  assert.equal(failed.output.consumed, true, stage);
   assert.deepEqual(
     select(failed.output, readinessCounterKeys),
     expectedReadinessFailure(stage),
@@ -999,6 +1099,13 @@ assert.deepEqual(
 assert.equal(finalOutputFailure.fixture.observed.consumed, true);
 assert.equal(finalOutputFailure.fixture.observed.tabNull, true);
 assert.equal(finalOutputFailure.fixture.observed.eligible, false);
+assert.equal(finalOutputFailure.fixture.observed.state, "V43_FINAL_OUTPUT_FAILED_STOP");
+assert.equal(finalOutputFailure.fixture.observed.attachmentTabNull, true);
+assert.equal(finalOutputFailure.fixture.observed.attachmentEligible, false);
+assert.equal(
+  finalOutputFailure.fixture.observed.attachmentState,
+  "V43Attachment_DOWNSTREAM_OUTPUT_FAILURE_DETACHED",
+);
 assert.equal(finalOutputFailure.fixture.observed.chromeNull, true);
 assert.equal(finalOutputFailure.fixture.observed.agentNull, true);
 assert.equal(finalOutputFailure.fixture.observed.setupNull, true);

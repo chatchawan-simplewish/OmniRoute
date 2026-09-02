@@ -9,6 +9,8 @@ Date: `2026-09-02` (`Asia/Bangkok`)
 V41 was consumed once and passed, but its retained CUA lexical binding is no
 longer present. V41 must not be retried or reinterpreted. V42 remains
 unexecuted and cannot satisfy its exact same-realm predecessor precondition.
+V42 is therefore superseded and static: it must never be executed,
+reinterpreted, or used as fallback, including if V43 fails.
 
 V43 is the smallest replacement: one newly reviewed, fresh-realm, one-shot
 gate that composes V41's reviewed attachment semantics with V42's reviewed
@@ -20,15 +22,22 @@ authorized by this design brief.
 
 The single V43 cell must:
 
-1. declare every V43 binding once and mark V43 consumed before import, setup,
-   enumeration, claim, navigation, or page work;
+1. declare every V43 binding once, prove its exact declared null/false/
+   uncreated defaults, and mark V43 consumed before evaluating the remainder of
+   the declaration-shape precondition or performing import, setup, enumeration,
+   claim, navigation, or page work; the remainder must prove the relevant
+   V35-V42 consumption, owned-tab, eligibility, state, setup, agent, and Chrome
+   sentinels are `undefined` in the new realm;
 2. import the pinned Computer Use runtime once, call setup once with no
    options, acquire Chrome once, read the complete API documentation once and
    write it once, set the exact reviewed session name once, and call
    `openTabs` once;
 3. preserve V41's complete cross-realm array, descriptor, no-symbol, rank-zero
    record, bounded-string, exact HTTPS `dash.cloudflare.com`, and later-record
-   noninspection contract;
+   noninspection contract; rank-zero selection is justified only by the pinned
+   documented last-opened/focused ordering and a fresh external owner
+   confirmation that the intended Cloudflare task tab is selected and no other
+   Chrome profile/window competes at action time;
 4. claim only the rank-zero tab once, prove exact controller identity, perform
    exactly one account-home navigation and one account-home URL/signature read
    with exact account-home path, exactly one `mysw.me` zone anchor, positive
@@ -50,7 +59,14 @@ The single V43 cell must:
 
 The cell must have exact operation counters and an explicit complete counter
 vector for success and every fixed failure stage. The unbound catch may emit
-only literal `Error`. Terminal-output failure must repeat complete cleanup.
+only literal `Error`. Terminal-output failure must repeat complete cleanup,
+rethrow without inspecting or logging the thrown value, and make no second
+write.
+
+The exact fixed-schema output may contain only bounded booleans, exact operation
+counters, fixed state/result/error literals, and approved bounded counts. It
+must never contain an offered listing, record metadata, tab ID, raw URL,
+account segment, DOM-derived text, credential, secret, or thrown value.
 
 ## Pure fixture requirements
 
@@ -58,12 +74,18 @@ The inert fixture must extract the sole LF-normalized V43 executable and prove:
 
 - syntax and exact brief/executable bytes and SHA-256;
 - complete success state, exact counter vector, sole retained V43 tab binding,
-  and absence of broad runtime/controller residue;
+  absence of broad runtime/controller residue, and the exact output key set;
 - rejection before claim for malformed array/descriptor/symbol/rank-zero
   inputs, including proof that later offered-record values are never read;
+- rejection before import/action for contaminated V35-V42 predecessor
+  declarations and nonfresh V43 defaults, with exact partial counters and full
+  cleanup;
 - bounded cleanup and complete counter vectors for import, setup,
   documentation, enumeration, claim, account-home navigation/signature,
   token-page navigation/signature/filter, and terminal-output failures; and
+- both a thrown plain data-name token and a thrown object whose `name` getter
+  throws, proving fixed output, absence of the token, zero getter calls, exact
+  counters, consumed/ineligible state, full cleanup, and exact output keys; and
 - zero real browser, provider, clipboard, credential, DNS, routing, VM,
   listener, proxy, owner, or network action.
 
@@ -79,6 +101,17 @@ The stable projection remains `10661` records / SHA-256
 The exact 12-path product baseline, clean evidence worktree, zero residue,
 absent public DNS, VM1205 safe checkpoint, archived prior owner, and sole-owner
 constraints remain mandatory action-time pins.
+
+The action-time realm must be newly reset and declaration-free for every named
+V35-V43 sentinel before the single send. Immediately before the single
+`openTabs` call, the owner must freshly and externally confirm exactly:
+
+`Chrome Profile Codex-Chrome-Bell-PC2, intended window, and intended Cloudflare task tab are selected; no other Chrome profile/window is offered to the extension.`
+
+That confirmation cannot be inferred, automated, delegated, or satisfied by a
+design/review artifact. Any selection, ordering, declaration, or realm drift or
+uncertainty stops V43 consumed before claim, without listing fallback,
+selected-tab fallback, get fallback, new-tab, reconnect, or manual fallback.
 
 No secret may be printed, committed, logged, or placed in evidence. The final
 Create/native Copy/native masked Paste confirmation and the later separate

@@ -40,14 +40,15 @@ Every offered record is validated before selection:
 - non-null ordinary plain record with bounded prototype depth and no symbols;
 - own keys limited to `id`, `lastOpened`, `providerTabId`, `tabGroup`, `title`,
   and `url`;
-- `id` and `url` must both be present enumerable data properties;
+- `id` must be a present enumerable data property; `url` remains optional and,
+  when absent, makes that record a nonmatch;
 - every present documented value must be a bounded, non-empty, control-free
-  string; present `undefined`, accessors, unknown keys, and malformed URLs fail
-  before claim;
-- each URL must use `https`, have no username, password, or explicit port, and
-  parse successfully; nonmatching safe URLs may belong to unrelated tabs;
-- exactly one record must have hostname `dash.cloudflare.com`, pathname
-  `/profile/api-tokens`, no query, and no fragment.
+  string; present `undefined`, accessors, and unknown keys fail before claim;
+- each present URL is used only as its already validated safe string; unrelated
+  `http:`, internal-scheme, ported, or otherwise nonmatching safe values are
+  permitted and are not parsed or subjected to target-origin predicates;
+- exactly one record must have URL string equality with
+  `https://dash.cloudflare.com/profile/api-tokens`.
 
 Zero or multiple exact matches fail closed. Only that exact returned record is
 claimed, exactly once. No tab id is guessed, reconstructed, or emitted.
@@ -119,9 +120,10 @@ query. V50 can never be retried, continued, reused, reinterpreted, or relaxed.
 Before live execution, all of the following must pass:
 
 - smallest executable and pure fixture derived mechanically from final V49;
-- syntax and fixtures covering zero, one, and multiple exact URL matches,
-  unrelated safe tabs, hostile records, optional-key rejection, counter
-  completeness, privacy, PASS retention, and one-proof-only cleanup;
+- syntax and fixtures covering zero, one, and multiple exact URL matches;
+  unrelated safe tabs with absent URL, `http:`, internal-scheme, and explicit-
+  port URL values; hostile records; optional-key rejection; counter
+  completeness; privacy; PASS retention; and one-proof-only cleanup;
 - direct-byte review package and independent `gpt-5.6-sol` High review with
   zero unresolved Critical, HIGH, IMPORTANT, or Minor findings;
 - later non-self-referential execution classification and separate coordinator

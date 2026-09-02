@@ -24,10 +24,12 @@ V29 opens one fresh owned tab through the persistent V5 controller, restores
 the exact settled account-home signature, and takes a fixed-key pre-snapshot.
 It may press `Enter` only if the Domains button is still unique, visible,
 enabled, non-inert, hit-testable, not already expanded, and its controlled
-target exists but is not visible. It then performs one asynchronous read-only
-poll that returns only fixed booleans and bounded integers describing route,
-expansion, controlled-panel visibility, and anchor counts. It closes the exact
-created tab on every reachable path.
+target exists but is not visible. Both the fixed-key body snapshot and a
+separate read-only evaluation of the exact counted press locator must prove
+`button.form === null`, excluding browser-default form submission. It then
+performs one asynchronous read-only poll that returns only fixed booleans and
+bounded integers describing route, expansion, controlled-panel visibility,
+and anchor counts. It closes the exact created tab on every reachable path.
 
 V29 emits no tag, role, ID, `aria-controls` value, href, URL, path, account or
 zone identifier, text, DOM, HTML, screenshot, provider response, credential,
@@ -60,6 +62,7 @@ await (async () => {
     settledUrlAttempted: 0, settledUrlFulfilled: 0,
     preSnapshotAttempted: 0, preSnapshotFulfilled: 0,
     locatorCountAttempted: 0, locatorCountFulfilled: 0,
+    targetSafetyAttempted: 0, targetSafetyFulfilled: 0,
     pressAttempted: 0, pressFulfilled: 0,
     postSnapshotAttempted: 0, postSnapshotFulfilled: 0,
     closeAttempted: 0, closeFulfilled: 0,
@@ -85,7 +88,7 @@ await (async () => {
   const preBooleanKeys = [
     "hostExact", "accountHomePath", "uniqueButton", "visibleButton",
     "tagButton", "hrefAbsent", "nativeClickAbsent", "enabled",
-    "nonInert", "rectPositive", "withinViewport",
+    "nonInert", "formAbsent", "rectPositive", "withinViewport",
     "centerHitSelfOrDescendant", "pointerEventsEnabled", "controlsPresent",
     "controlsTargetPresent", "controlsTargetVisible", "expandedTrue",
     "tabStopPresent",
@@ -124,6 +127,7 @@ await (async () => {
   let tabShape = false;
   let preSnapshotValidated = false;
   let preShapeExact = false;
+  let pressTargetSafe = false;
   let postSnapshotValidated = false;
   let postSnapshotComplete = false;
   let preSnapshot = null;
@@ -273,6 +277,7 @@ await (async () => {
           nativeClickAbsent: typeof button?.click !== "function",
           enabled: button !== null && !disabled,
           nonInert: button !== null && !button.hasAttribute("inert"),
+          formAbsent: button !== null && "form" in button && button.form === null,
           rectPositive,
           withinViewport,
           centerHitSelfOrDescendant:
@@ -313,6 +318,7 @@ await (async () => {
       preSnapshot.nativeClickAbsent === true &&
       preSnapshot.enabled === true &&
       preSnapshot.nonInert === true &&
+      preSnapshot.formAbsent === true &&
       preSnapshot.rectPositive === true &&
       preSnapshot.withinViewport === true &&
       preSnapshot.centerHitSelfOrDescendant === true &&
@@ -340,6 +346,14 @@ await (async () => {
     counters.locatorCountFulfilled++;
     if (domainsButtonCount !== 1) {
       throw new Error("DomainsExpansionLocatorCountError");
+    }
+    counters.targetSafetyAttempted++;
+    pressTargetSafe = await domainsButton.evaluate((button) =>
+      button.tagName === "BUTTON" && "form" in button && button.form === null,
+    );
+    counters.targetSafetyFulfilled++;
+    if (pressTargetSafe !== true) {
+      throw new Error("DomainsExpansionSubmitSafetyError");
     }
     counters.pressAttempted++;
     await domainsButton.press("Enter", { timeoutMs: 5000 });
@@ -511,6 +525,7 @@ await (async () => {
     tabShape,
     preSnapshotValidated,
     preShapeExact,
+    pressTargetSafe,
     postSnapshotValidated,
     postSnapshotComplete,
     preSnapshot,

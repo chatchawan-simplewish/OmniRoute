@@ -1,125 +1,53 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-01T17:27:32+07:00",
+  "timestamp": "2026-09-03T02:36:08+07:00",
   "phase": "omniroute-secure-console-transfer",
   "phase_name": "OmniRoute secure console transfer and standard team API continuation",
   "phase_dir": ".superpowers/sdd/2026-08-30-omniroute-standard-team-api",
   "plan": 1,
-  "task": 4,
+  "task": 5,
   "total_tasks": 8,
-  "status": "paused_at_reviewed_new_session_boundary",
+  "status": "paused_for_85_percent_context_rollover_after_v50_design_pass",
   "completed_tasks": [
-    {
-      "id": 1,
-      "name": "Commit and classify the reviewed V3 token-page readiness replacement",
-      "status": "done",
-      "commit": "5b221c05d3181a23eb754e3a99aebd1954686f80"
-    },
-    {
-      "id": 2,
-      "name": "Consume V3 once, stop on exact title precondition failure, and record the fail-closed incident",
-      "status": "done_fail_closed",
-      "commit": "172da50d2b841398c6e4c1d55942e3f6a75d38eb"
-    },
-    {
-      "id": 3,
-      "name": "Create and independently review the title-independent V4 semantic replacement",
-      "status": "done_static_pass",
-      "commit": "82971f2d7165325b616dab293e275cb7287d1914 brief; 7e2bf2341d88113536507298b3df8f1f25e8f417 Sol High PASS review"
-    }
+    {"id": 1, "name": "Consume V3 once and record its fail-closed title-precondition failure", "status": "done_fail_closed", "commit": "172da50d2b841398c6e4c1d55942e3f6a75d38eb"},
+    {"id": 2, "name": "Create and statically review the title-independent V4 semantic replacement", "status": "done_static_only", "commit": "82971f2d7165325b616dab293e275cb7287d1914 brief; 7e2bf2341d88113536507298b3df8f1f25e8f417 Sol High PASS"},
+    {"id": 3, "name": "Close V35-V48 replacement and diagnostic gates without provider mutation", "status": "done_spent_or_static", "commit": "V48 live result c8f0adab7; earlier gate evidence retained in phase artifacts"},
+    {"id": 4, "name": "Build, review, classify, and consume V49 fresh-realm readiness", "status": "done_fail_closed", "commit": "classification 1d4481262; live result d1c70a8a0"},
+    {"id": 5, "name": "Design and independently review V50 unique-URL reacquisition", "status": "done_design_pass", "commit": "design fix 22ed4ee1c; Sol High PASS be4271027"}
   ],
   "remaining_tasks": [
-    {
-      "id": 4,
-      "name": "Replace V4 retained-session adoption with a fresh-session Chrome/Profile reacquisition contract and independent Sol High review",
-      "status": "not_started"
-    },
-    {
-      "id": 5,
-      "name": "Create a non-self-referential execution classification and post-commit coordinator tuple for the fresh-session contract",
-      "status": "not_started"
-    },
-    {
-      "id": 6,
-      "name": "After Prox-01 and VM1205 are available, revalidate every local/VM/DNS/provider pin and consume the new browser/prestart gate once",
-      "status": "not_started"
-    },
-    {
-      "id": 7,
-      "name": "Prepare the reviewed Cloudflare form, then stop for mandatory final Create/native Copy/native masked Paste confirmation and later separate exact-row deletion confirmation",
-      "status": "not_started"
-    },
-    {
-      "id": 8,
-      "name": "Complete redacted evidence, cleanup, revocation proof, and remaining standard-team API work through final Sol High audit",
-      "status": "not_started"
-    }
+    {"id": 6, "name": "Implement V50 executable and pure fixtures, then obtain independent Sol High implementation PASS", "status": "not_started"},
+    {"id": 7, "name": "Create non-self-referential V50 execution classification and post-commit coordinator tuple, then revalidate all action-time pins", "status": "not_started"},
+    {"id": 8, "name": "Consume V50 once and, only after PASS, continue the separately reviewed secure-console creation, native secret transfer, service verification, and exact-row revocation sequence", "status": "not_started"}
   ],
   "blockers": [
-    {
-      "description": "V3 is consumed and failed. Its V3 binding is null/ineligible with state V3_ADOPTION_OR_READINESS_FAILED, and its invoked pre-Create disposition is also spent.",
-      "type": "technical",
-      "workaround": "Never retry, continue, or reinterpret V3. Use only a new independently reviewed contract."
-    },
-    {
-      "description": "The V4 brief and static review are PASS, but V4 requires retained same-task Node declarations that a new Codex task will not inherit.",
-      "type": "technical",
-      "workaround": "Before any browser use in the new task, create and independently review a fresh-session Chrome Profile Codex-Chrome-Bell-PC2 reacquisition contract. Do not execute V4 directly."
-    },
-    {
-      "description": "Prox-01 may be powered off during the pause, so VM1205 and live VM checks may be unavailable.",
-      "type": "human_action",
-      "workaround": "Offline handoff and contract work may continue. Power on Prox-01 and confirm VM1205 readiness before any live action-time VM/browser/provider gate."
-    }
+    {"type": "technical", "description": "V3, V35-V42, V44, and V46-V49 are consumed or permanently ineligible; V43 is static and permanently ineligible; V4 is static evidence only.", "workaround": "Never retry, continue, reuse, reinterpret, or relax any prior gate. Continue only through a new fully reviewed V50 contract."},
+    {"type": "review", "description": "V50 design is PASS, but no V50 executable, fixture, implementation review, classification, or coordinator tuple exists yet.", "workaround": "Implement from exact design commit 22ed4ee1c, obtain independent Sol High zero-finding PASS, then classify non-self-referentially and prove the coordinator tuple before any live send."},
+    {"type": "ownership", "description": "This task stops unarchived at the 85 percent context boundary and must not resume modifying work or consume a gate after transfer.", "workaround": "The newly created continuation task receives explicit worktree and authority-gate ownership through this handoff and the project session-continuity rule."}
   ],
   "human_actions_pending": [
-    {
-      "action": "Power on Prox-01 before the resumed task reaches live action-time VM1205 validation.",
-      "context": "No process started in this run depends on Prox-01, so it is safe to power off tonight. It must be available before live VM-dependent execution.",
-      "blocking": false
-    },
-    {
-      "action": "Later provide the mandatory combined final Create/native Copy/native masked Paste confirmation.",
-      "context": "Standing unattended authority does not bypass this explicitly retained external browser/secret-transfer confirmation.",
-      "blocking": true
-    },
-    {
-      "action": "Later provide a separate confirmation for exact Cloudflare token-row deletion.",
-      "context": "Revocation remains a distinct mandatory action-time checkpoint.",
-      "blocking": true
-    }
+    {"action": "Later provide the mandatory combined final Create/native Copy/native masked Paste confirmation.", "context": "Browser safety and the reviewed secret-transfer contract require action-time confirmation even under standing unattended authority.", "blocking": true},
+    {"action": "Later provide a separate confirmation for exact Cloudflare token-row deletion.", "context": "Revocation is a distinct destructive action-time checkpoint.", "blocking": true}
   ],
   "decisions": [
-    {
-      "decision": "Do not use Cloudflare page-title text as the token-page identity gate.",
-      "rationale": "The exact reviewed V3 navigation succeeded but Cloudflare title drift caused a fail-closed precondition failure before any readiness or filter action. V4 instead binds exact navigation to unique token-search, aria-controls result-region, Create-control, paginator, total, rows, no-busy, and query-echo semantics.",
-      "phase": "omniroute-secure-console-transfer"
-    },
-    {
-      "decision": "Do not execute the statically PASS V4 contract in a new task.",
-      "rationale": "V4 deliberately depends on retained same-task Node bindings. A new task must first replace only that adoption boundary with a reviewed fresh-session profile contract.",
-      "phase": "omniroute-secure-console-transfer"
-    },
-    {
-      "decision": "Pause before execution classification.",
-      "rationale": "This leaves a clean reviewed design boundary with no reusable live authority and no background process to clean up before Prox-01 shutdown.",
-      "phase": "omniroute-secure-console-transfer"
-    }
+    {"decision": "Allow concurrent Codex work in different tabs of the same Chrome profile when provider objects and authority lanes are disjoint.", "rationale": "Sole gate ownership protects the exact tab and token object; it does not require sole use of the browser profile.", "phase": "omniroute-secure-console-transfer"},
+    {"decision": "Replace V49's rank-zero listing assumption with exactly one literal API Tokens URL match.", "rationale": "Tab recency is unstable in the allowed shared-profile topology. V50 validates every record safely, permits unrelated safe URLs or absent optional URLs as nonmatches, and claims only one exact returned target record.", "phase": "omniroute-secure-console-transfer"},
+    {"decision": "Escalate recommendation approval only for a super-critical action that is also materially different from the reviewed plan and materially more expensive than the initial plan.", "rationale": "All routine safest recommendations remain pre-approved, while mandatory external confirmations and higher-priority safety boundaries remain binding.", "phase": "omniroute-secure-console-transfer"}
   ],
   "uncommitted_files": [
     "open-sse/services/codexQuotaFetcher.ts",
+    "src/app/api/v1/models/catalog.ts",
+    "src/lib/localDb.ts",
+    "tests/unit/api/models-agent-route-aliases.test.ts",
+    "tests/unit/services/agent-route.test.ts",
     "open-sse/services/agentRoute.ts",
     "open-sse/services/agentRouteObjectives.ts",
-    "src/app/api/v1/agent-routes/",
-    "src/app/api/v1/models/catalog.ts",
+    "src/app/api/v1/agent-routes/events/route.ts",
     "src/lib/db/agentRouteRuns.ts",
     "src/lib/db/migrations/134_agent_route_runs.sql",
-    "src/lib/localDb.ts",
     "tests/unit/api/agent-route-events.test.ts",
-    "tests/unit/api/models-agent-route-aliases.test.ts",
-    "tests/unit/db/agent-route-runs.test.ts",
-    "tests/unit/services/agent-route.test.ts"
+    "tests/unit/db/agent-route-runs.test.ts"
   ],
-  "next_action": "In a new Codex task, read project-root AGENTS.md, .planning/HANDOFF.json, the V3 title incident, the V4 brief, and the V4 PASS review. Acknowledge every blocking constraint. Do not inspect Chrome or execute V4. First author and independently review a minimal fresh-session replacement that may attach only to Chrome Profile Codex-Chrome-Bell-PC2 and reacquire exactly one intended task tab without broad tab listing, retry, fallback, or provider mutation.",
-  "context_notes": "Safe pause at branch codex/omniroute-agent-routing HEAD 7e2bf2341d88113536507298b3df8f1f25e8f417. V4 brief commit 82971f2d7165325b616dab293e275cb7287d1914 is 54334 bytes SHA-256 89E52D8157677821FC44E84CFCABFC4AEB01A1F9CF23D0DDBCD31E56085B8EE8. V4 Sol High PASS review commit 7e2bf2341d88113536507298b3df8f1f25e8f417 is 7813 bytes SHA-256 547449928E647AE5E229A4ECAEEF4BFD9473410F494BE1B88E0197F9FD7ACADB, with authorizes_live_execution=false. Expected V4 source projection is A792CFD81D9ED03C341EAD7AC3A631435308FE59A7B286DE7308E14C13E74B57 over 10661 records, index 0, baseline 12. Current Chrome was logged in; V3 performed one navigation only, then failed before readiness/fill/read. No Cloudflare provider change, clipboard access, credential creation, proxy, listener, owner process, VM mutation, DNS change, or routing action occurred. No background server/watcher/process was started. Prox-01 is safe to power off."
+  "next_action": "In the continuation task, read project-root AGENTS.md and then .planning/.continue-here.md in its Required Reading order. Verify HEAD and the exact 12-path dirty baseline. Implement the smallest V50 executable and pure fixture from design commit 22ed4ee1c and Sol High PASS review commit be4271027. Do not initialize CUA, inspect Chrome, claim a tab, or perform any provider action until the committed implementation independently passes Sol High review, receives a later non-self-referential classification, and passes a separate post-commit coordinator tuple.",
+  "context_notes": "Safe rollover handoff parent is be427102721e31d86a95d2a0309e46bea3dbb71a; the handoff commit directly follows it and changes only .planning/HANDOFF.json and .planning/.continue-here.md. V49 classification 1d4481262481c039272ee90e4f97fc7beaae6011 was consumed once and failed before claim because the listing did not satisfy its rank-zero trusted-listing contract; exact cause remains NOT PROVEN. V49 cleanup proof passed once and the CUA realm was reset. No token, secret, provider change, claim, navigation, proxy, listener, owner process, VM mutation, DNS change, or routing change occurred. V50 initial design 658ca8380 received one IMPORTANT finding at review 724581118; corrected design 22ed4ee1c closed it and independent Sol High PASS is be4271027 with Critical/HIGH/IMPORTANT/Minor all zero, implementation_may_proceed=true, authorizes_live_execution=false. Prox-01 and VM1205 were confirmed online. Last action-time safe checkpoint before V49 passed: evidence worktree clean at 80adaa7d5d63d1d2c7bfa63b236c6bee93b3b1d8; public A/CNAME absent; local residue zero; VM1205 omniroute and bell-cloudflare-proxy running, team-api-proxy and omniroute-team-tunnel absent, port 20130 absent, retained file SHA a31c2010bb47767e25a826cebcd2469cb51d8af5c5ae089e46d2051edd69d9bb. Revalidate these later; do not treat them as current. Root AGENTS.md contains standing unattended authority, concurrent-tab, tree-progress, 85-percent rollover/no-archive, and escalation-threshold rules."
 }

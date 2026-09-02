@@ -15,10 +15,10 @@ intended task tab are selected, with no other Chrome profile/window offered to
 the extension. Current browser documentation states that `openTabs()` returns
 top-level user tabs ordered by `lastOpened` descending.
 
-V36 therefore validates the complete returned array privately, requires the
-documented rank-zero record to be a current Cloudflare Dashboard tab, and
-claims exactly that original record. It does not require the selected window to
-contain only one tab and emits no tab metadata.
+V36 therefore validates the complete returned array structurally and privately,
+requires the documented rank-zero record to be a current Cloudflare Dashboard
+tab, and claims only its once-cached primitive ID. It does not require the
+selected window to contain only one tab and emits no tab metadata.
 
 ## Consumed predecessor boundary
 
@@ -65,18 +65,23 @@ URL read, and body snapshot. There is no retry, fallback, loop over candidates,
 selected-tab fallback, second enumeration, second claim, new tab, tab close,
 manual integration, alternate browser, or alternate profile/window.
 
-The returned list is rejected unless it is a bounded nonempty array and every
-entry is an exact stable plain record: no symbols, no accessors, all own fields
-enumerable data descriptors, only the current allowed names, mandatory nonempty
-bounded control-free ID, and every present value a nonempty bounded control-free
-string. The projector reads and caches each ID descriptor once. The rank-zero
-record is the only candidate because the API contract orders records by most
-recent open/focus and the owner has externally selected the intended task tab.
-Its private URL must parse as HTTPS `dash.cloudflare.com`, with no port,
-username, or password. Neither the record nor any field value is emitted.
+The returned list is rejected unless it is a bounded nonempty ordinary array
+with no own symbols, no unexpected own names, one standard data `length`
+descriptor, and exactly one enumerable data descriptor for every numeric index
+`0..length-1`. Projection never invokes the array iterator or reads an indexed
+property. Every descriptor-cached entry must be an exact stable plain record:
+no symbols, no accessors, all own fields enumerable data descriptors, only the
+current allowed names, mandatory nonempty bounded control-free ID, and every
+present value a nonempty bounded control-free string. The projector reads and
+caches each field descriptor once. The rank-zero record is the only candidate
+because the API contract orders records by most recent open/focus and the owner
+has externally selected the intended task tab. Its private URL must parse as
+HTTPS `dash.cloudflare.com`, with no port, username, or password. Neither the
+record nor any field value is emitted.
 
-The exact original rank-zero record is passed once to `claimTab()`. The claimed
-tab's ID must equal the privately cached ID. V36 then navigates the claimed tab
+Only the cached primitive ID from the exact rank-zero descriptor projection is
+passed once to `claimTab()`. No untrusted record is retained or re-read. The
+claimed tab's ID must equal the privately cached ID. V36 then navigates it
 to `https://dash.cloudflare.com/`, waits once for 20000 ms, and requires the
 same account-home signature used by the reviewed predecessors:
 
@@ -159,14 +164,32 @@ await (async () => {
       (prototype !== null && Object.getPrototypeOf(prototype) === null);
   };
   const trustedListing = (value) => {
-    if (!Array.isArray(value) || value.length < 1 || value.length > 1000) {
-      return null;
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype ||
+        Object.getOwnPropertySymbols(value).length !== 0) return null;
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+    if (!lengthDescriptor || !("value" in lengthDescriptor) ||
+        lengthDescriptor.enumerable !== false ||
+        !Number.isSafeInteger(lengthDescriptor.value) ||
+        lengthDescriptor.value < 1 || lengthDescriptor.value > 1000) return null;
+    const length = lengthDescriptor.value;
+    const arrayNames = Object.getOwnPropertyNames(value);
+    if (arrayNames.length !== length + 1 ||
+        !arrayNames.includes("length")) return null;
+    const expectedNames = new Set(["length"]);
+    for (let index = 0; index < length; index++) {
+      expectedNames.add(String(index));
     }
+    if (arrayNames.some((name) => !expectedNames.has(name))) return null;
     const allowed = new Set([
       "id", "lastOpened", "providerTabId", "tabGroup", "title", "url",
     ]);
     const projected = [];
-    for (const item of value) {
+    for (let index = 0; index < length; index++) {
+      const indexDescriptor =
+        Object.getOwnPropertyDescriptor(value, String(index));
+      if (!indexDescriptor || !("value" in indexDescriptor) ||
+          indexDescriptor.enumerable !== true) return null;
+      const item = indexDescriptor.value;
       if (!plainRecord(item) ||
           Object.getOwnPropertySymbols(item).length !== 0) return null;
       const keys = Object.getOwnPropertyNames(item);
@@ -188,8 +211,9 @@ await (async () => {
         if (key === "url") validatedUrl = descriptor.value;
       }
       if (validatedId === null) return null;
-      projected.push({ record: item, id: validatedId, url: validatedUrl });
+      projected.push({ id: validatedId, url: validatedUrl });
     }
+    if (projected.length !== length) return null;
     const first = projected[0];
     if (first.url === null) return null;
     let parsed = null;
@@ -203,9 +227,8 @@ await (async () => {
       parsed.hostname === "dash.cloudflare.com" &&
       parsed.port === "" && parsed.username === "" && parsed.password === "";
     return urlCloudflare ? {
-      record: first.record,
       id: first.id,
-      count: value.length,
+      count: length,
       urlCloudflare,
     } : null;
   };
@@ -304,7 +327,7 @@ await (async () => {
     if (!listingValidated) throw new Error("OrderedTabListingShapeError");
 
     counters.claimAttempted++;
-    adopted = await secureConsoleChromeV36.user.claimTab(candidate.record);
+    adopted = await secureConsoleChromeV36.user.claimTab(candidate.id);
     counters.claimFulfilled++;
     controllerOwnership = typeof adopted === "object" && adopted !== null &&
       typeof adopted.id === "string" && adopted.id === candidate.id &&
@@ -458,9 +481,13 @@ await (async () => {
   unexpected fields, empty/oversize/control-bearing values, empty or oversized
   arrays, missing rank-zero URL, non-Cloudflare rank-zero URL, and claimed-ID
   mismatch.
-- A multi-record fixture must prove the exact original rank-zero object is the
-  sole object passed to a one-call claim stub; no later record is inspected for
-  selection and no field value appears in output.
+- A multi-record fixture must prove structural rank-zero projection without
+  iterator invocation and that only the cached primitive ID reaches a one-call
+  claim stub; no later record is used for selection and no field value appears
+  in output. An own iterator that redirects to another record must be rejected.
+- A Proxy record whose descriptor result and property-get value disagree must
+  prove there is no untrusted candidate read after projection and only the
+  cached descriptor ID reaches the claim stub.
 - Snapshot fixtures must prove exact PASS and rejection of class instances,
   missing/extra fields, non-safe counts, wrong host/path/zone count, zero
   anchors, and busy state.
@@ -471,16 +498,27 @@ await (async () => {
 
 ## Action-time pins after independent PASS
 
+The first independent review is static FAIL evidence at commit
+`36460bd2f7ead55d945a8b86b3d81d88b718f1fe`. This correction addresses both
+IMPORTANT findings without any live action:
+
+- `V36-001`: the array is now projected only from a cached standard length
+  descriptor and exact own numeric data descriptors; own symbols, custom
+  iterators, holes, accessors, subclasses, and unexpected names are rejected;
+- `V36-002`: the projector retains no record object and `claimTab()` receives
+  only the once-cached validated primitive ID. A disagreeing Proxy fixture
+  proves zero untrusted property reads after projection.
+
 Coordinator offline evidence before review:
 
 - executable cells: `1`;
-- normalized UTF-8 cell bytes: `13929`;
+- normalized UTF-8 cell bytes: `15005`;
 - cell SHA-256:
-  `035DA9B16658C3A8F1CCDCDADE735E53DE3271B9CC065D130CB2C1F214E1050D`;
+  `DC954CEB50C79777E424C18BE2586DB86A6288F71350CBBB6ED134E9B2A78422`;
 - `node.exe --check` of an async-function wrapper: `PASS`;
 - pure exact-record, null-prototype, rejection, rank-zero object identity,
   one-call claim stub, snapshot projector, and negative semantic fixtures:
-  `V36_PURE_FIXTURES_PASS`.
+  `V36_FIX1_PURE_FIXTURES_PASS`.
 
 Live execution remains forbidden until an independent Sol High review returns
 PASS with zero Critical/HIGH/IMPORTANT/Minor findings, the PASS review is

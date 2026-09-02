@@ -3,7 +3,6 @@
 Date: `2026-09-02` (`Asia/Bangkok`)
 
 `authorizes_live_execution=false`
-
 ## Purpose
 
 Replace consumed V39 with the smallest fresh-session one-shot using the already
@@ -466,4 +465,3 @@ confirmation and later separate exact-row deletion confirmation remain external
 and cannot be pre-approved, automated, delegated, or waived.
 
 `authorizes_live_execution=false`
-

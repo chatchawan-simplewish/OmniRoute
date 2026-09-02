@@ -154,7 +154,7 @@ await (async () => {
       throw new Error("FreshChromeDocumentationShapeError");
     }
     counters.documentationWriteAttempted++;
-    nodeRepl.write(documentation);
+    await nodeRepl.write(documentation);
     counters.documentationWriteFulfilled++;
 
     secureConsoleV34AttachmentExact =
@@ -187,20 +187,30 @@ await (async () => {
     secureConsoleSetupBrowserRuntimeV34 = null;
   }
   counters.writeAttempted++;
-  nodeRepl.write({
-    result,
-    declarationShape,
-    moduleShape,
-    agentShape,
-    connectedShape,
-    documentationValidated,
-    documentationLength,
-    consumed: secureConsoleV34AttachmentConsumed,
-    attachmentExact: secureConsoleV34AttachmentExact,
-    state: secureConsoleV34AttachmentState,
-    ...counters,
-    errorClass,
-  });
+  try {
+    await nodeRepl.write({
+      result,
+      declarationShape,
+      moduleShape,
+      agentShape,
+      connectedShape,
+      documentationValidated,
+      documentationLength,
+      consumed: secureConsoleV34AttachmentConsumed,
+      attachmentExact: secureConsoleV34AttachmentExact,
+      state: secureConsoleV34AttachmentState,
+      ...counters,
+      errorClass,
+    });
+  } catch (terminalError) {
+    secureConsoleV34AttachmentExact = false;
+    secureConsoleV34AttachmentState =
+      "V34_ATTACHMENT_FINAL_OUTPUT_FAILED_STOP";
+    secureConsoleChromeV34 = null;
+    secureConsoleAgentV34 = null;
+    secureConsoleSetupBrowserRuntimeV34 = null;
+    throw terminalError;
+  }
 })();
 ~~~
 
@@ -210,7 +220,10 @@ documentation length in `1000..1000000`, every declared attempted/fulfilled
 pair `1/1`, consumed/attachmentExact true, state `V34_ATTACHMENT_PASS`,
 error class `NONE`, complete documentation output, complete fixed terminal
 output, and completed tool status. Anything else spends Call 1 and stops; Call
-2 must not be sent.
+2 must not be sent. A JavaScript-visible terminal-output rejection clears the
+V34 attachment/controller bindings and rethrows without a second output. If
+transport failure or truncation is not visible inside JavaScript, bindings may
+remain; dispose the entire fresh Node realm and do not reuse it for a successor.
 
 ## Call 2 — sole selected-tab account-home reacquisition
 
@@ -322,10 +335,7 @@ await (async () => {
     await adopted.goto("https://dash.cloudflare.com/");
     counters.navigationFulfilled++;
     counters.waitAttempted++;
-    await adopted.playwright.waitForTimeout(
-      20000,
-      { state: "networkidle" },
-    );
+    await adopted.playwright.waitForTimeout(20000);
     counters.waitFulfilled++;
     counters.urlAttempted++;
     const homeUrl = await adopted.url();
@@ -409,33 +419,43 @@ await (async () => {
     secureConsoleSetupBrowserRuntimeV34 = null;
   }
   counters.writeAttempted++;
-  nodeRepl.write({
-    result,
-    declarationShape,
-    predecessorExact,
-    controllerOwnership,
-    tabShape,
-    homeUrlValidated,
-    snapshotValidated,
-    semanticComplete,
-    snapshot,
-    selectedAttempted: counters.selectedAttempted,
-    selectedFulfilled: counters.selectedFulfilled,
-    navigationAttempted: counters.navigationAttempted,
-    navigationFulfilled: counters.navigationFulfilled,
-    waitAttempted: counters.waitAttempted,
-    waitFulfilled: counters.waitFulfilled,
-    urlAttempted: counters.urlAttempted,
-    urlFulfilled: counters.urlFulfilled,
-    snapshotAttempted: counters.snapshotAttempted,
-    snapshotFulfilled: counters.snapshotFulfilled,
-    writeAttempted: counters.writeAttempted,
-    errorClass,
-    consumed: secureConsoleV34AdoptionConsumed,
-    bindingEligible: secureConsoleOwnedTaskTabV34Eligible,
-    bindingNull: secureConsoleOwnedTaskTabV34 === null,
-    bindingState: secureConsoleOwnedTaskTabV34State,
-  });
+  try {
+    await nodeRepl.write({
+      result,
+      declarationShape,
+      predecessorExact,
+      controllerOwnership,
+      tabShape,
+      homeUrlValidated,
+      snapshotValidated,
+      semanticComplete,
+      snapshot,
+      selectedAttempted: counters.selectedAttempted,
+      selectedFulfilled: counters.selectedFulfilled,
+      navigationAttempted: counters.navigationAttempted,
+      navigationFulfilled: counters.navigationFulfilled,
+      waitAttempted: counters.waitAttempted,
+      waitFulfilled: counters.waitFulfilled,
+      urlAttempted: counters.urlAttempted,
+      urlFulfilled: counters.urlFulfilled,
+      snapshotAttempted: counters.snapshotAttempted,
+      snapshotFulfilled: counters.snapshotFulfilled,
+      writeAttempted: counters.writeAttempted,
+      errorClass,
+      consumed: secureConsoleV34AdoptionConsumed,
+      bindingEligible: secureConsoleOwnedTaskTabV34Eligible,
+      bindingNull: secureConsoleOwnedTaskTabV34 === null,
+      bindingState: secureConsoleOwnedTaskTabV34State,
+    });
+  } catch (terminalError) {
+    secureConsoleOwnedTaskTabV34 = null;
+    secureConsoleOwnedTaskTabV34Eligible = false;
+    secureConsoleOwnedTaskTabV34State = "V34_FINAL_OUTPUT_FAILED_STOP";
+    secureConsoleChromeV34 = null;
+    secureConsoleAgentV34 = null;
+    secureConsoleSetupBrowserRuntimeV34 = null;
+    throw terminalError;
+  }
 })();
 ~~~
 
@@ -444,9 +464,12 @@ Call-2 PASS requires exact result
 semantic boolean true, fixed snapshot shape, exact zone href count `1`,
 positive anchor count, busy count `0`, every declared attempted/fulfilled
 pair `1/1`, error class `NONE`, consumed/bindingEligible true, bindingNull
-false, and state `V34_ACCOUNT_HOME_READY_ELIGIBLE`. Anything else spends Call
-2, clears every V34 controller/owner binding, and stops. Never retry either
-call.
+false, and state `V34_ACCOUNT_HOME_READY_ELIGIBLE`. An ordinary failure or a
+JavaScript-visible terminal-output rejection spends Call 2, clears every V34
+controller/owner binding, and stops without closing the externally owned tab.
+If transport failure or truncation is not visible inside JavaScript, bindings
+may remain; dispose the entire fresh Node realm and do not reuse it. Never retry
+either call.
 
 ## Prohibited actions and confirmation boundary
 
@@ -488,4 +511,7 @@ extracted Call-2 bytes/SHA-256.
 
 A failed, uncertain, malformed, incomplete, or residue-bearing result consumes
 that call and stops. Do not retry, continue, reinterpret, reconnect, fall back,
-relax a verdict, or manually integrate.
+relax a verdict, or manually integrate. A JavaScript-visible terminal-output
+rejection runs the fixed binding cleanup and rethrows without a second output;
+unobservable transport failure or truncation requires disposal of the entire
+fresh Node realm before any separately reviewed successor.

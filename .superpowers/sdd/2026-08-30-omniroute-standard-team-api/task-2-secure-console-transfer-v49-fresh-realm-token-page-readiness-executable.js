@@ -105,6 +105,13 @@ await (async () => {
       typeof secureConsoleOwnedTaskTabV46PostNativeDetachConsumed === "undefined" &&
       typeof secureConsoleCloudflareReadsV46Consumed === "undefined" &&
       typeof secureConsoleV46Consumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV47 === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV47Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV47State === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV47PreCreateDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV47PostNativeDetachConsumed === "undefined" &&
+      typeof secureConsoleCloudflareReadsV47Consumed === "undefined" &&
+      typeof secureConsoleV47Consumed === "undefined" &&
       typeof secureConsoleV48Consumed === "undefined" &&
       typeof secureConsoleV48State === "undefined" &&
       typeof secureConsoleV48Result === "undefined";

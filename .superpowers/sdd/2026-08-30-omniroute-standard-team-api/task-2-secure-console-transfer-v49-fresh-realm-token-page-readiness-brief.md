@@ -22,17 +22,18 @@ cleanup query is non-authorizing incident evidence and no precedent.
 - V47 source fixture length: `50343` bytes.
 - V47 source fixture SHA-256:
   `90771E3BB4423B986A8AAF5CD6F4BD6F208B176639D1BBCBF6BEB466F24815A3`
-- Executable length: `41699` bytes.
+- Executable length: `42193` bytes.
 - Executable SHA-256:
-  `F279984ABAEDD5087B99956E04763F592022E45E2D3AE974293184F148BD12AE`
-- Pure fixture length: `50618` bytes.
+  `D60CC7898F509013D19DFF1E7254065F5C2FF531386211A348CDF392F3D59988`
+- Pure fixture length: `52056` bytes.
 - Pure fixture SHA-256:
-  `8C916F69588C9003CEB4FF2C0B0C28EEA75D4557FAA8A03BFB9B8EA9552F7B7F`
+  `31A060E86A08432C56676B2D1A2A1C3107CD9076A16399C9BDF28A77E9B92585`
 
 ## Exact implementation delta
 
 The executable is the final V47 executable mechanically renamed to V49, with
-only three new predecessor-absence checks:
+only ten new predecessor-absence checks: all seven persistent V47 declarations
+and these three V48 declarations:
 
 - `secureConsoleV48Consumed`
 - `secureConsoleV48State`
@@ -40,9 +41,11 @@ only three new predecessor-absence checks:
 
 The fixture is the final V47 fixture mechanically renamed to V49, with only:
 
+- the seven persistent V47 predecessor-contamination cases;
 - the same three V48 predecessor-contamination cases;
 - one explicit assertion that an absent optional key may pass;
 - one present-`undefined` optional-key rejection case; and
+- one inert coordinator-cleanup model covering proof success and proof failure;
 - the terminal predecessor field renamed to `v48PredecessorsAbsent`.
 
 Every present documented listing value remains a bounded, non-empty,
@@ -88,6 +91,10 @@ Any failure or uncertainty spends V49, clears both tab bindings and every broad
 alias, and stops ineligible. Only one fixed state-only cleanup proof is allowed;
 if it fails there is no corrected second query. The realm is reset and the
 uncertainty recorded. No retry or continuation is allowed.
+
+The pure coordinator-cleanup model proves both success and proof-failure paths
+perform exactly one proof attempt followed immediately by one reset, with zero
+corrected or second-query attempts.
 
 ## Review and live prerequisites
 

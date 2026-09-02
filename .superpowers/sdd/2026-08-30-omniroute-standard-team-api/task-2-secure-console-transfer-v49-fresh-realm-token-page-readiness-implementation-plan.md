@@ -24,10 +24,13 @@ functional V47 browser, listing, account-home, token-page, counter, output,
 privacy, binding, and cleanup logic byte-for-byte except for the reviewed deltas
 below.
 
-Add the three V48 top-level declarations to the executable predecessor-absence
-guard and to the fixture contamination loop. Add one fixture proving a present
-optional `undefined` value is rejected before claim and retain an explicit
-passing assertion for an absent optional key.
+Add all seven persistent V47 declarations and the three V48 top-level
+declarations to the executable predecessor-absence guard and to the fixture
+contamination loop. Add one fixture proving a present optional `undefined`
+value is rejected before claim, retain an explicit passing assertion for an
+absent optional key, and add the smallest inert coordinator-cleanup model that
+proves one proof attempt, immediate reset, and zero corrected queries on both
+proof success and proof failure.
 
 ## Task 2 — Prove the declared delta
 
@@ -37,8 +40,9 @@ Run the smallest local checks:
 2. the V49 pure fixture, requiring exact terminal
    `V49_PURE_FIXTURES_PASS`;
 3. a normalized comparison against V47 that maps V49 names/literals back to
-   V47 and removes only the three V48 guard/contamination additions plus the two
-   optional-key fixture assertions; and
+   V47 and removes only the seven V47 plus three V48 guard/contamination
+   additions, the two optional-key fixture assertions, the inert cleanup model,
+   and its fixed terminal evidence; and
 4. source scans proving no retry, reconnect, Create click, Copy, clipboard,
    secret, provider mutation, alternate URL, or manual-continuation path was
    added.

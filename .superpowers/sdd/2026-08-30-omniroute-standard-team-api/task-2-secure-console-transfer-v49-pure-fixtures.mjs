@@ -843,6 +843,13 @@ for (const prelude of [
   "let secureConsoleOwnedTaskTabV46PostNativeDetachConsumed = false;\n",
   "let secureConsoleCloudflareReadsV46Consumed = false;\n",
   "let secureConsoleV46Consumed = false;\n",
+  "let secureConsoleOwnedTaskTabV47 = null;\n",
+  "let secureConsoleOwnedTaskTabV47Eligible = false;\n",
+  "let secureConsoleOwnedTaskTabV47State = \"DIRTY\";\n",
+  "let secureConsoleOwnedTaskTabV47PreCreateDetachConsumed = false;\n",
+  "let secureConsoleOwnedTaskTabV47PostNativeDetachConsumed = false;\n",
+  "let secureConsoleCloudflareReadsV47Consumed = false;\n",
+  "let secureConsoleV47Consumed = false;\n",
   "let secureConsoleV48Consumed = false;\n",
   "let secureConsoleV48State = \"DIRTY\";\n",
   "let secureConsoleV48Result = {};\n",
@@ -1267,6 +1274,32 @@ assert.deepEqual(documentationOutputFailure.fixture.documentationFailureObserved
 });
 assert.equal(outputGetterCalls, 0);
 
+const modelCoordinatorCleanup = (proofFails) => {
+  let proofAttempts = 0;
+  let correctedQueryAttempts = 0;
+  let resetAttempts = 0;
+  const order = [];
+  try {
+    proofAttempts++;
+    order.push("proof");
+    if (proofFails) throw new Error("fixed proof failure");
+  } catch {
+    // Record uncertainty; never correct or retry the failed proof.
+  } finally {
+    resetAttempts++;
+    order.push("reset");
+  }
+  return { proofAttempts, correctedQueryAttempts, resetAttempts, order };
+};
+const cleanupProofSuccess = modelCoordinatorCleanup(false);
+const cleanupProofFailure = modelCoordinatorCleanup(true);
+for (const scenario of [cleanupProofSuccess, cleanupProofFailure]) {
+  assert.equal(scenario.proofAttempts, 1);
+  assert.equal(scenario.correctedQueryAttempts, 0);
+  assert.equal(scenario.resetAttempts, 1);
+  assert.deepEqual(scenario.order, ["proof", "reset"]);
+}
+
 console.log(JSON.stringify({
   result: "V49_PURE_FIXTURES_PASS",
   briefBytes: Buffer.byteLength(brief),
@@ -1284,6 +1317,11 @@ console.log(JSON.stringify({
   fixedFailureCleanup: true,
   hostileThrownValues: true,
   terminalOutputCleanup: true,
+  oneProofOnlyCleanup: true,
+  cleanupProofScenarioCount: 2,
+  cleanupProofAttempts: 2,
+  cleanupCorrectedQueryAttempts: 0,
+  cleanupResetAttempts: 2,
   completeCounterVectors: true,
   getterCalls,
   listingGetterCalls,

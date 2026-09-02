@@ -22,14 +22,18 @@ or used as fallback, including if V43 fails.
 
 - Sole executable:
   `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v43-fresh-realm-token-page-readiness-executable.js`
-  / `36818` bytes / SHA-256
-  `02259382E069888EB0F175B89234C12F4EE79AE6A14B22428125AC8BC3709677`.
+  / `39193` bytes / SHA-256
+  `13E56326548D660B111DDC63857BFD33250A548F7D094FA4131EEBB694D24B01`.
 - Inert fixture:
   `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v43-pure-fixtures.mjs`
-  / `24031` bytes / SHA-256
-  `2C31175974D904CF979BD22157CAB3911F83078D783622C9B4A2050E8A64F760`.
-- Exact fixture terminal:
-  `{"result":"V43_PURE_FIXTURES_PASS","executableBytes":36818,"executableSha256":"02259382E069888EB0F175B89234C12F4EE79AE6A14B22428125AC8BC3709677","syntax":"PASS","declarationFree":true,"exactOutputKeys":true,"fullCellSuccess":true,"fixedFailureCleanup":true,"hostileThrownValues":true,"terminalOutputCleanup":true,"completeCounterVectors":true,"getterCalls":0}`.
+  / `40500` bytes / SHA-256
+  `DCDAD2355DFF7C715E360D20A42F55D50082C1EF614A70C98A4ECE92F8C36145`.
+- The fixture terminal must report `V43_PURE_FIXTURES_PASS`, its directly
+  computed brief bytes/SHA-256, executable `39193` bytes/SHA-256
+  `13E56326548D660B111DDC63857BFD33250A548F7D094FA4131EEBB694D24B01`,
+  syntax PASS, and true declaration/listing/output/success/failure/privacy/
+  cleanup/counter claims with all three getter counters zero. The later immutable
+  package review/classification pins the exact non-self-referential terminal.
 
 Both files have one final LF. The executable is a static reviewed file; it is
 not generated, transformed, wrapped, or concatenated at action time. The sole

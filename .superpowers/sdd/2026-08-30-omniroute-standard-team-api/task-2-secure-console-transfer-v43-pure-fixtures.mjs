@@ -6,11 +6,17 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
+const briefPath = path.join(
+  directory,
+  "task-2-secure-console-transfer-v43-fresh-realm-token-page-readiness-brief.md",
+);
+const brief = fs.readFileSync(briefPath, "utf8");
 const executablePath = path.join(
   directory,
   "task-2-secure-console-transfer-v43-fresh-realm-token-page-readiness-executable.js",
 );
 const executable = fs.readFileSync(executablePath, "utf8").replace(/\r\n/g, "\n");
+assert.ok(brief.includes("13E56326548D660B111DDC63857BFD33250A548F7D094FA4131EEBB694D24B01"));
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 new AsyncFunction(executable);
 
@@ -32,9 +38,98 @@ for (const forbidden of [
   assert.equal(executable.includes(forbidden), false, forbidden);
 }
 
+const listingBlock = executable.match(
+  /\/\/ BEGIN_V43Attachment_PURE_TRUSTED_LISTING\n([\s\S]*?)\n\s*\/\/ END_V43Attachment_PURE_TRUSTED_LISTING/,
+);
+assert.notEqual(listingBlock, null);
+const trustedListing = new Function(
+  `${listingBlock[1]}\nreturn trustedListing;`,
+)();
+const listingAccount = "1".repeat(32);
+const listingTargetUrl =
+  `https://dash.cloudflare.com/${listingAccount}/account`;
+const validListing = {
+  id: "task-tab",
+  count: 2,
+  urlCloudflare: true,
+};
+assert.deepEqual(trustedListing([
+  { id: "task-tab", url: listingTargetUrl },
+  { id: "other-tab", url: "https://example.invalid/" },
+]), validListing);
+const foreignListing = vm.runInNewContext(`[
+  { id: "task-tab", url: "${listingTargetUrl}" },
+  { id: "other-tab", url: "https://example.invalid/" }
+]`);
+assert.notEqual(Object.getPrototypeOf(foreignListing), Array.prototype);
+assert.deepEqual(trustedListing(foreignListing), validListing);
+assert.equal(trustedListing([]), null);
+assert.equal(trustedListing(new Array(1)), null);
+assert.equal(trustedListing([
+  { id: "other", url: "https://example.invalid/" },
+  { id: "task-tab", url: listingTargetUrl },
+]), null);
+assert.equal(trustedListing([{ id: "task-tab" }]), null);
+assert.equal(trustedListing([{
+  id: "task-tab",
+  url: "https://dash.cloudflare.com.evil.invalid/",
+}]), null);
+assert.equal(trustedListing([{
+  id: "task-tab",
+  url: listingTargetUrl,
+  extra: "unexpected",
+}]), null);
+const symbolListing = [{ id: "task-tab", url: listingTargetUrl }];
+symbolListing[Symbol("unexpected")] = true;
+assert.equal(trustedListing(symbolListing), null);
+const namedListing = [{ id: "task-tab", url: listingTargetUrl }];
+namedListing.extra = true;
+assert.equal(trustedListing(namedListing), null);
+let listingGetterCalls = 0;
+const indexAccessor = [];
+Object.defineProperty(indexAccessor, "0", {
+  enumerable: true,
+  configurable: true,
+  get() {
+    listingGetterCalls++;
+    return { id: "task-tab", url: listingTargetUrl };
+  },
+});
+indexAccessor.length = 1;
+assert.equal(trustedListing(indexAccessor), null);
+const recordAccessor = { url: listingTargetUrl };
+Object.defineProperty(recordAccessor, "id", {
+  enumerable: true,
+  configurable: true,
+  get() {
+    listingGetterCalls++;
+    return "task-tab";
+  },
+});
+assert.equal(trustedListing([recordAccessor]), null);
+const laterHostileRecord = {};
+Object.defineProperty(laterHostileRecord, "id", {
+  enumerable: true,
+  configurable: true,
+  get() {
+    listingGetterCalls++;
+    throw new Error("later record must not be inspected");
+  },
+});
+assert.deepEqual(trustedListing([
+  { id: "task-tab", url: listingTargetUrl },
+  laterHostileRecord,
+]), validListing);
+assert.equal(listingGetterCalls, 0);
+const nullRecord = Object.assign(Object.create(null), {
+  id: "task-tab",
+  url: listingTargetUrl,
+});
+assert.equal(trustedListing([nullRecord]).urlCloudflare, true);
+
 const importSource = `const imported = await import(
-      "file:///C:/Users/chatc/.codex/plugins/cache/openai-bundled/chrome/26.831.20005/scripts/browser-client.mjs"
-    );`;
+        "file:///C:/Users/chatc/.codex/plugins/cache/openai-bundled/chrome/26.831.20005/scripts/browser-client.mjs"
+      );`;
 const observationHook =
   "    globalThis.__v43Fixture.observed = {\n" +
   "      consumed: secureConsoleV43Consumed,\n" +
@@ -47,34 +142,65 @@ const observationHook =
   "      chromeNull: secureConsoleChromeV43Attachment === null,\n" +
   "      agentNull: secureConsoleAgentV43Attachment === null,\n" +
   "      setupNull: secureConsoleSetupBrowserRuntimeV43Attachment === null,\n" +
+  "      evidenceNull: secureConsoleV43AttachmentEvidence === null,\n" +
+  "      outputErrorNull: secureConsoleV43TerminalOutputFailure === null,\n" +
   "      counters: { ...counters },\n" +
   "    };\n";
 const documentationFailureHook =
   "  globalThis.__v43Fixture.documentationFailureObserved = {\n" +
   "    consumed: secureConsoleV43Consumed,\n" +
+  "    tabNull: secureConsoleOwnedTaskTabV43 === null,\n" +
+  "    eligible: secureConsoleOwnedTaskTabV43Eligible,\n" +
+  "    state: secureConsoleOwnedTaskTabV43State,\n" +
   "    attachmentTabNull: secureConsoleOwnedTaskTabV43Attachment === null,\n" +
   "    attachmentEligible: secureConsoleOwnedTaskTabV43AttachmentEligible,\n" +
   "    attachmentState: secureConsoleV43AttachmentState,\n" +
   "    chromeNull: secureConsoleChromeV43Attachment === null,\n" +
   "    agentNull: secureConsoleAgentV43Attachment === null,\n" +
   "    setupNull: secureConsoleSetupBrowserRuntimeV43Attachment === null,\n" +
+  "    evidenceNull: secureConsoleV43AttachmentEvidence === null,\n" +
+  "    outputErrorNull: secureConsoleV43TerminalOutputFailure === null,\n" +
   "  };\n";
 const instrumented = executable
   .replace(importSource, "const imported = globalThis.__v43Fixture.imported;")
   .replace(
     "if (secureConsoleV43TerminalOutputFailure !== null) {\n" +
-      "  throw secureConsoleV43TerminalOutputFailure;",
+      "    const terminalOutputFailure = secureConsoleV43TerminalOutputFailure;\n" +
+      "    secureConsoleV43TerminalOutputFailure = null;\n" +
+      "    secureConsoleV43AttachmentEvidence = null;\n" +
+      "    throw terminalOutputFailure;",
     "if (secureConsoleV43TerminalOutputFailure !== null) {\n" +
+      "    const terminalOutputFailure = secureConsoleV43TerminalOutputFailure;\n" +
+      "    globalThis.__v43Fixture.documentationFailureAttachment =\n" +
+      "      { ...secureConsoleV43AttachmentEvidence };\n" +
+      "    secureConsoleV43TerminalOutputFailure = null;\n" +
+      "    secureConsoleV43AttachmentEvidence = null;\n" +
       documentationFailureHook +
-      "  throw secureConsoleV43TerminalOutputFailure;",
+      "    throw terminalOutputFailure;",
   )
   .replace(
-    "    });\n  } catch (terminalError) {",
-    "    });\n" + observationHook + "  } catch (terminalError) {",
+    "      await nodeRepl.write({",
+    "      globalThis.__v43Fixture.finalWriteAttachment =\n" +
+      "        { ...secureConsoleV43AttachmentEvidence };\n" +
+      "      await nodeRepl.write({",
   )
   .replace(
-    "    throw terminalError;\n  }\n})();\n",
-    observationHook + "    throw terminalError;\n  }\n})();\n",
+    "      secureConsoleV43AttachmentEvidence = null;\n" +
+      "      secureConsoleV43TerminalOutputFailure = null;\n" +
+      "    } catch (terminalError) {",
+    "      secureConsoleV43AttachmentEvidence = null;\n" +
+      "      secureConsoleV43TerminalOutputFailure = null;\n" +
+      observationHook +
+      "    } catch (terminalError) {",
+  )
+  .replace(
+    "      secureConsoleV43AttachmentEvidence = null;\n" +
+      "      secureConsoleV43TerminalOutputFailure = null;\n" +
+      "      throw terminalError;",
+    "      secureConsoleV43AttachmentEvidence = null;\n" +
+      "      secureConsoleV43TerminalOutputFailure = null;\n" +
+      observationHook +
+      "      throw terminalError;",
   );
 assert.notEqual(instrumented, executable);
 assert.equal(instrumented.includes("await import("), false);
@@ -92,24 +218,28 @@ const documentationSeed = [
   "url?: string",
 ].join("\n");
 const documentation = documentationSeed.padEnd(42596, "x");
+let outputGetterCalls = 0;
 
 const makeFixture = ({
   claimThrown = null,
   failStage = null,
   failTokenNavigation = false,
   failWriteAt = 0,
+  listingValue = null,
 } = {}) => {
   const fixture = {
     writes: [],
     writeCalls: 0,
     observed: null,
     documentationFailureObserved: null,
+    documentationFailureAttachment: null,
+    finalWriteAttachment: null,
     claimThrown,
     failStage,
     failTokenNavigation,
     failWriteAt,
-    outputThrown: { fixture: "output" },
-    importCalls: 0,
+    listingValue,
+    outputThrown: null,
     setupCalls: 0,
     connectCalls: 0,
     documentationCalls: 0,
@@ -121,8 +251,16 @@ const makeFixture = ({
     urlCalls: 0,
     accountSnapshotCalls: 0,
     tokenEvaluateCalls: 0,
+    filterEvaluateCalls: 0,
     filterValue: "",
   };
+  fixture.outputThrown = {};
+  Object.defineProperty(fixture.outputThrown, "name", {
+    get() {
+      outputGetterCalls++;
+      throw new Error("output name must not be read");
+    },
+  });
   const fail = (stage) => {
     if (fixture.failStage === stage) throw { name: `Hidden-${stage}` };
   };
@@ -130,23 +268,38 @@ const makeFixture = ({
   const queryEcho = {
     async waitFor(options) {
       assert.deepEqual(options, { state: "visible", timeoutMs: 20000 });
+      fail("queryEchoWait");
     },
-    async count() { return 1; },
+    async count() {
+      if (fixture.failStage === "queryEchoCount") return 0;
+      return 1;
+    },
   };
   const emptyStatus = {
     async waitFor(options) {
       assert.deepEqual(options, { state: "visible", timeoutMs: 20000 });
+      fail("emptyStatusWait");
     },
-    async count() { return 1; },
+    async count() {
+      if (fixture.failStage === "emptyStatusCount") return 0;
+      return 1;
+    },
   };
   const paginator = {
-    async count() { return 1; },
+    async count() {
+      if (fixture.failStage === "paginatorShape") return 0;
+      return 1;
+    },
     async waitFor(options) {
       assert.deepEqual(options, { state: "visible", timeoutMs: 20000 });
+      fail("readinessWait");
     },
   };
   const resultsRoot = {
-    async count() { return 1; },
+    async count() {
+      if (fixture.failStage === "controlledRoot") return 0;
+      return 1;
+    },
     locator(selector) {
       if (selector === '[aria-label="Pagination"]') return paginator;
       assert.equal(selector, "table tbody");
@@ -154,12 +307,24 @@ const makeFixture = ({
         getByText(text, options) {
           assert.equal(text, "OmniRoute secure console R5 20260901");
           assert.deepEqual(options, { exact: true });
-          return { async count() { return 0; } };
+          return {
+            async count() {
+              if (fixture.failStage === "nameReadThrow") fail("nameReadThrow");
+              if (fixture.failStage === "nameReadInvalid") return 1;
+              return 0;
+            },
+          };
         },
       };
     },
     async evaluate() {
       fixture.tokenEvaluateCalls++;
+      if (fixture.failStage === "baselineInvalid" &&
+          fixture.tokenEvaluateCalls === 1) {
+        return { terminalZero: false, completeNonempty: false };
+      }
+      if (fixture.failStage === "terminalInvalid" &&
+          fixture.tokenEvaluateCalls === 2) return false;
       return fixture.tokenEvaluateCalls === 1
         ? { terminalZero: true, completeNonempty: false }
         : true;
@@ -184,7 +349,13 @@ const makeFixture = ({
           assert.deepEqual(options, {
             hasText: "OmniRoute secure console R5 20260901",
           });
-          return { async count() { return 0; } };
+          return {
+            async count() {
+              if (fixture.failStage === "rowReadThrow") fail("rowReadThrow");
+              if (fixture.failStage === "rowReadInvalid") return 1;
+              return 0;
+            },
+          };
         },
       };
     },
@@ -196,9 +367,15 @@ const makeFixture = ({
     },
     async getAttribute(name) {
       assert.equal(name, "aria-controls");
+      if (fixture.failStage === "regionBinding") return "bad region id!";
       return "token-results";
     },
     async evaluate() {
+      fixture.filterEvaluateCalls++;
+      if (fixture.failStage === "initialFilterInvalid" &&
+          fixture.filterEvaluateCalls === 1) return false;
+      if (fixture.failStage === "tokenValueInvalid" &&
+          fixture.filterEvaluateCalls === 2) return false;
       return fixture.filterValue === "" ||
         fixture.filterValue === "OmniRoute secure console R5 20260901";
     },
@@ -228,6 +405,12 @@ const makeFixture = ({
     },
     async url() {
       fixture.urlCalls++;
+      if (fixture.failStage === "accountUrl" && fixture.gotoCalls === 1) {
+        return "https://dash.cloudflare.com/not-an-account/home";
+      }
+      if (fixture.failStage === "tokenUrl" && fixture.gotoCalls === 2) {
+        return "https://dash.cloudflare.com/profile/not-api-tokens";
+      }
       return currentUrl;
     },
     playwright: {
@@ -271,7 +454,15 @@ const makeFixture = ({
         }
         assert.ok(role === "button" || role === "link");
         assert.deepEqual(options, { name: "Create Token", exact: true });
-        return { async count() { return role === "button" ? 1 : 0; } };
+        return {
+          async count() {
+            if (fixture.failStage === "createReadThrow" && role === "button") {
+              fail("createReadThrow");
+            }
+            if (fixture.failStage === "createReadInvalid") return 0;
+            return role === "button" ? 1 : 0;
+          },
+        };
       },
       getByText() {
         throw new Error("top-level getByText must not be used");
@@ -283,6 +474,7 @@ const makeFixture = ({
     async documentation() {
       fixture.documentationCalls++;
       fail("documentation");
+      if (fixture.failStage === "documentationInvalid") return "incomplete";
       return documentation;
     },
     async nameSession(name) {
@@ -294,6 +486,8 @@ const makeFixture = ({
       async openTabs() {
         fixture.openTabsCalls++;
         fail("enumeration");
+        if (fixture.failStage === "listingShape") return new Array(1);
+        if (fixture.listingValue !== null) return fixture.listingValue;
         return vm.runInNewContext(`[
           { id: "task-tab", url: "${accountUrl}" },
           { id: "other-tab", url: "https://example.invalid/" }
@@ -304,6 +498,8 @@ const makeFixture = ({
         assert.equal(id, "task-tab");
         fail("claim");
         if (fixture.claimThrown !== null) throw fixture.claimThrown;
+        if (fixture.failStage === "controllerShape") return { ...tab, id: "wrong" };
+        if (fixture.failStage === "tabShape") return { id: "task-tab" };
         return tab;
       },
     },
@@ -312,12 +508,14 @@ const makeFixture = ({
     async setupBrowserRuntime() {
       fixture.setupCalls++;
       fail("setup");
+      if (fixture.failStage === "agentShape") return {};
       return {
         browsers: {
           async get(id) {
             fixture.connectCalls++;
             assert.equal(id, "chrome");
             fail("connect");
+            if (fixture.failStage === "chromeShape") return {};
             return browser;
           },
         },
@@ -329,6 +527,8 @@ const makeFixture = ({
       configurable: true,
       get() { throw { name: "Hidden-import" }; },
     });
+  } else if (fixture.failStage === "moduleShape") {
+    fixture.imported = {};
   }
   return fixture;
 };
@@ -403,6 +603,27 @@ assert.equal(
   success.attachment.result,
   "EXACT_V43Attachment_CROSS_REALM_TASK_TAB_ACCOUNT_HOME_REACQUISITION_PASS",
 );
+const attachmentSuccessCounters = {
+  importAttempted: 1, importFulfilled: 1,
+  setupAttempted: 1, setupFulfilled: 1,
+  connectAttempted: 1, connectFulfilled: 1,
+  documentationAttempted: 1, documentationFulfilled: 1,
+  documentationWriteAttempted: 1, documentationWriteFulfilled: 1,
+  nameAttempted: 1, nameFulfilled: 1,
+  openTabsAttempted: 1, openTabsFulfilled: 1,
+  claimAttempted: 1, claimFulfilled: 1,
+  navigationAttempted: 1, navigationFulfilled: 1,
+  waitAttempted: 1, waitFulfilled: 1,
+  urlAttempted: 1, urlFulfilled: 1,
+  snapshotAttempted: 1, snapshotFulfilled: 1,
+  writeAttempted: 0,
+};
+assert.deepEqual(
+  Object.fromEntries(
+    Object.keys(attachmentSuccessCounters).map((key) => [key, success.attachment[key]]),
+  ),
+  attachmentSuccessCounters,
+);
 assert.equal(success.tokenSemanticSignature, true);
 assert.equal(success.continuationBindingsRetained, true);
 assert.equal(success.predecessorRuntimeCleared, true);
@@ -410,7 +631,6 @@ assert.equal(success.bindingEligible, true);
 assert.equal(success.bindingNull, false);
 assert.equal(success.consumed, true);
 assert.equal(success.errorClass, "NONE");
-assert.equal(successRun.fixture.importCalls, 0);
 assert.equal(successRun.fixture.setupCalls, 1);
 assert.equal(successRun.fixture.connectCalls, 1);
 assert.equal(successRun.fixture.openTabsCalls, 1);
@@ -419,6 +639,20 @@ assert.equal(successRun.fixture.gotoCalls, 2);
 assert.equal(successRun.fixture.waitCalls, 1);
 assert.equal(successRun.fixture.urlCalls, 2);
 assert.equal(successRun.fixture.accountSnapshotCalls, 1);
+assert.deepEqual(
+  Object.keys(success.attachment.snapshot).sort(),
+  [
+    "accountHomePath", "allAnchorCount", "busyCount", "exactZoneHrefCount",
+    "hostExact",
+  ],
+);
+assert.equal(typeof success.attachment.snapshot.hostExact, "boolean");
+assert.equal(typeof success.attachment.snapshot.accountHomePath, "boolean");
+for (const key of ["allAnchorCount", "busyCount", "exactZoneHrefCount"]) {
+  assert.equal(Number.isSafeInteger(success.attachment.snapshot[key]), true, key);
+  assert.ok(success.attachment.snapshot[key] >= 0, key);
+  assert.ok(success.attachment.snapshot[key] <= 100000, key);
+}
 assert.deepEqual(successRun.fixture.observed, {
   consumed: true,
   tabNull: false,
@@ -430,6 +664,8 @@ assert.deepEqual(successRun.fixture.observed, {
   chromeNull: true,
   agentNull: true,
   setupNull: true,
+  evidenceNull: true,
+  outputErrorNull: true,
   counters: {
     bindingAttempted: 1, bindingFulfilled: 1,
     navigationAttempted: 1, navigationFulfilled: 1,
@@ -443,16 +679,24 @@ assert.deepEqual(successRun.fixture.observed, {
   },
 });
 
-const contaminated = await run({}, "let secureConsoleV41Consumed = false;\n");
-assert.equal(contaminated.caught, null);
-assert.equal(contaminated.fixture.setupCalls, 0);
-assert.equal(contaminated.fixture.openTabsCalls, 0);
-assert.equal(contaminated.output.result, "V43_TOKEN_PAGE_SEMANTIC_READINESS_FAILED_STOP");
-assert.equal(contaminated.output.attachment.declarationShape, false);
-assert.equal(contaminated.output.attachment.importAttempted, 0);
-assert.equal(contaminated.output.bindingEligible, false);
-assert.equal(contaminated.output.failureCleanupComplete, true);
-assert.deepEqual(Object.keys(contaminated.output).sort(), expectedTopKeys);
+for (const prelude of [
+  "let secureConsoleV41Consumed = false;\n",
+  "let secureConsoleOwnedTaskTabV40 = null;\n",
+  "let secureConsoleChromeV39 = {};\n",
+  "let secureConsoleOwnedTaskTabV35Eligible = false;\n",
+  "let secureConsoleCloudflareReadsV42Consumed = false;\n",
+]) {
+  const contaminated = await run({}, prelude);
+  assert.equal(contaminated.caught, null);
+  assert.equal(contaminated.fixture.setupCalls, 0);
+  assert.equal(contaminated.fixture.openTabsCalls, 0);
+  assert.equal(contaminated.output.result, "V43_TOKEN_PAGE_SEMANTIC_READINESS_FAILED_STOP");
+  assert.equal(contaminated.output.attachment.declarationShape, false);
+  assert.equal(contaminated.output.attachment.importAttempted, 0);
+  assert.equal(contaminated.output.bindingEligible, false);
+  assert.equal(contaminated.output.failureCleanupComplete, true);
+  assert.deepEqual(Object.keys(contaminated.output).sort(), expectedTopKeys);
+}
 
 const nonfreshSource = instrumented.replace(
   "let secureConsoleV43Consumed = false;",
@@ -464,6 +708,22 @@ assert.equal(nonfresh.fixture.setupCalls, 0);
 assert.equal(nonfresh.output.attachment.declarationShape, false);
 assert.equal(nonfresh.output.attachment.importAttempted, 0);
 assert.equal(nonfresh.output.failureCleanupComplete, true);
+for (const [before, after] of [
+  ["let secureConsoleOwnedTaskTabV43 = null;", "let secureConsoleOwnedTaskTabV43 = {};"],
+  ["let secureConsoleOwnedTaskTabV43Eligible = false;", "let secureConsoleOwnedTaskTabV43Eligible = true;"],
+  ["let secureConsoleOwnedTaskTabV43State = \"UNADOPTED\";", "let secureConsoleOwnedTaskTabV43State = \"DIRTY\";"],
+  ["let secureConsoleOwnedTaskTabV43PreCreateDetachConsumed = false;", "let secureConsoleOwnedTaskTabV43PreCreateDetachConsumed = true;"],
+  ["let secureConsoleCloudflareReadsV43Consumed = false;", "let secureConsoleCloudflareReadsV43Consumed = true;"],
+]) {
+  const altered = instrumented.replace(before, after);
+  assert.notEqual(altered, instrumented);
+  const dirtyDefault = await run({}, "", altered);
+  assert.equal(dirtyDefault.caught, null);
+  assert.equal(dirtyDefault.fixture.setupCalls, 0);
+  assert.equal(dirtyDefault.output.attachment.declarationShape, false);
+  assert.equal(dirtyDefault.output.attachment.importAttempted, 0);
+  assert.equal(dirtyDefault.output.failureCleanupComplete, true);
+}
 
 const attachmentCounterPairs = [
   ["importAttempted", "importFulfilled", "import"],
@@ -494,12 +754,30 @@ const readinessCounterKeys = [
 const select = (value, keys) => Object.fromEntries(keys.map((key) => [key, value[key]]));
 const expectedAttachmentFailure = (stage) => {
   const expected = Object.fromEntries(attachmentCounterKeys.map((key) => [key, 0]));
+  const operation = {
+    moduleShape: "import",
+    agentShape: "setup",
+    chromeShape: "connect",
+    documentationInvalid: "documentation",
+    listingShape: "enumeration",
+    controllerShape: "claim",
+    tabShape: "claim",
+    accountUrl: null,
+  }[stage] ?? stage;
+  const fulfilledInvalid = new Set([
+    "moduleShape", "agentShape", "chromeShape", "documentationInvalid",
+    "listingShape", "controllerShape", "tabShape", "accountUrl",
+    "accountSignature",
+  ]);
   let stopped = false;
   for (const [attempted, fulfilled, failureStage] of attachmentCounterPairs) {
     if (stopped) continue;
     expected[attempted] = 1;
-    if (failureStage === stage) {
-      if (stage === "accountSignature") expected[fulfilled] = 1;
+    const stopsHere = stage === "accountUrl"
+      ? attempted === "urlAttempted"
+      : failureStage === operation;
+    if (stopsHere) {
+      if (fulfilledInvalid.has(stage)) expected[fulfilled] = 1;
       stopped = true;
     } else {
       expected[fulfilled] = 1;
@@ -510,10 +788,27 @@ const expectedAttachmentFailure = (stage) => {
 const zeroReadiness = Object.fromEntries(readinessCounterKeys.map((key) => [key, 0]));
 zeroReadiness.writeAttempted = 1;
 
+const malformedListing = new Array(1);
+const listingRejected = await run({ listingValue: malformedListing });
+assert.equal(listingRejected.caught, null);
+assert.equal(listingRejected.fixture.claimCalls, 0);
+assert.equal(listingRejected.output.attachment.listingValidated, false);
+assert.equal(listingRejected.output.attachment.claimAttempted, 0);
+assert.equal(listingRejected.output.attachment.claimFulfilled, 0);
+assert.equal(listingRejected.output.failureCleanupComplete, true);
+const listingFailureCounters = expectedAttachmentFailure("claim");
+listingFailureCounters.claimAttempted = 0;
+assert.deepEqual(
+  select(listingRejected.output.attachment, attachmentCounterKeys),
+  listingFailureCounters,
+);
+assert.deepEqual(select(listingRejected.output, readinessCounterKeys), zeroReadiness);
+
 for (const stage of [
-  "import", "setup", "connect", "documentation", "sessionName",
-  "enumeration", "claim", "accountNavigation", "accountWait",
-  "accountSignature",
+  "import", "moduleShape", "setup", "agentShape", "connect", "chromeShape",
+  "documentation", "documentationInvalid", "sessionName", "enumeration",
+  "listingShape", "claim", "controllerShape", "tabShape",
+  "accountNavigation", "accountWait", "accountUrl", "accountSignature",
 ]) {
   const failed = await run({ failStage: stage });
   assert.equal(failed.caught, null, stage);
@@ -544,17 +839,79 @@ const expectedReadinessFailure = (stage) => {
   expected.navigationFulfilled = 1;
   expected.urlAttempted = 1;
   expected.urlFulfilled = 1;
-  if (stage === "tokenSignature") {
+  if ([
+    "tokenUrl", "tokenSignature", "regionBinding", "controlledRoot",
+    "paginatorShape",
+  ].includes(stage)) {
     expected.writeAttempted = 1;
     return expected;
   }
   expected.readinessAttempted = 1;
+  if (stage === "readinessWait") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
   expected.readinessFulfilled = 1;
+  if (["initialFilterInvalid", "baselineInvalid"].includes(stage)) {
+    expected.writeAttempted = 1;
+    return expected;
+  }
   expected.fillAttempted = 1;
+  if (stage === "tokenFill") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.fillFulfilled = 1;
+  expected.readinessAttempted = 2;
+  if (stage === "queryEchoWait") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.readinessFulfilled = 2;
+  if (stage === "queryEchoCount") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.readinessAttempted = 3;
+  if (stage === "emptyStatusWait") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.readinessFulfilled = 3;
+  if (stage === "emptyStatusCount") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.createReadAttempted = 1;
+  if (stage === "createReadThrow") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.createReadFulfilled = 1;
+  expected.nameReadAttempted = 1;
+  if (stage === "nameReadThrow") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.nameReadFulfilled = 1;
+  expected.rowReadAttempted = 1;
+  if (stage === "rowReadThrow") {
+    expected.writeAttempted = 1;
+    return expected;
+  }
+  expected.rowReadFulfilled = 1;
   expected.writeAttempted = 1;
   return expected;
 };
-for (const stage of ["tokenNavigation", "tokenSignature", "tokenFill"]) {
+for (const stage of [
+  "tokenNavigation", "tokenUrl", "tokenSignature", "regionBinding",
+  "controlledRoot", "paginatorShape", "readinessWait",
+  "initialFilterInvalid", "baselineInvalid", "tokenFill", "queryEchoWait",
+  "queryEchoCount", "emptyStatusWait", "emptyStatusCount",
+  "tokenValueInvalid", "terminalInvalid", "createReadThrow",
+  "createReadInvalid", "nameReadThrow", "nameReadInvalid", "rowReadThrow",
+  "rowReadInvalid",
+]) {
   const failed = await run({ failStage: stage });
   assert.equal(failed.caught, null, stage);
   assert.equal(failed.output.errorClass, "Error", stage);
@@ -568,6 +925,31 @@ for (const stage of ["tokenNavigation", "tokenSignature", "tokenFill"]) {
   assert.deepEqual(Object.keys(failed.output).sort(), expectedTopKeys, stage);
   assert.equal(JSON.stringify(failed.output).includes(`Hidden-${stage}`), false, stage);
 }
+
+const attachmentCounterMismatchSource = instrumented.replace(
+  "counters.snapshotFulfilled++;",
+  "void 0;",
+);
+assert.notEqual(attachmentCounterMismatchSource, instrumented);
+const attachmentCounterMismatch = await run({}, "", attachmentCounterMismatchSource);
+assert.equal(attachmentCounterMismatch.caught, null);
+assert.equal(attachmentCounterMismatch.output.attachment.semanticComplete, true);
+assert.equal(attachmentCounterMismatch.output.attachment.snapshotAttempted, 1);
+assert.equal(attachmentCounterMismatch.output.attachment.snapshotFulfilled, 0);
+assert.equal(attachmentCounterMismatch.output.attachment.errorClass, "Error");
+assert.equal(attachmentCounterMismatch.output.failureCleanupComplete, true);
+
+const readinessCounterMismatchSource = instrumented.replace(
+  "counters.rowReadFulfilled++;",
+  "void 0;",
+);
+assert.notEqual(readinessCounterMismatchSource, instrumented);
+const readinessCounterMismatch = await run({}, "", readinessCounterMismatchSource);
+assert.equal(readinessCounterMismatch.caught, null);
+assert.equal(readinessCounterMismatch.output.rowReadAttempted, 1);
+assert.equal(readinessCounterMismatch.output.rowReadFulfilled, 0);
+assert.equal(readinessCounterMismatch.output.errorClass, "Error");
+assert.equal(readinessCounterMismatch.output.failureCleanupComplete, true);
 
 let getterCalls = 0;
 const assertHostileClaimFailure = async (thrown, token) => {
@@ -606,11 +988,22 @@ const finalOutputFailure = await run({ failWriteAt: 2 });
 assert.equal(finalOutputFailure.caught, finalOutputFailure.fixture.outputThrown);
 assert.equal(finalOutputFailure.fixture.writeCalls, 2);
 assert.equal(finalOutputFailure.fixture.writes.length, 1);
+assert.deepEqual(
+  select(finalOutputFailure.fixture.finalWriteAttachment, attachmentCounterKeys),
+  attachmentSuccessCounters,
+);
+assert.deepEqual(
+  finalOutputFailure.fixture.observed.counters,
+  select(success, readinessCounterKeys),
+);
+assert.equal(finalOutputFailure.fixture.observed.consumed, true);
 assert.equal(finalOutputFailure.fixture.observed.tabNull, true);
 assert.equal(finalOutputFailure.fixture.observed.eligible, false);
 assert.equal(finalOutputFailure.fixture.observed.chromeNull, true);
 assert.equal(finalOutputFailure.fixture.observed.agentNull, true);
 assert.equal(finalOutputFailure.fixture.observed.setupNull, true);
+assert.equal(finalOutputFailure.fixture.observed.evidenceNull, true);
+assert.equal(finalOutputFailure.fixture.observed.outputErrorNull, true);
 
 const documentationOutputFailure = await run({ failWriteAt: 1 });
 assert.equal(
@@ -619,22 +1012,52 @@ assert.equal(
 );
 assert.equal(documentationOutputFailure.fixture.writeCalls, 1);
 assert.equal(documentationOutputFailure.fixture.writes.length, 0);
+assert.deepEqual(
+  select(
+    documentationOutputFailure.fixture.documentationFailureAttachment,
+    attachmentCounterKeys,
+  ),
+  {
+    importAttempted: 1, importFulfilled: 1,
+    setupAttempted: 1, setupFulfilled: 1,
+    connectAttempted: 1, connectFulfilled: 1,
+    documentationAttempted: 1, documentationFulfilled: 1,
+    documentationWriteAttempted: 1, documentationWriteFulfilled: 0,
+    nameAttempted: 0, nameFulfilled: 0,
+    openTabsAttempted: 0, openTabsFulfilled: 0,
+    claimAttempted: 0, claimFulfilled: 0,
+    navigationAttempted: 0, navigationFulfilled: 0,
+    waitAttempted: 0, waitFulfilled: 0,
+    urlAttempted: 0, urlFulfilled: 0,
+    snapshotAttempted: 0, snapshotFulfilled: 0,
+    writeAttempted: 0,
+  },
+);
 assert.deepEqual(documentationOutputFailure.fixture.documentationFailureObserved, {
   consumed: true,
+  tabNull: true,
+  eligible: false,
+  state: "UNADOPTED",
   attachmentTabNull: true,
   attachmentEligible: false,
   attachmentState: "V43Attachment_REACQUISITION_OR_READINESS_FAILED",
   chromeNull: true,
   agentNull: true,
   setupNull: true,
+  evidenceNull: true,
+  outputErrorNull: true,
 });
+assert.equal(outputGetterCalls, 0);
 
 console.log(JSON.stringify({
   result: "V43_PURE_FIXTURES_PASS",
+  briefBytes: Buffer.byteLength(brief),
+  briefSha256: crypto.createHash("sha256").update(brief).digest("hex").toUpperCase(),
   executableBytes: Buffer.byteLength(executable),
   executableSha256: crypto.createHash("sha256").update(executable).digest("hex").toUpperCase(),
   syntax: "PASS",
   declarationFree: true,
+  listingMatrix: true,
   exactOutputKeys: true,
   fullCellSuccess: true,
   fixedFailureCleanup: true,
@@ -642,4 +1065,6 @@ console.log(JSON.stringify({
   terminalOutputCleanup: true,
   completeCounterVectors: true,
   getterCalls,
+  listingGetterCalls,
+  outputGetterCalls,
 }));

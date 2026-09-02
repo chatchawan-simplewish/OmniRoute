@@ -95,6 +95,11 @@ for (const raw of Object.values(ordinaryRecord())) {
   assert.equal(serializedExact.includes(raw), false);
 }
 
+const foreign = inspect(vm.runInNewContext("[{ id: 'tab-foreign' }]"));
+assert.equal(foreign.arrayIsArray, true);
+assert.equal(foreign.rankZeroOrdinaryPrototype, true);
+assert.equal(JSON.stringify(foreign).includes("tab-foreign"), false);
+
 const optionalUndefined = ordinaryRecord();
 optionalUndefined.title = undefined;
 const optionalResult = inspect([optionalUndefined]);

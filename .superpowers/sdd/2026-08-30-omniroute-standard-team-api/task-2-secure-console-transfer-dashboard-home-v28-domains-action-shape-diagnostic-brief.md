@@ -11,6 +11,11 @@ the sole locator click rejected before fulfillment. V23, V26, and V27 have now
 failed at three different guarded route boundaries. V28 therefore does not
 guess or attempt another activation method.
 
+Fix round 1 closes IMPORTANT `V28-001` from independent review commit
+`20e7795247f575cc87fcedca131feb83f8a892bb` by requiring all six V23, V26,
+and V27 pre-create/post-native detach flags to exist as booleans and remain
+false in the exact predecessor boundary.
+
 V28 is a fresh-tab, one-shot, read-only structural diagnostic. It reproduces
 only the proven condition-based settled-home boundary, takes one synchronous
 fixed-key snapshot of the unique visible Domains element and its safe
@@ -114,6 +119,12 @@ await (async () => {
       typeof secureConsoleDashboardV25DiagnosticConsumed === "boolean" &&
       typeof secureConsoleDashboardV26RouteConsumed === "boolean" &&
       typeof secureConsoleDashboardV27RouteConsumed === "boolean" &&
+      typeof secureConsoleOwnedTaskTabV23PreCreateDetachConsumed === "boolean" &&
+      typeof secureConsoleOwnedTaskTabV23PostNativeDetachConsumed === "boolean" &&
+      typeof secureConsoleDashboardV26PreCreateDetachConsumed === "boolean" &&
+      typeof secureConsoleDashboardV26PostNativeDetachConsumed === "boolean" &&
+      typeof secureConsoleDashboardV27PreCreateDetachConsumed === "boolean" &&
+      typeof secureConsoleDashboardV27PostNativeDetachConsumed === "boolean" &&
       typeof secureConsoleDashboardV28DiagnosticConsumed === "boolean";
     predecessorExact =
       declarationShape &&
@@ -124,6 +135,8 @@ await (async () => {
       secureConsoleOwnedTaskTabV23Eligible === false &&
       secureConsoleOwnedTaskTabV23State ===
         "CLOUDFLARE_PRESTART_READS_FAILED_CLEAN_V23" &&
+      secureConsoleOwnedTaskTabV23PreCreateDetachConsumed === false &&
+      secureConsoleOwnedTaskTabV23PostNativeDetachConsumed === false &&
       typeof secureConsoleDashboardV24DiagnosticConsumed === "undefined" &&
       typeof secureConsoleDashboardV24RetainedTab === "undefined" &&
       typeof secureConsoleDashboardV24State === "undefined" &&
@@ -134,11 +147,15 @@ await (async () => {
       secureConsoleDashboardV26RetainedTab === null &&
       secureConsoleDashboardV26Eligible === false &&
       secureConsoleDashboardV26State === "V26_ROUTE_FAILED_CLEAN" &&
+      secureConsoleDashboardV26PreCreateDetachConsumed === false &&
+      secureConsoleDashboardV26PostNativeDetachConsumed === false &&
       secureConsoleCloudflareReadsV26Consumed === false &&
       secureConsoleDashboardV27RouteConsumed === true &&
       secureConsoleDashboardV27RetainedTab === null &&
       secureConsoleDashboardV27Eligible === false &&
       secureConsoleDashboardV27State === "V27_ROUTE_FAILED_CLEAN" &&
+      secureConsoleDashboardV27PreCreateDetachConsumed === false &&
+      secureConsoleDashboardV27PostNativeDetachConsumed === false &&
       secureConsoleCloudflareReadsV27Consumed === false &&
       secureConsoleDashboardV28RetainedTab === null &&
       secureConsoleDashboardV28State === "UNCREATED";
@@ -405,7 +422,8 @@ manual integration, verdict relaxation, tab discovery, reconnect, or alternate
 browser path is allowed.
 
 Independent Sol High review must verify the V27 consumed-failed-clean boundary,
-the three-attempt architectural stop, the diagnostic-only scope, complete
+the `V28-001` six-flag correction, the three-attempt architectural stop, the
+diagnostic-only scope, complete
 fixed-key cross-realm projection, account-local href comparison, no identifier
 or attribute-value leakage, zero activation call sites, cleanup/cardinality,
 secrets, no provider mutation, no retry, and both mandatory confirmations.

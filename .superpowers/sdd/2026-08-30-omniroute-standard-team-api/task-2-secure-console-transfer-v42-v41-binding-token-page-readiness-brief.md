@@ -109,6 +109,7 @@ await (async () => {
   let tokenFilterComplete = false;
   let tokenSemanticSignature = false;
   let continuationBindingsRetained = false;
+  let predecessorRuntimeCleared = false;
   let failureCleanupComplete = false;
   let adopted = null;
   try {
@@ -345,16 +346,40 @@ await (async () => {
   if (result === "EXACT_V42_TOKEN_PAGE_SEMANTIC_READINESS_PASS") {
     secureConsoleOwnedTaskTabV42 = adopted;
     secureConsoleOwnedTaskTabV42Eligible = true;
-    secureConsoleOwnedTaskTabV42State =
-      "TOKEN_PAGE_SEMANTIC_READY_ELIGIBLE";
     secureConsoleOwnedTaskTabV41 = null;
     secureConsoleOwnedTaskTabV41Eligible = false;
     secureConsoleV41State = "V41_TRANSFERRED_TO_V42";
+    secureConsoleChromeV41 = null;
+    secureConsoleAgentV41 = null;
+    secureConsoleSetupBrowserRuntimeV41 = null;
+    predecessorRuntimeCleared =
+      secureConsoleChromeV41 === null &&
+      secureConsoleAgentV41 === null &&
+      secureConsoleSetupBrowserRuntimeV41 === null;
     continuationBindingsRetained =
       secureConsoleOwnedTaskTabV42 !== null &&
       secureConsoleOwnedTaskTabV42Eligible === true &&
       secureConsoleOwnedTaskTabV41 === null &&
-      secureConsoleOwnedTaskTabV41Eligible === false;
+      secureConsoleOwnedTaskTabV41Eligible === false &&
+      predecessorRuntimeCleared === true;
+    if (continuationBindingsRetained) {
+      secureConsoleOwnedTaskTabV42State =
+        "TOKEN_PAGE_SEMANTIC_READY_ELIGIBLE";
+    } else {
+      result = "V42_TOKEN_PAGE_SEMANTIC_READINESS_FAILED_STOP";
+      errorClass = "Error";
+      secureConsoleOwnedTaskTabV42 = null;
+      secureConsoleOwnedTaskTabV42Eligible = false;
+      secureConsoleOwnedTaskTabV42State =
+        "V42_TOKEN_PAGE_SEMANTIC_READINESS_FAILED";
+      secureConsoleV41State = "V41_DOWNSTREAM_FAILURE_DETACHED";
+      failureCleanupComplete =
+        secureConsoleOwnedTaskTabV42 === null &&
+        secureConsoleOwnedTaskTabV42Eligible === false &&
+        secureConsoleOwnedTaskTabV41 === null &&
+        secureConsoleOwnedTaskTabV41Eligible === false &&
+        predecessorRuntimeCleared === true;
+    }
   } else {
     secureConsoleOwnedTaskTabV42 = null;
     secureConsoleOwnedTaskTabV42Eligible = false;
@@ -366,14 +391,16 @@ await (async () => {
     secureConsoleChromeV41 = null;
     secureConsoleAgentV41 = null;
     secureConsoleSetupBrowserRuntimeV41 = null;
+    predecessorRuntimeCleared =
+      secureConsoleChromeV41 === null &&
+      secureConsoleAgentV41 === null &&
+      secureConsoleSetupBrowserRuntimeV41 === null;
     failureCleanupComplete =
       secureConsoleOwnedTaskTabV42 === null &&
       secureConsoleOwnedTaskTabV42Eligible === false &&
       secureConsoleOwnedTaskTabV41 === null &&
       secureConsoleOwnedTaskTabV41Eligible === false &&
-      secureConsoleChromeV41 === null &&
-      secureConsoleAgentV41 === null &&
-      secureConsoleSetupBrowserRuntimeV41 === null;
+      predecessorRuntimeCleared === true;
   }
 
   counters.writeAttempted++;
@@ -393,6 +420,7 @@ await (async () => {
       tokenFilterComplete,
       tokenSemanticSignature,
       continuationBindingsRetained,
+      predecessorRuntimeCleared,
       failureCleanupComplete,
       ...counters,
       errorClass,

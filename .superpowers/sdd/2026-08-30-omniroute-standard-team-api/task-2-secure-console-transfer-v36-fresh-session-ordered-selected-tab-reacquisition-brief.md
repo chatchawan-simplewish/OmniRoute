@@ -319,9 +319,9 @@ await (async () => {
     counters.openTabsAttempted++;
     const offered = await secureConsoleChromeV36.user.openTabs();
     counters.openTabsFulfilled++;
-    offeredCount = Array.isArray(offered) ? offered.length : -1;
     const candidate = trustedListing(offered);
     listingValidated = candidate !== null;
+    offeredCount = listingValidated ? candidate.count : -1;
     rankZeroSelected = listingValidated;
     candidateUrlCloudflare = listingValidated && candidate.urlCloudflare;
     if (!listingValidated) throw new Error("OrderedTabListingShapeError");
@@ -508,17 +508,24 @@ IMPORTANT findings without any live action:
 - `V36-002`: the projector retains no record object and `claimTab()` receives
   only the once-cached validated primitive ID. A disagreeing Proxy fixture
   proves zero untrusted property reads after projection.
+- The fix-1 review is static FAIL evidence at commit
+  `a0f15ddde6432d5c586bf64902a75ed6eb2d7b78`; it confirms `V36-001` and
+  `V36-002` closed and identifies `V36-003`.
+- `V36-003`: no ordinary `offered.length` read remains. `offeredCount` stays at
+  its fixed sentinel until projection succeeds, then receives only the cached,
+  bounded `candidate.count`. A Proxy-array fixture proves zero property-get
+  reads while producing the fixed bounded evidence count.
 
 Coordinator offline evidence before review:
 
 - executable cells: `1`;
-- normalized UTF-8 cell bytes: `15005`;
+- normalized UTF-8 cell bytes: `15000`;
 - cell SHA-256:
-  `DC954CEB50C79777E424C18BE2586DB86A6288F71350CBBB6ED134E9B2A78422`;
+  `5395EAC07AEC15AB63BC78AA9DB1E89AE909DC00EE74991F6CEDF0BCB32834B0`;
 - `node.exe --check` of an async-function wrapper: `PASS`;
 - pure exact-record, null-prototype, rejection, rank-zero object identity,
   one-call claim stub, snapshot projector, and negative semantic fixtures:
-  `V36_FIX1_PURE_FIXTURES_PASS`.
+  `V36_FIX2_PURE_FIXTURES_PASS`.
 
 Live execution remains forbidden until an independent Sol High review returns
 PASS with zero Critical/HIGH/IMPORTANT/Minor findings, the PASS review is

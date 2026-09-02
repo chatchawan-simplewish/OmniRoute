@@ -50,7 +50,6 @@ await (async () => {
     offeredCount: -1,
     arrayOwnNamesExact: false,
     allIndexDescriptorsDataEnumerable: false,
-    allIndexValuesNonNullObjects: false,
     descriptorIndexCountMatchesLength: false,
     rankZeroNonNullObject: false,
     rankZeroOrdinaryPrototype: false,
@@ -68,7 +67,11 @@ await (async () => {
     urlParseSucceeded: false,
     urlHttps: false,
     urlCloudflareHostExact: false,
-    urlApiTokensPathExact: false,
+    urlPortEmpty: false,
+    urlUsernameEmpty: false,
+    urlPasswordEmpty: false,
+    urlCloudflareV47: false,
+    urlAbsentOrCloudflareV47: false,
     documentedKeyChecks: {
       id: emptyKeyCheck(true),
       lastOpened: emptyKeyCheck(false),
@@ -115,7 +118,6 @@ await (async () => {
       offeredCount: -1,
       arrayOwnNamesExact: false,
       allIndexDescriptorsDataEnumerable: false,
-      allIndexValuesNonNullObjects: false,
       descriptorIndexCountMatchesLength: false,
       rankZeroNonNullObject: false,
       rankZeroOrdinaryPrototype: false,
@@ -133,7 +135,11 @@ await (async () => {
       urlParseSucceeded: false,
       urlHttps: false,
       urlCloudflareHostExact: false,
-      urlApiTokensPathExact: false,
+      urlPortEmpty: false,
+      urlUsernameEmpty: false,
+      urlPasswordEmpty: false,
+      urlCloudflareV47: false,
+      urlAbsentOrCloudflareV47: false,
       documentedKeyChecks: {
         id: keyCheck(true),
         lastOpened: keyCheck(false),
@@ -177,18 +183,14 @@ await (async () => {
 
     const descriptors = [];
     let descriptorsSafe = true;
-    let valuesObjects = true;
     for (let index = 0; index < length; index++) {
       const descriptor = getOwnPropertyDescriptor(offered, stringFrom(index));
       descriptors.push(descriptor);
       const data = descriptor !== undefined && hasOwn(descriptor, "value") &&
         !hasOwn(descriptor, "get") && !hasOwn(descriptor, "set");
       if (!data || descriptor.enumerable !== true) descriptorsSafe = false;
-      if (!data || typeof descriptor.value !== "object" ||
-          descriptor.value === null) valuesObjects = false;
     }
     diagnostic.allIndexDescriptorsDataEnumerable = descriptorsSafe;
-    diagnostic.allIndexValuesNonNullObjects = valuesObjects;
     diagnostic.descriptorIndexCountMatchesLength = descriptors.length === length;
 
     const firstDescriptor = descriptors[0];
@@ -289,6 +291,7 @@ await (async () => {
 
     const urlCheck = diagnostic.documentedKeyChecks.url;
     diagnostic.urlFieldPresent = urlCheck.present;
+    diagnostic.urlAbsentOrCloudflareV47 = !urlCheck.present;
     diagnostic.urlFieldSafeString = urlCheck.present && urlCheck.data &&
       urlCheck.valueTypeAllowed && urlValue !== null;
     if (diagnostic.urlFieldSafeString) {
@@ -299,8 +302,13 @@ await (async () => {
         diagnostic.urlHttps = parsed.protocol === "https:";
         diagnostic.urlCloudflareHostExact =
           parsed.hostname === "dash.cloudflare.com";
-        diagnostic.urlApiTokensPathExact =
-          parsed.pathname === "/profile/api-tokens";
+        diagnostic.urlPortEmpty = parsed.port === "";
+        diagnostic.urlUsernameEmpty = parsed.username === "";
+        diagnostic.urlPasswordEmpty = parsed.password === "";
+        diagnostic.urlCloudflareV47 = diagnostic.urlHttps &&
+          diagnostic.urlCloudflareHostExact && diagnostic.urlPortEmpty &&
+          diagnostic.urlUsernameEmpty && diagnostic.urlPasswordEmpty;
+        diagnostic.urlAbsentOrCloudflareV47 = diagnostic.urlCloudflareV47;
       } catch {
         diagnostic.urlParseSucceeded = false;
       }

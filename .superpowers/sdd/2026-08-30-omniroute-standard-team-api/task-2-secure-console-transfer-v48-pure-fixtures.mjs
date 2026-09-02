@@ -32,7 +32,6 @@ const expectedKeys = [
   "offeredCount",
   "arrayOwnNamesExact",
   "allIndexDescriptorsDataEnumerable",
-  "allIndexValuesNonNullObjects",
   "descriptorIndexCountMatchesLength",
   "rankZeroNonNullObject",
   "rankZeroOrdinaryPrototype",
@@ -50,7 +49,11 @@ const expectedKeys = [
   "urlParseSucceeded",
   "urlHttps",
   "urlCloudflareHostExact",
-  "urlApiTokensPathExact",
+  "urlPortEmpty",
+  "urlUsernameEmpty",
+  "urlPasswordEmpty",
+  "urlCloudflareV47",
+  "urlAbsentOrCloudflareV47",
   "documentedKeyChecks",
 ];
 const expectedDocumentedKeys = [
@@ -117,6 +120,11 @@ const sparseResult = inspect(sparse);
 assert.equal(sparseResult.arrayOwnNamesExact, false);
 assert.equal(sparseResult.allIndexDescriptorsDataEnumerable, false);
 
+const laterRankPrimitive = inspect([ordinaryRecord(), 42]);
+assert.equal(laterRankPrimitive.allIndexDescriptorsDataEnumerable, true);
+assert.equal(laterRankPrimitive.rankZeroAllValuesV47Safe, true);
+assert.equal(laterRankPrimitive.urlCloudflareV47, true);
+
 let indexGetterCalls = 0;
 const accessorArray = new Array(1);
 Object.defineProperty(accessorArray, "0", {
@@ -173,6 +181,28 @@ const malformedUrlResult = inspect([malformedUrl]);
 assert.equal(malformedUrlResult.urlFieldSafeString, true);
 assert.equal(malformedUrlResult.urlParseSucceeded, false);
 assert.equal(malformedUrlResult.urlCloudflareHostExact, false);
+assert.equal(malformedUrlResult.urlAbsentOrCloudflareV47, false);
+
+const portUrl = ordinaryRecord();
+portUrl.url = "https://dash.cloudflare.com:8443/profile/api-tokens";
+const portResult = inspect([portUrl]);
+assert.equal(portResult.urlHttps, true);
+assert.equal(portResult.urlCloudflareHostExact, true);
+assert.equal(portResult.urlPortEmpty, false);
+assert.equal(portResult.urlCloudflareV47, false);
+
+const userInfoUrl = ordinaryRecord();
+userInfoUrl.url = "https://user:pass@dash.cloudflare.com/profile/api-tokens";
+const userInfoResult = inspect([userInfoUrl]);
+assert.equal(userInfoResult.urlUsernameEmpty, false);
+assert.equal(userInfoResult.urlPasswordEmpty, false);
+assert.equal(userInfoResult.urlCloudflareV47, false);
+
+const unrelatedPathUrl = ordinaryRecord();
+unrelatedPathUrl.url = "https://dash.cloudflare.com/unrelated";
+const unrelatedPathResult = inspect([unrelatedPathUrl]);
+assert.equal(unrelatedPathResult.urlCloudflareV47, true);
+assert.equal(unrelatedPathResult.urlAbsentOrCloudflareV47, true);
 
 assert.throws(() => inspect(new Proxy([], {
   ownKeys() {

@@ -83,7 +83,6 @@ V48 reports these predicates independently so the rejecting rule is identifiable
 - `length` value is a safe integer in `[1,1000]`;
 - own string names are exactly `length` plus canonical indices `0..length-1`;
 - every index has an own enumerable data descriptor with no getter or setter;
-- every index descriptor contains a non-null object value; and
 - descriptor-derived index count equals the bounded length.
 
 `offeredCount` is populated only from the cached own `length` data descriptor
@@ -122,8 +121,12 @@ cached standard `URL` constructor. It reports only booleans for:
 - URL field safe string;
 - URL parse success;
 - HTTPS scheme;
-- exact `dash.cloudflare.com` hostname; and
-- exact intended API Tokens pathname.
+- exact `dash.cloudflare.com` hostname;
+- empty port;
+- empty username;
+- empty password;
+- the exact V47 Cloudflare-origin conjunction; and
+- the exact V47 absent-URL-or-valid-Cloudflare-origin acceptance predicate.
 
 The raw URL and all parsed components must be cleared before output and must
 never be returned, logged, committed, or placed in evidence.
@@ -154,8 +157,9 @@ Before live execution, the implementation must provide:
 
 1. one exact executable source and one smallest pure-fixture check;
 2. syntax PASS plus a fixed `V48_PURE_FIXTURES_PASS` result covering ordinary,
-   optional-undefined, accessor, symbol, sparse, extra-key, bad-prototype,
-   malformed-length, malformed-URL, and throwing-object cases;
+   optional-undefined, accessor, symbol, sparse, later-rank primitive, extra-key,
+   bad-prototype, malformed-length, URL port/userinfo/path, malformed-URL, and
+   throwing-object cases;
 3. a committed byte/hash review package;
 4. independent Sol High review with zero unresolved Critical, HIGH, or IMPORTANT
    findings and an exact PASS verdict;

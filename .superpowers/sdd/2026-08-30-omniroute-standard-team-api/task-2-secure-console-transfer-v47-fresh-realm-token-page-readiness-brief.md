@@ -32,22 +32,24 @@ still fails closed.
 
 - Executable:
   `task-2-secure-console-transfer-v47-fresh-realm-token-page-readiness-executable.js`
-- Executable length: `41045` bytes.
+- Executable length: `41533` bytes.
 - Executable SHA-256:
-  `359CC0E55C1C1944F8C4EDC00FAFD695C54988EFDD4FAAF5A3727BB80AF51A3E`
+  `5B44CE8AADCA857C24BCCC6C93F566856AE93711065B8BA4577590703DAA708D`
 - Pure fixture:
   `task-2-secure-console-transfer-v47-pure-fixtures.mjs`
-- Pure fixture length: `49287` bytes.
+- Pure fixture length: `50343` bytes.
 - Pure fixture SHA-256:
-  `330EF84E5A2CBBAE246584A8D9FB3405F7E632D69E52B04261EFC372D8BA8798`
+  `90771E3BB4423B986A8AAF5CD6F4BD6F208B176639D1BBCBF6BEB466F24815A3`
 
 Any byte or hash drift invalidates review and execution eligibility.
 
 ## One-shot declarations and ownership
 
-V47 uses only its fresh V47 declarations. Before execution a fixed direct
-`typeof` audit must prove all V35-V47 predecessor and candidate declarations
-absent in the fresh realm. The exact executable may be sent only once.
+V47 uses only its fresh V47 declarations. Its own predecessor guard directly
+checks the established V35-V45 set plus all seven V46 top-level declarations.
+Before execution a separate fixed direct `typeof` audit must prove all V35-V47
+predecessor and candidate declarations absent in the fresh realm. The exact
+executable may be sent only once.
 
 The attachment stage performs exactly one runtime import, setup, Chrome
 connection, complete documentation read and terminal write, session name,
@@ -71,6 +73,12 @@ home path, exactly one `mysw.me` zone link, positive anchor count, and zero busy
 indicators. Only the owned tab is transferred downstream on exact PASS.
 
 ## Token-page semantic readiness
+
+The pure fixture includes one inert contamination case for each V46 top-level
+declaration and proves every case consumes V47 but stops before import, setup,
+documentation, naming, listing, claim, or navigation, with exact cleanup. Its
+terminal field is `v46PredecessorsAbsent` and it derives the V47 executable
+length and SHA-256 directly before requiring both values in this brief.
 
 The downstream stage performs one exact navigation to
 `https://dash.cloudflare.com/profile/api-tokens`, one exact URL read, then:

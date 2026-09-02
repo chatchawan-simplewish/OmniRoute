@@ -97,7 +97,14 @@ await (async () => {
       typeof secureConsoleOwnedTaskTabV45 === "undefined" &&
       typeof secureConsoleOwnedTaskTabV45Eligible === "undefined" &&
       typeof secureConsoleV45Consumed === "undefined" &&
-      typeof secureConsoleV45State === "undefined";
+      typeof secureConsoleV45State === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV46 === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV46Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV46State === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV46PreCreateDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV46PostNativeDetachConsumed === "undefined" &&
+      typeof secureConsoleCloudflareReadsV46Consumed === "undefined" &&
+      typeof secureConsoleV46Consumed === "undefined";
     const counters = {
       importAttempted: 0, importFulfilled: 0,
       setupAttempted: 0, setupFulfilled: 0,
@@ -880,9 +887,3 @@ await (async () => {
     }
   })();
 })();
-
-
-
-
-
-

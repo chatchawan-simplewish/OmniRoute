@@ -18,7 +18,11 @@ const executablePath = path.join(
   "task-2-secure-console-transfer-v47-fresh-realm-token-page-readiness-executable.js",
 );
 const executable = fs.readFileSync(executablePath, "utf8").replace(/\r\n/g, "\n");
+const executableBytes = Buffer.byteLength(executable);
+const executableSha256 = crypto.createHash("sha256").update(executable).digest("hex").toUpperCase();
 assert.ok(brief.includes("55C8833CF0E405022B747298CE71E7ED6DCF4A301A6C429026A598004444050E"));
+assert.ok(brief.includes(`- Executable length: \`${executableBytes}\` bytes.`));
+assert.ok(brief.includes(`  \`${executableSha256}\``));
 const fixtureBytes = fixture.length;
 const fixtureSha256 = crypto.createHash("sha256").update(fixture).digest("hex").toUpperCase();
 assert.ok(brief.includes(`- Pure fixture length: \`${fixtureBytes}\` bytes.`));
@@ -830,6 +834,13 @@ for (const prelude of [
   "let secureConsoleOwnedTaskTabV45Eligible = false;\n",
   "let secureConsoleV45Consumed = false;\n",
   "let secureConsoleV45State = \"DIRTY\";\n",
+  "let secureConsoleOwnedTaskTabV46 = null;\n",
+  "let secureConsoleOwnedTaskTabV46Eligible = false;\n",
+  "let secureConsoleOwnedTaskTabV46State = \"DIRTY\";\n",
+  "let secureConsoleOwnedTaskTabV46PreCreateDetachConsumed = false;\n",
+  "let secureConsoleOwnedTaskTabV46PostNativeDetachConsumed = false;\n",
+  "let secureConsoleCloudflareReadsV46Consumed = false;\n",
+  "let secureConsoleV46Consumed = false;\n",
 ]) {
   const contaminated = await run({}, prelude);
   assert.equal(contaminated.caught, null);
@@ -837,8 +848,19 @@ for (const prelude of [
   assert.equal(contaminated.fixture.openTabsCalls, 0);
   assert.equal(contaminated.output.result, "V47_TOKEN_PAGE_SEMANTIC_READINESS_FAILED_STOP");
   assert.equal(contaminated.output.attachment.declarationShape, false);
-  assert.equal(contaminated.output.attachment.importAttempted, 0);
+  for (const key of [
+    "importAttempted", "setupAttempted", "documentationAttempted",
+    "nameAttempted", "openTabsAttempted", "claimAttempted",
+    "navigationAttempted", "waitAttempted", "urlAttempted",
+    "snapshotAttempted",
+  ]) assert.equal(contaminated.output.attachment[key], 0, `${prelude.trim()} ${key}`);
+  assert.equal(contaminated.output.consumed, true);
   assert.equal(contaminated.output.bindingEligible, false);
+  assert.equal(contaminated.output.bindingNull, true);
+  assert.equal(
+    contaminated.output.state,
+    "V47_TOKEN_PAGE_SEMANTIC_READINESS_FAILED",
+  );
   assert.equal(contaminated.output.failureCleanupComplete, true);
   assert.deepEqual(Object.keys(contaminated.output).sort(), expectedTopKeys);
 }
@@ -1244,13 +1266,13 @@ console.log(JSON.stringify({
   result: "V47_PURE_FIXTURES_PASS",
   briefBytes: Buffer.byteLength(brief),
   briefSha256: crypto.createHash("sha256").update(brief).digest("hex").toUpperCase(),
-  executableBytes: Buffer.byteLength(executable),
-  executableSha256: crypto.createHash("sha256").update(executable).digest("hex").toUpperCase(),
+  executableBytes,
+  executableSha256,
   fixtureBytes,
   fixtureSha256,
   syntax: "PASS",
   declarationFree: true,
-  v45PredecessorsAbsent: true,
+  v46PredecessorsAbsent: true,
   listingMatrix: true,
   exactOutputKeys: true,
   fullCellSuccess: true,
@@ -1262,7 +1284,3 @@ console.log(JSON.stringify({
   listingGetterCalls,
   outputGetterCalls,
 }));
-
-
-
-

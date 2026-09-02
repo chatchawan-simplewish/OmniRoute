@@ -5,7 +5,9 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
-const directory = path.dirname(fileURLToPath(import.meta.url));
+const fixturePath = fileURLToPath(import.meta.url);
+const directory = path.dirname(fixturePath);
+const fixture = fs.readFileSync(fixturePath);
 const briefPath = path.join(
   directory,
   "task-2-secure-console-transfer-v44-fresh-realm-token-page-readiness-brief.md",
@@ -17,6 +19,10 @@ const executablePath = path.join(
 );
 const executable = fs.readFileSync(executablePath, "utf8").replace(/\r\n/g, "\n");
 assert.ok(brief.includes("75F4700B6519A1EA519FE509053735B85E1690A25D5C302B566293A86BF82F67"));
+const fixtureBytes = fixture.length;
+const fixtureSha256 = crypto.createHash("sha256").update(fixture).digest("hex").toUpperCase();
+assert.ok(brief.includes(`- Pure fixture length: \`${fixtureBytes}\` bytes.`));
+assert.ok(brief.includes(`  \`${fixtureSha256}\``));
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 new AsyncFunction(executable);
 
@@ -1169,6 +1175,8 @@ console.log(JSON.stringify({
   briefSha256: crypto.createHash("sha256").update(brief).digest("hex").toUpperCase(),
   executableBytes: Buffer.byteLength(executable),
   executableSha256: crypto.createHash("sha256").update(executable).digest("hex").toUpperCase(),
+  fixtureBytes,
+  fixtureSha256,
   syntax: "PASS",
   declarationFree: true,
   v43PredecessorsAbsent: true,

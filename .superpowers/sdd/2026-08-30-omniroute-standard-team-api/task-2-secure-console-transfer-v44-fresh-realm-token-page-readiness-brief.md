@@ -30,9 +30,9 @@ secret, confirmation, counter, output, and cleanup constraints remain unchanged.
   `75F4700B6519A1EA519FE509053735B85E1690A25D5C302B566293A86BF82F67`
 - Pure fixture:
   `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v44-pure-fixtures.mjs`
-- Pure fixture length: `45955` bytes.
+- Pure fixture length: `46332` bytes.
 - Pure fixture SHA-256:
-  `E63752DD544605D64DDB43F79CDF60D24B9E413F9E8F7C75499B2EA7BB16EA40`
+  `C9CA54C48A846B83C7D31F72EE609C40088A8B669C6A6AE90B4643AF1762F799`
 - Browser client module:
   `C:\Users\chatc\.codex\plugins\cache\openai-bundled\chrome\26.831.21537\scripts\browser-client.mjs`
 - Browser client length: `149771` bytes.

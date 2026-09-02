@@ -26,16 +26,18 @@ V45 was consumed exactly once and returned
 
 ## Root cause
 
-V44's listing validation rejected the sole offered tab only because it required
-the array object's prototype to equal the current REPL realm's
-`Array.prototype`. The browser runtime returned a genuine cross-realm array:
-`Array.isArray` and every bounded structural/content check passed, while the
-realm-local prototype identity check did not.
+V45 confirms that the returned value is a genuine cross-realm array:
+`Array.isArray` passed while realm-local prototype identity differed. That
+difference is non-causal because V44 deliberately used `Array.isArray` and did
+not require realm-local array-prototype identity.
 
-This is sufficient evidence for the narrow replacement: accept a genuine
-cross-realm array without weakening any length, descriptor, key, value, ID,
-URL, page-signature, completeness, no-residue, secret, confirmation, or cleanup
-constraint.
+V45 rules out every other structural and value rejection in V44 except V44's
+requirement that the optional `url` property be present and Cloudflare-qualified.
+The fresh `cua.getState()` independently proved that the sole offered tab was
+the selected Cloudflare API Tokens tab, while the browser API contract declares
+`url?: string`. Therefore the narrow evidenced incompatibility is V44 treating
+an API-optional listing URL as mandatory. No broader listing relaxation is
+supported.
 
 ## Security and provider boundary
 
@@ -48,10 +50,13 @@ constraint.
 
 ## Replacement boundary
 
-V46 must change only the incompatible realm-local array-prototype equality
-requirement. It must retain `Array.isArray` plus every passed structural and
-content invariant and all V44 semantic page-signature, completeness,
-no-residue, no-retry, secret, confirmation, and cleanup constraints. V46 may
-not be executed until an independent Sol High PASS review, a
+V46 must change only the incompatible requirement that each candidate listing
+record contain `url`. If `url` is present it must remain V37-safe and exactly
+Cloudflare-qualified; if absent, the sole/rank-zero/user-confirmed selection
+must be verified after claim by the unchanged Cloudflare navigation and page
+signatures. V46 must retain `Array.isArray`, every passed structural/content
+invariant, and all V44 semantic page-signature, completeness, no-residue,
+no-retry, secret, confirmation, and cleanup constraints. V46 may not be
+executed until an independent Sol High PASS review, a
 non-self-referential classification, and a post-commit coordinator tuple are
 complete.

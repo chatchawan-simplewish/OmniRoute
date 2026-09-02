@@ -16,7 +16,8 @@ V32 takes the minimum native route now supported by direct evidence. It opens
 one fresh owned tab through the persistent V5 controller, restores the exact
 account-home signature, and freshly requires exactly one anchor href whose
 parsed host and pathname match the same-account mysw.me zone route. It then
-uses one direct goto to that observed route, waits once for bounded network
+uses one direct goto to the freshly observed and strictly validated href,
+including any observed query or fragment, then waits once for bounded network
 idle, reads the settled URL once, and takes one synchronous fixed-shape page
 snapshot. No UI activation is retried.
 
@@ -113,6 +114,7 @@ await (async () => {
   let homeUrlValidated = false;
   let preSnapshotValidated = false;
   let preShapeExact = false;
+  let observedZoneUrlValidated = false;
   let zoneUrlValidated = false;
   let postSnapshotValidated = false;
   let postSnapshotComplete = false;
@@ -222,7 +224,7 @@ await (async () => {
       await tab.playwright.locator("body").evaluate(
         (body, segment) => {
           const anchors = [...body.querySelectorAll("a[href]")];
-          const exactZoneHrefCount = anchors.filter((item) => {
+          const exactZoneAnchors = anchors.filter((item) => {
             try {
               const url = new URL(
                 item.getAttribute("href") || "",
@@ -236,13 +238,17 @@ await (async () => {
             } catch {
               return false;
             }
-          }).length;
+          });
+          const exactZoneHrefCount = exactZoneAnchors.length;
           return {
             hostExact: location.protocol === "https:" &&
               location.hostname === "dash.cloudflare.com",
             accountHomePath:
               new RegExp("^/" + segment + "/home/?$").test(location.pathname),
             exactZoneHrefCount,
+            observedZoneHref: exactZoneHrefCount === 1
+              ? exactZoneAnchors[0].getAttribute("href") || ""
+              : "",
             allAnchorCount: anchors.length,
             busyCount: body.querySelectorAll(
               '[aria-busy="true"], [role="progressbar"]',
@@ -252,8 +258,45 @@ await (async () => {
         accountSegment,
       );
     counters.preSnapshotFulfilled++;
+    const untrustedPreShape =
+      plainRecord(untrustedPreSnapshot) &&
+      exactKeys(
+        untrustedPreSnapshot,
+        [...preBooleanKeys, ...preIntegerKeys, "observedZoneHref"],
+      ) &&
+      typeof untrustedPreSnapshot.observedZoneHref === "string" &&
+      untrustedPreSnapshot.observedZoneHref.length > 0 &&
+      untrustedPreSnapshot.observedZoneHref.length <= 2048 &&
+      !/[\u0000-\u001f\u007f]/.test(
+        untrustedPreSnapshot.observedZoneHref,
+      );
+    let observedZoneUrl = null;
+    if (untrustedPreShape) {
+      try {
+        observedZoneUrl = new URL(
+          untrustedPreSnapshot.observedZoneHref,
+          homeUrl,
+        );
+      } catch {}
+    }
+    observedZoneUrlValidated =
+      observedZoneUrl !== null &&
+      observedZoneUrl.protocol === "https:" &&
+      observedZoneUrl.hostname === "dash.cloudflare.com" &&
+      observedZoneUrl.port === "" &&
+      observedZoneUrl.username === "" &&
+      observedZoneUrl.password === "" &&
+      new RegExp(
+        "^/" + accountSegment + "/mysw\\.me/?$",
+      ).test(observedZoneUrl.pathname);
     preSnapshot = trustedRecord(
-      untrustedPreSnapshot,
+      untrustedPreShape ? {
+        hostExact: untrustedPreSnapshot.hostExact,
+        accountHomePath: untrustedPreSnapshot.accountHomePath,
+        exactZoneHrefCount: untrustedPreSnapshot.exactZoneHrefCount,
+        allAnchorCount: untrustedPreSnapshot.allAnchorCount,
+        busyCount: untrustedPreSnapshot.busyCount,
+      } : null,
       preBooleanKeys,
       preIntegerKeys,
     );
@@ -264,13 +307,12 @@ await (async () => {
       preSnapshot.accountHomePath === true &&
       preSnapshot.exactZoneHrefCount === 1 &&
       preSnapshot.allAnchorCount > 0 &&
-      preSnapshot.busyCount === 0;
+      preSnapshot.busyCount === 0 &&
+      observedZoneUrlValidated === true;
     if (!preShapeExact) throw new Error("ZoneRoutePreShapeError");
 
-    const zoneUrl =
-      "https://dash.cloudflare.com/" + accountSegment + "/mysw.me";
     counters.zoneNavigationAttempted++;
-    await tab.goto(zoneUrl);
+    await tab.goto(observedZoneUrl.href);
     counters.zoneNavigationFulfilled++;
     counters.zoneWaitAttempted++;
     await tab.playwright.waitForTimeout(20000, { state: "networkidle" });
@@ -427,6 +469,7 @@ await (async () => {
     homeUrlValidated,
     preSnapshotValidated,
     preShapeExact,
+    observedZoneUrlValidated,
     zoneUrlValidated,
     postSnapshotValidated,
     postSnapshotComplete,

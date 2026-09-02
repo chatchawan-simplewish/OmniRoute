@@ -132,17 +132,192 @@ await (async () => {
     const name = typeof error?.name === "string" ? error.name : "Error";
     return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name) ? name : "Error";
   };
-  const v37SafeString = (key, value) => {
-    const limit = key === "url" ? 16384 : key === "title" ? 4096 : 512;
-    return typeof value === "string" && value.length > 0 &&
-      value.length <= limit && !/[\u0000-\u001f\u007f]/.test(value);
+  // BEGIN_V38_PURE_LISTING_DIAGNOSTIC
+  const inspectListingV38 = (offered) => {
+    const diagnostic = {
+      arrayIsArray: null,
+      arrayPrototypeExact: null,
+      arraySymbolsZero: null,
+      lengthDescriptorPresent: null,
+      lengthDescriptorData: null,
+      lengthDescriptorNonEnumerable: null,
+      lengthDescriptorSafeBounded: null,
+      offeredCount: -1,
+      arrayOwnNamesReadable: null,
+      arrayNameCountExact: null,
+      arrayNamesExpectedOnly: null,
+      allIndexDescriptorsPresent: null,
+      allIndexDescriptorsData: null,
+      allIndexDescriptorsEnumerable: null,
+      allRecordsPlain: null,
+      allRecordSymbolsZero: null,
+      allRecordKeysAllowedWithId: null,
+      allRecordDescriptorsPresent: null,
+      allRecordDescriptorsData: null,
+      allRecordDescriptorsEnumerable: null,
+      allRecordIdsV37Safe: null,
+      allRecordUrlsAbsentOrV37Safe: null,
+      allOptionalValuesStringOrUndefined: null,
+      allRecordValuesV37Safe: null,
+    };
+    const v37SafeString = (key, value) => {
+      const limit = key === "url" ? 16384 : key === "title" ? 4096 : 512;
+      return typeof value === "string" && value.length > 0 &&
+        value.length <= limit && !/[\u0000-\u001f\u007f]/.test(value);
+    };
+    const plainRecord = (value) => {
+      if (typeof value !== "object" || value === null) return false;
+      const prototype = Object.getPrototypeOf(value);
+      return prototype === null ||
+        (prototype !== null && Object.getPrototypeOf(prototype) === null);
+    };
+
+    diagnostic.arrayIsArray = Array.isArray(offered);
+    if (!diagnostic.arrayIsArray) return diagnostic;
+    diagnostic.arrayPrototypeExact =
+      Object.getPrototypeOf(offered) === Array.prototype;
+    diagnostic.arraySymbolsZero =
+      Object.getOwnPropertySymbols(offered).length === 0;
+    const lengthDescriptor =
+      Object.getOwnPropertyDescriptor(offered, "length");
+    diagnostic.lengthDescriptorPresent = lengthDescriptor !== undefined;
+    diagnostic.lengthDescriptorData =
+      diagnostic.lengthDescriptorPresent &&
+      Object.prototype.hasOwnProperty.call(lengthDescriptor, "value");
+    diagnostic.lengthDescriptorNonEnumerable =
+      diagnostic.lengthDescriptorPresent &&
+      lengthDescriptor.enumerable === false;
+    diagnostic.lengthDescriptorSafeBounded =
+      diagnostic.lengthDescriptorData &&
+      Number.isSafeInteger(lengthDescriptor.value) &&
+      lengthDescriptor.value >= 1 && lengthDescriptor.value <= 1000;
+    if (!diagnostic.lengthDescriptorSafeBounded) return diagnostic;
+
+    diagnostic.offeredCount = lengthDescriptor.value;
+    const arrayNames = Object.getOwnPropertyNames(offered);
+    diagnostic.arrayOwnNamesReadable = true;
+    diagnostic.arrayNameCountExact =
+      arrayNames.length === diagnostic.offeredCount + 1;
+    const expectedNames = new Set(["length"]);
+    for (let index = 0; index < diagnostic.offeredCount; index++) {
+      expectedNames.add(String(index));
+    }
+    diagnostic.arrayNamesExpectedOnly = true;
+    for (let index = 0; index < arrayNames.length; index++) {
+      if (!expectedNames.has(arrayNames[index])) {
+        diagnostic.arrayNamesExpectedOnly = false;
+      }
+    }
+
+    const indexDescriptors = [];
+    diagnostic.allIndexDescriptorsPresent = true;
+    diagnostic.allIndexDescriptorsData = true;
+    diagnostic.allIndexDescriptorsEnumerable = true;
+    for (let index = 0; index < diagnostic.offeredCount; index++) {
+      const descriptor =
+        Object.getOwnPropertyDescriptor(offered, String(index));
+      indexDescriptors.push(descriptor);
+      if (descriptor === undefined) {
+        diagnostic.allIndexDescriptorsPresent = false;
+        diagnostic.allIndexDescriptorsData = false;
+        diagnostic.allIndexDescriptorsEnumerable = false;
+        continue;
+      }
+      if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) {
+        diagnostic.allIndexDescriptorsData = false;
+      }
+      if (descriptor.enumerable !== true) {
+        diagnostic.allIndexDescriptorsEnumerable = false;
+      }
+    }
+    if (!diagnostic.allIndexDescriptorsPresent ||
+        !diagnostic.allIndexDescriptorsData) return diagnostic;
+
+    diagnostic.allRecordsPlain = true;
+    for (let index = 0; index < indexDescriptors.length; index++) {
+      if (!plainRecord(indexDescriptors[index].value)) {
+        diagnostic.allRecordsPlain = false;
+      }
+    }
+    if (!diagnostic.allRecordsPlain) return diagnostic;
+
+    const allowed = new Set([
+      "id", "lastOpened", "providerTabId", "tabGroup", "title", "url",
+    ]);
+    diagnostic.allRecordSymbolsZero = true;
+    diagnostic.allRecordKeysAllowedWithId = true;
+    diagnostic.allRecordDescriptorsPresent = true;
+    diagnostic.allRecordDescriptorsData = true;
+    diagnostic.allRecordDescriptorsEnumerable = true;
+    diagnostic.allRecordIdsV37Safe = true;
+    diagnostic.allRecordUrlsAbsentOrV37Safe = true;
+    diagnostic.allOptionalValuesStringOrUndefined = true;
+    diagnostic.allRecordValuesV37Safe = true;
+    for (let index = 0; index < indexDescriptors.length; index++) {
+      const item = indexDescriptors[index].value;
+      if (Object.getOwnPropertySymbols(item).length !== 0) {
+        diagnostic.allRecordSymbolsZero = false;
+      }
+      const keys = Object.getOwnPropertyNames(item);
+      let hasId = false;
+      for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+        const key = keys[keyIndex];
+        const keyAllowed = allowed.has(key);
+        const optionalAllowed = keyAllowed && key !== "id";
+        if (key === "id") hasId = true;
+        if (!keyAllowed) diagnostic.allRecordKeysAllowedWithId = false;
+        const descriptor = Object.getOwnPropertyDescriptor(item, key);
+        if (descriptor === undefined) {
+          diagnostic.allRecordDescriptorsPresent = false;
+          diagnostic.allRecordDescriptorsData = false;
+          diagnostic.allRecordDescriptorsEnumerable = false;
+          diagnostic.allRecordValuesV37Safe = false;
+          if (key === "id") diagnostic.allRecordIdsV37Safe = false;
+          if (key === "url") {
+            diagnostic.allRecordUrlsAbsentOrV37Safe = false;
+          }
+          if (optionalAllowed) {
+            diagnostic.allOptionalValuesStringOrUndefined = false;
+          }
+          continue;
+        }
+        const data =
+          Object.prototype.hasOwnProperty.call(descriptor, "value");
+        if (!data) diagnostic.allRecordDescriptorsData = false;
+        if (descriptor.enumerable !== true) {
+          diagnostic.allRecordDescriptorsEnumerable = false;
+        }
+        if (!data) {
+          diagnostic.allRecordValuesV37Safe = false;
+          if (key === "id") diagnostic.allRecordIdsV37Safe = false;
+          if (key === "url") {
+            diagnostic.allRecordUrlsAbsentOrV37Safe = false;
+          }
+          if (optionalAllowed) {
+            diagnostic.allOptionalValuesStringOrUndefined = false;
+          }
+          continue;
+        }
+        const value = descriptor.value;
+        const safe = v37SafeString(key, value);
+        if (!safe) diagnostic.allRecordValuesV37Safe = false;
+        if (key === "id" && !safe) diagnostic.allRecordIdsV37Safe = false;
+        if (key === "url" && !safe) {
+          diagnostic.allRecordUrlsAbsentOrV37Safe = false;
+        }
+        if (optionalAllowed &&
+            !(typeof value === "string" || value === undefined)) {
+          diagnostic.allOptionalValuesStringOrUndefined = false;
+        }
+      }
+      if (!hasId) {
+        diagnostic.allRecordKeysAllowedWithId = false;
+        diagnostic.allRecordIdsV37Safe = false;
+      }
+    }
+    return diagnostic;
   };
-  const plainRecord = (value) => {
-    if (typeof value !== "object" || value === null) return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === null ||
-      (prototype !== null && Object.getPrototypeOf(prototype) === null);
-  };
+  // END_V38_PURE_LISTING_DIAGNOSTIC
   try {
     declarationShape =
       gateWasFresh === true &&
@@ -164,16 +339,13 @@ await (async () => {
       "file:///C:/Users/chatc/.codex/plugins/cache/openai-bundled/chrome/26.831.20005/scripts/browser-client.mjs"
     );
     counters.importFulfilled++;
-    moduleShape =
-      typeof imported.setupBrowserRuntime === "function" &&
-      imported.BROWSER_CLIENT_ID === "chrome";
+    moduleShape = typeof imported === "object" && imported !== null &&
+      typeof imported.setupBrowserRuntime === "function";
     if (!moduleShape) throw new Error("BrowserModuleShapeError");
     secureConsoleSetupBrowserRuntimeV38 = imported.setupBrowserRuntime;
 
     counters.setupAttempted++;
-    secureConsoleAgentV38 = await secureConsoleSetupBrowserRuntimeV38({
-      transport: "cdp",
-    });
+    secureConsoleAgentV38 = await secureConsoleSetupBrowserRuntimeV38();
     counters.setupFulfilled++;
     agentShape =
       typeof secureConsoleAgentV38 === "object" &&
@@ -224,135 +396,32 @@ await (async () => {
     const offered = await secureConsoleChromeV38.user.openTabs();
     counters.openTabsFulfilled++;
 
-    arrayIsArray = Array.isArray(offered);
-    if (arrayIsArray) {
-      arrayPrototypeExact = Object.getPrototypeOf(offered) === Array.prototype;
-      arraySymbolsZero = Object.getOwnPropertySymbols(offered).length === 0;
-      const lengthDescriptor =
-        Object.getOwnPropertyDescriptor(offered, "length");
-      lengthDescriptorPresent = lengthDescriptor !== undefined;
-      lengthDescriptorData = lengthDescriptorPresent &&
-        Object.prototype.hasOwnProperty.call(lengthDescriptor, "value");
-      lengthDescriptorNonEnumerable = lengthDescriptorPresent &&
-        lengthDescriptor.enumerable === false;
-      lengthDescriptorSafeBounded = lengthDescriptorData &&
-        Number.isSafeInteger(lengthDescriptor.value) &&
-        lengthDescriptor.value >= 1 && lengthDescriptor.value <= 1000;
-      if (lengthDescriptorSafeBounded) {
-        offeredCount = lengthDescriptor.value;
-        const arrayNames = Object.getOwnPropertyNames(offered);
-        arrayOwnNamesReadable = true;
-        arrayNameCountExact = arrayNames.length === offeredCount + 1;
-        const expectedNames = new Set(["length"]);
-        for (let index = 0; index < offeredCount; index++) {
-          expectedNames.add(String(index));
-        }
-        arrayNamesExpectedOnly = true;
-        for (let index = 0; index < arrayNames.length; index++) {
-          if (!expectedNames.has(arrayNames[index])) {
-            arrayNamesExpectedOnly = false;
-          }
-        }
-
-        const indexDescriptors = [];
-        allIndexDescriptorsPresent = true;
-        allIndexDescriptorsData = true;
-        allIndexDescriptorsEnumerable = true;
-        for (let index = 0; index < offeredCount; index++) {
-          const descriptor =
-            Object.getOwnPropertyDescriptor(offered, String(index));
-          indexDescriptors.push(descriptor);
-          if (descriptor === undefined) allIndexDescriptorsPresent = false;
-          if (descriptor === undefined ||
-              !Object.prototype.hasOwnProperty.call(descriptor, "value")) {
-            allIndexDescriptorsData = false;
-          }
-          if (descriptor === undefined || descriptor.enumerable !== true) {
-            allIndexDescriptorsEnumerable = false;
-          }
-        }
-
-        if (allIndexDescriptorsPresent && allIndexDescriptorsData) {
-          const allowed = new Set([
-            "id", "lastOpened", "providerTabId", "tabGroup", "title", "url",
-          ]);
-          allRecordsPlain = true;
-          allRecordSymbolsZero = true;
-          allRecordKeysAllowedWithId = true;
-          allRecordDescriptorsPresent = true;
-          allRecordDescriptorsData = true;
-          allRecordDescriptorsEnumerable = true;
-          allRecordIdsV37Safe = true;
-          allRecordUrlsAbsentOrV37Safe = true;
-          allOptionalValuesStringOrUndefined = true;
-          allRecordValuesV37Safe = true;
-          for (let index = 0; index < indexDescriptors.length; index++) {
-            const item = indexDescriptors[index].value;
-            const itemPlain = plainRecord(item);
-            if (!itemPlain) {
-              allRecordsPlain = false;
-              allRecordSymbolsZero = false;
-              allRecordKeysAllowedWithId = false;
-              allRecordDescriptorsPresent = false;
-              allRecordDescriptorsData = false;
-              allRecordDescriptorsEnumerable = false;
-              allRecordIdsV37Safe = false;
-              allRecordUrlsAbsentOrV37Safe = false;
-              allOptionalValuesStringOrUndefined = false;
-              allRecordValuesV37Safe = false;
-              continue;
-            }
-            if (Object.getOwnPropertySymbols(item).length !== 0) {
-              allRecordSymbolsZero = false;
-            }
-            const keys = Object.getOwnPropertyNames(item);
-            let hasId = false;
-            for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
-              const key = keys[keyIndex];
-              if (key === "id") hasId = true;
-              if (!allowed.has(key)) allRecordKeysAllowedWithId = false;
-              const descriptor = Object.getOwnPropertyDescriptor(item, key);
-              if (descriptor === undefined) {
-                allRecordDescriptorsPresent = false;
-                allRecordDescriptorsData = false;
-                allRecordDescriptorsEnumerable = false;
-                allRecordValuesV37Safe = false;
-                if (key === "id") allRecordIdsV37Safe = false;
-                if (key === "url") allRecordUrlsAbsentOrV37Safe = false;
-                continue;
-              }
-              const data =
-                Object.prototype.hasOwnProperty.call(descriptor, "value");
-              if (!data) {
-                allRecordDescriptorsData = false;
-                allRecordValuesV37Safe = false;
-                if (key === "id") allRecordIdsV37Safe = false;
-                if (key === "url") allRecordUrlsAbsentOrV37Safe = false;
-                continue;
-              }
-              if (descriptor.enumerable !== true) {
-                allRecordDescriptorsEnumerable = false;
-              }
-              const value = descriptor.value;
-              const safe = v37SafeString(key, value);
-              if (!safe) allRecordValuesV37Safe = false;
-              if (key === "id" && !safe) allRecordIdsV37Safe = false;
-              if (key === "url" && !safe) {
-                allRecordUrlsAbsentOrV37Safe = false;
-              }
-              if (key !== "id" &&
-                  !(typeof value === "string" || value === undefined)) {
-                allOptionalValuesStringOrUndefined = false;
-              }
-            }
-            if (!hasId) {
-              allRecordKeysAllowedWithId = false;
-              allRecordIdsV37Safe = false;
-            }
-          }
-        }
-      }
-    }
+    ({
+      arrayIsArray,
+      arrayPrototypeExact,
+      arraySymbolsZero,
+      lengthDescriptorPresent,
+      lengthDescriptorData,
+      lengthDescriptorNonEnumerable,
+      lengthDescriptorSafeBounded,
+      offeredCount,
+      arrayOwnNamesReadable,
+      arrayNameCountExact,
+      arrayNamesExpectedOnly,
+      allIndexDescriptorsPresent,
+      allIndexDescriptorsData,
+      allIndexDescriptorsEnumerable,
+      allRecordsPlain,
+      allRecordSymbolsZero,
+      allRecordKeysAllowedWithId,
+      allRecordDescriptorsPresent,
+      allRecordDescriptorsData,
+      allRecordDescriptorsEnumerable,
+      allRecordIdsV37Safe,
+      allRecordUrlsAbsentOrV37Safe,
+      allOptionalValuesStringOrUndefined,
+      allRecordValuesV37Safe,
+    } = inspectListingV38(offered));
 
     const exactCounters =
       counters.importAttempted === 1 && counters.importFulfilled === 1 &&
@@ -435,12 +504,51 @@ await (async () => {
 })();
 ~~~
 
+## Required offline syntax and pure-fixture check
+
+The committed fixture is
+`.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v38-pure-fixtures.mjs`.
+It reads this committed working-tree brief, requires exactly one JavaScript
+cell, normalizes that cell to LF, constructs an `AsyncFunction` without
+invoking it, extracts the exact marked `inspectListingV38` helper from that
+cell, and runs the helper only against synthetic values. It imports the pinned
+module without calling setup and proves the corrected module namespace shape.
+It also replaces only the dynamic-import expression in memory, executes that
+transformed cell with inert setup/browser/documentation/listing/terminal stubs,
+and proves the exact terminal schema, success counters, permanent ineligibility,
+binding cleanup, and zero action counters. It performs no real browser setup,
+Chrome get, enumeration, provider, network, or VM action.
+
+Run it from the worktree root with:
+
+```powershell
+node .superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v38-pure-fixtures.mjs
+```
+
+The sole acceptable result is one JSON object with
+`result="V38_PURE_FIXTURES_PASS"`, `syntax="PASS"`, `moduleShape=true`,
+`fixedSchema=true`, and `getterCalls=0`, plus the current bounded brief and
+executable byte/hash pins.
+
+The fixture matrix must remain exact and passing for ordinary and foreign-realm
+Arrays; array symbols; empty/oversize length; unexpected names; holes; index
+accessors and non-enumerable indices; ordinary, null-prototype, and non-plain
+records; record symbols; missing and unexpected keys; unstable missing
+descriptors; enumerable and non-enumerable record accessors; optional
+`undefined`; empty, oversize, and control-bearing values; fixed schema; and
+traps proving no getter, iterator, or direct array/record property read. A
+foreign-realm fixture is only a diagnostic expectation and is not evidence
+about the live listing. The inert full-cell fixture must also prove one each of
+documentation, session naming, and enumeration, exact fixed terminal schema,
+success/consume/cleanup state, and zero claim/navigation/URL/snapshot actions.
+
 ## Action-time pins and single-use procedure
 
 Immediately before any live send, the sole Sol High owner must prove and record:
 
-1. this brief's commit, blob, bytes, SHA-256, executable bytes, and executable
-   SHA-256;
+1. this brief and fixture's commit, paths, blobs, bytes, and SHA-256; exactly one
+   extracted executable; its normalized UTF-8 bytes and SHA-256; exact syntax
+   PASS; and exact `V38_PURE_FIXTURES_PASS` output with every fixed field above;
 2. an independent Sol High PASS review of these exact committed bytes, with zero
    unresolved Critical, HIGH, or IMPORTANT findings;
 3. a later non-self-referential execution-classification commit whose parent is

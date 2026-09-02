@@ -16,6 +16,8 @@ await (async () => {
     connectFulfilled: 0,
     documentationAttempted: 0,
     documentationFulfilled: 0,
+    documentationWriteAttempted: 0,
+    documentationWriteFulfilled: 0,
     nameAttempted: 0,
     nameFulfilled: 0,
     openTabsAttempted: 0,
@@ -370,6 +372,13 @@ await (async () => {
     if (!documentationValidated) {
       throw new Error("CompleteDocumentationValidationError");
     }
+    counters.documentationWriteAttempted++;
+    try {
+      await nodeRepl.write(documentation);
+      counters.documentationWriteFulfilled++;
+    } catch {
+      throw new Error("V48DocumentationOutputError");
+    }
 
     counters.nameAttempted++;
     await chromeV48.nameSession("🔐 OmniRoute V48 listing diagnostic");
@@ -386,7 +395,10 @@ await (async () => {
       counters.setupFulfilled === 1 && counters.connectAttempted === 1 &&
       counters.connectFulfilled === 1 &&
       counters.documentationAttempted === 1 &&
-      counters.documentationFulfilled === 1 && counters.nameAttempted === 1 &&
+      counters.documentationFulfilled === 1 &&
+      counters.documentationWriteAttempted === 1 &&
+      counters.documentationWriteFulfilled === 1 &&
+      counters.nameAttempted === 1 &&
       counters.nameFulfilled === 1 && counters.openTabsAttempted === 1 &&
       counters.openTabsFulfilled === 1 && counters.claimAttempted === 0 &&
       counters.navigationAttempted === 0 && counters.waitAttempted === 0 &&

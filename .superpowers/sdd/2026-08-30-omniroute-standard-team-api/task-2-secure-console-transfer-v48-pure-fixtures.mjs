@@ -240,8 +240,9 @@ const runCell = async () => {
     fixtureImported,
     nodeRepl,
   );
-  assert.equal(terminalWrites.length, 1);
-  return terminalWrites[0];
+  assert.equal(terminalWrites.length, 2);
+  assert.equal(terminalWrites[0], documentation);
+  return terminalWrites[1];
 };
 
 const terminal = await runCell();
@@ -261,7 +262,8 @@ assert.equal(terminal.state, "DIAGNOSTIC_CAPTURED_INELIGIBLE");
 for (const key of [
   "importAttempted", "importFulfilled", "setupAttempted", "setupFulfilled",
   "connectAttempted", "connectFulfilled", "documentationAttempted",
-  "documentationFulfilled", "nameAttempted", "nameFulfilled",
+  "documentationFulfilled", "documentationWriteAttempted",
+  "documentationWriteFulfilled", "nameAttempted", "nameFulfilled",
   "openTabsAttempted", "openTabsFulfilled",
 ]) assert.equal(terminal[key], 1);
 for (const key of [

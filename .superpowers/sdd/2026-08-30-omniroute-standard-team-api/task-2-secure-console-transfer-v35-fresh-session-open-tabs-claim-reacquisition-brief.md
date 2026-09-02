@@ -199,6 +199,10 @@ Call-1 PASS. It calls `openTabs()` once, permits exactly one returned candidate,
 privately validates that candidate against the exact current
 `BrowserUserTabInfo` field set, calls `claimTab()` once with only its exact
 validated opaque ID, then applies the unchanged account-home semantic gate.
+The projector requires the established cross-realm plain-record shape,
+enumerates every own string and symbol name, rejects accessors, non-enumerable
+or non-current fields, and caches the validated ID from its single descriptor
+read without re-reading the untrusted candidate.
 
 ~~~javascript
 let secureConsoleOwnedTaskTabV35 = null;
@@ -234,21 +238,29 @@ await (async () => {
     const name = typeof error?.name === "string" ? error.name : "Error";
     return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name) ? name : "Error";
   };
+  const plainRecord = (value) => {
+    if (typeof value !== "object" || value === null) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === null ||
+      (prototype !== null && Object.getPrototypeOf(prototype) === null);
+  };
   const trustedCandidate = (value) => {
     if (!Array.isArray(value) || value.length !== 1) return null;
     const item = value[0];
-    if (typeof item !== "object" || item === null) return null;
+    if (!plainRecord(item)) return null;
     if (Object.getOwnPropertySymbols(item).length !== 0) return null;
     const allowed = new Set([
       "id", "lastOpened", "providerTabId", "tabGroup", "title", "url",
     ]);
-    const keys = Object.keys(item);
+    const keys = Object.getOwnPropertyNames(item);
     if (!keys.includes("id") || keys.some((key) => !allowed.has(key))) {
       return null;
     }
+    let validatedId = null;
     for (const key of keys) {
       const descriptor = Object.getOwnPropertyDescriptor(item, key);
-      if (!descriptor || !("value" in descriptor)) return null;
+      if (!descriptor || !("value" in descriptor) ||
+          descriptor.enumerable !== true) return null;
       const limit = key === "url" ? 16384 : key === "title" ? 4096 : 512;
       if (typeof descriptor.value !== "string" ||
           descriptor.value.length === 0 ||
@@ -256,14 +268,12 @@ await (async () => {
           /[\u0000-\u001f\u007f]/.test(descriptor.value)) {
         return null;
       }
+      if (key === "id") validatedId = descriptor.value;
     }
-    const id = Object.getOwnPropertyDescriptor(item, "id").value;
-    return { id };
+    return validatedId === null ? null : { id: validatedId };
   };
   const trustedSnapshot = (value) => {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return null;
-    }
+    if (!plainRecord(value)) return null;
     const expected = [
       "accountHomePath", "allAnchorCount", "busyCount",
       "exactZoneHrefCount", "hostExact",

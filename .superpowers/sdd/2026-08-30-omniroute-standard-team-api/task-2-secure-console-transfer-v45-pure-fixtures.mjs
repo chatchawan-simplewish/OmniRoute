@@ -24,7 +24,7 @@ const cells = [...brief.matchAll(/~~~javascript\r?\n([\s\S]*?)\r?\n~~~/g)];
 assert.equal(cells.length, 1);
 const cell = cells[0][1].replace(/\r\n/g, "\n");
 const fixtureSha256 = crypto.createHash("sha256").update(fixture).digest("hex").toUpperCase();
-assert.ok(brief.includes("D30020117449F9738B89EB6F1D9834A9BD19675EE903505C20C42D00F770C838"));
+assert.ok(brief.includes("D4469DA4ECA7BF2667894A7780C6F022D02827548BE873B716EA2D778B0AE81F"));
 assert.ok(brief.includes(`- Pure fixture length: \`${fixture.length}\` bytes.`));
 assert.ok(brief.includes(`  \`${fixtureSha256}\``));
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
@@ -355,29 +355,43 @@ const resetFullCellFixture = () => {
   nameCalls = 0;
   openTabsCalls = 0;
 };
-resetFullCellFixture();
-await runTransformedCell("let secureConsoleV44Consumed = true;\n");
-assert.equal(documentationCalls, 0);
-assert.equal(nameCalls, 0);
-assert.equal(openTabsCalls, 0);
-assert.equal(terminalWrites.length, 1);
-const contaminated = terminalWrites[0];
-assert.deepEqual(Object.keys(contaminated), expectedTerminalKeys);
-assert.equal(contaminated.result, "V45_FRESH_LISTING_SHAPE_DIAGNOSTIC_FAILED_STOP");
-assert.equal(contaminated.declarationShape, false);
-assert.equal(contaminated.consumed, true);
-assert.equal(contaminated.bindingEligible, false);
-assert.equal(contaminated.bindingNull, true);
-assert.equal(contaminated.state, "V45_DIAGNOSTIC_FAILED_INELIGIBLE");
-for (const key of [
-  "importAttempted", "importFulfilled", "setupAttempted", "setupFulfilled",
-  "connectAttempted", "connectFulfilled", "documentationAttempted",
-  "documentationFulfilled", "documentationWriteAttempted",
-  "documentationWriteFulfilled", "nameAttempted", "nameFulfilled",
-  "openTabsAttempted", "openTabsFulfilled", "claimAttempted",
-  "navigationAttempted", "urlAttempted", "snapshotAttempted",
-]) assert.equal(contaminated[key], 0);
-assert.equal(contaminated.writeAttempted, 1);
+for (const prelude of [
+  "let secureConsoleV44Consumed = true;\n",
+  "let secureConsoleAgentV35 = {};\n",
+  "let secureConsoleChromeV41 = {};\n",
+  "let secureConsoleOwnedTaskTabV35 = null;\n",
+  "let secureConsoleOwnedTaskTabV44Eligible = false;\n",
+  "let secureConsoleOwnedTaskTabV44State = \"DIRTY\";\n",
+  "let secureConsoleOwnedTaskTabV44PreCreateDetachConsumed = false;\n",
+  "let secureConsoleOwnedTaskTabV44PostNativeDetachConsumed = false;\n",
+  "let secureConsoleSetupBrowserRuntimeV35 = () => {};\n",
+  "let secureConsoleV35AttachmentExact = false;\n",
+  "let secureConsoleCloudflareReadsV43Consumed = false;\n",
+]) {
+  resetFullCellFixture();
+  await runTransformedCell(prelude);
+  assert.equal(documentationCalls, 0);
+  assert.equal(nameCalls, 0);
+  assert.equal(openTabsCalls, 0);
+  assert.equal(terminalWrites.length, 1);
+  const contaminated = terminalWrites[0];
+  assert.deepEqual(Object.keys(contaminated), expectedTerminalKeys);
+  assert.equal(contaminated.result, "V45_FRESH_LISTING_SHAPE_DIAGNOSTIC_FAILED_STOP");
+  assert.equal(contaminated.declarationShape, false);
+  assert.equal(contaminated.consumed, true);
+  assert.equal(contaminated.bindingEligible, false);
+  assert.equal(contaminated.bindingNull, true);
+  assert.equal(contaminated.state, "V45_DIAGNOSTIC_FAILED_INELIGIBLE");
+  for (const key of [
+    "importAttempted", "importFulfilled", "setupAttempted", "setupFulfilled",
+    "connectAttempted", "connectFulfilled", "documentationAttempted",
+    "documentationFulfilled", "documentationWriteAttempted",
+    "documentationWriteFulfilled", "nameAttempted", "nameFulfilled",
+    "openTabsAttempted", "openTabsFulfilled", "claimAttempted",
+    "navigationAttempted", "urlAttempted", "snapshotAttempted",
+  ]) assert.equal(contaminated[key], 0);
+  assert.equal(contaminated.writeAttempted, 1);
+}
 
 const assertFixedFailure = async (thrown) => {
   resetFullCellFixture();

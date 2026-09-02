@@ -39,14 +39,14 @@ The paired `docs/api.json` must reproduce `58480` bytes and SHA-256
 
 Candidate-package pins:
 
-- Extracted executable length: `18106` normalized UTF-8 bytes.
+- Extracted executable length: `21169` normalized UTF-8 bytes.
 - Extracted executable SHA-256:
-  `D30020117449F9738B89EB6F1D9834A9BD19675EE903505C20C42D00F770C838`.
+  `D4469DA4ECA7BF2667894A7780C6F022D02827548BE873B716EA2D778B0AE81F`.
 - Pure fixture:
   `.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v45-pure-fixtures.mjs`.
-- Pure fixture length: `15043` bytes.
+- Pure fixture length: `15689` bytes.
 - Pure fixture SHA-256:
-  `B37CCD1783887DB149B792A4712E750F01A6536F159323236BCE4B31BE2B2EF4`.
+  `4C287F217B918FDC9DBC52638BB22FC7A077361D2EBA2961962080574D63CBFF`.
 
 The fixture terminal must directly emit the brief, executable, and fixture
 byte/hash tuple. The brief hash is intentionally not embedded here.
@@ -358,6 +358,54 @@ await (async () => {
       typeof secureConsoleCloudflareReadsV42Consumed === "undefined" &&
       typeof secureConsoleCloudflareReadsV43Consumed === "undefined" &&
       typeof secureConsoleCloudflareReadsV44Consumed === "undefined" &&
+      typeof secureConsoleAgentV35 === "undefined" &&
+      typeof secureConsoleAgentV36 === "undefined" &&
+      typeof secureConsoleAgentV37 === "undefined" &&
+      typeof secureConsoleAgentV38 === "undefined" &&
+      typeof secureConsoleAgentV39 === "undefined" &&
+      typeof secureConsoleAgentV40 === "undefined" &&
+      typeof secureConsoleAgentV41 === "undefined" &&
+      typeof secureConsoleChromeV35 === "undefined" &&
+      typeof secureConsoleChromeV36 === "undefined" &&
+      typeof secureConsoleChromeV37 === "undefined" &&
+      typeof secureConsoleChromeV38 === "undefined" &&
+      typeof secureConsoleChromeV39 === "undefined" &&
+      typeof secureConsoleChromeV40 === "undefined" &&
+      typeof secureConsoleChromeV41 === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV35 === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV35Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV35State === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV36 === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV36Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV37 === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV37Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV38Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV39Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV40Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV41Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV42Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV42PostNativeDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV42PreCreateDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV42State === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV43Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV43PostNativeDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV43PreCreateDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV43State === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV44Eligible === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV44PostNativeDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV44PreCreateDetachConsumed === "undefined" &&
+      typeof secureConsoleOwnedTaskTabV44State === "undefined" &&
+      typeof secureConsoleSetupBrowserRuntimeV35 === "undefined" &&
+      typeof secureConsoleSetupBrowserRuntimeV36 === "undefined" &&
+      typeof secureConsoleSetupBrowserRuntimeV37 === "undefined" &&
+      typeof secureConsoleV35AttachmentExact === "undefined" &&
+      typeof secureConsoleV35AttachmentState === "undefined" &&
+      typeof secureConsoleV36State === "undefined" &&
+      typeof secureConsoleV37State === "undefined" &&
+      typeof secureConsoleV38State === "undefined" &&
+      typeof secureConsoleV39State === "undefined" &&
+      typeof secureConsoleV40State === "undefined" &&
+      typeof secureConsoleV41State === "undefined" &&
       secureConsoleSetupBrowserRuntimeV45 === null &&
       secureConsoleAgentV45 === null &&
       secureConsoleChromeV45 === null &&

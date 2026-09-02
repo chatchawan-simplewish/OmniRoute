@@ -64,6 +64,8 @@ and `url`; `id` is required and every documented value is a string.
 - A captured diagnostic is permanently ineligible for tab adoption. Success
   means the fixed diagnostic was captured, not that any structural predicate
   passed.
+- The outer catch never inspects, stringifies, coerces, prototype-tests, or
+  reads a property from the thrown value. It assigns only literal `"Error"`.
 - Every thrown or transport-uncertain outcome consumes V38 and requires Node
   realm disposal. There is no retry, fallback, manual inspection, raw-output
   relaxation, or continuation.
@@ -128,10 +130,6 @@ await (async () => {
   let allOptionalValuesStringOrUndefined = null;
   let allRecordValuesV37Safe = null;
   let errorClass = "NONE";
-  const safeErrorClass = (error) => {
-    const name = typeof error?.name === "string" ? error.name : "Error";
-    return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name) ? name : "Error";
-  };
   // BEGIN_V38_PURE_LISTING_DIAGNOSTIC
   const inspectListingV38 = (offered) => {
     const diagnostic = {
@@ -437,8 +435,8 @@ await (async () => {
       counters.urlAttempted === 0 && counters.snapshotAttempted === 0;
     if (!exactCounters) throw new Error("V38CompletenessError");
     result = "EXACT_V38_FIXED_LISTING_SHAPE_DIAGNOSTIC_CAPTURED";
-  } catch (error) {
-    errorClass = safeErrorClass(error);
+  } catch {
+    errorClass = "Error";
   }
 
   secureConsoleSetupBrowserRuntimeV38 = null;
@@ -541,6 +539,12 @@ foreign-realm fixture is only a diagnostic expectation and is not evidence
 about the live listing. The inert full-cell fixture must also prove one each of
 documentation, session naming, and enumeration, exact fixed terminal schema,
 success/consume/cleanup state, and zero claim/navigation/URL/snapshot actions.
+Two inert reflection-failure fixtures must throw, respectively, a plain object
+with data `name="ASecretLikeToken"` and an object whose `name` getter itself
+throws. Both must produce exactly one fixed failure terminal after the required
+documentation write, emit literal `errorClass="Error"`, contain no thrown data,
+invoke the getter zero times, preserve exact failure counters, clear every
+binding, and end consumed/permanently ineligible.
 
 ## Action-time pins and single-use procedure
 

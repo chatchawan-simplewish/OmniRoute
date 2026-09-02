@@ -231,6 +231,7 @@ const terminalWrites = [];
 let documentationCalls = 0;
 let nameCalls = 0;
 let openTabsCalls = 0;
+let currentListingFactory = ordinary;
 const fixtureBrowser = {
   async documentation() {
     documentationCalls++;
@@ -243,7 +244,7 @@ const fixtureBrowser = {
   user: {
     async openTabs() {
       openTabsCalls++;
-      return ordinary();
+      return currentListingFactory();
     },
   },
 };
@@ -264,20 +265,23 @@ const transformedCell = cell.replace(
   "const imported = globalThis.__v38FixtureImported;",
 );
 assert.notEqual(transformedCell, cell);
-const previousNodeRepl = globalThis.nodeRepl;
-globalThis.__v38FixtureImported = fixtureImported;
-globalThis.nodeRepl = {
-  async write(value) {
-    terminalWrites.push(value);
-  },
+const runTransformedCell = async () => {
+  const previousNodeRepl = globalThis.nodeRepl;
+  globalThis.__v38FixtureImported = fixtureImported;
+  globalThis.nodeRepl = {
+    async write(value) {
+      terminalWrites.push(value);
+    },
+  };
+  try {
+    await new AsyncFunction(transformedCell)();
+  } finally {
+    delete globalThis.__v38FixtureImported;
+    if (previousNodeRepl === undefined) delete globalThis.nodeRepl;
+    else globalThis.nodeRepl = previousNodeRepl;
+  }
 };
-try {
-  await new AsyncFunction(transformedCell)();
-} finally {
-  delete globalThis.__v38FixtureImported;
-  if (previousNodeRepl === undefined) delete globalThis.nodeRepl;
-  else globalThis.nodeRepl = previousNodeRepl;
-}
+await runTransformedCell();
 assert.equal(documentationCalls, 1);
 assert.equal(nameCalls, 1);
 assert.equal(openTabsCalls, 1);
@@ -339,6 +343,60 @@ for (const key of [
   "claimAttempted", "navigationAttempted", "urlAttempted", "snapshotAttempted",
 ]) assert.equal(terminal[key], 0);
 
+const resetFullCellFixture = () => {
+  terminalWrites.length = 0;
+  documentationCalls = 0;
+  nameCalls = 0;
+  openTabsCalls = 0;
+};
+const assertFixedFailure = async (thrown) => {
+  resetFullCellFixture();
+  currentListingFactory = () => new Proxy(ordinary(), {
+    getPrototypeOf() {
+      throw thrown;
+    },
+  });
+  await runTransformedCell();
+  assert.equal(documentationCalls, 1);
+  assert.equal(nameCalls, 1);
+  assert.equal(openTabsCalls, 1);
+  assert.equal(terminalWrites.length, 2);
+  assert.equal(terminalWrites[0], documentation);
+  const failure = terminalWrites[1];
+  assert.deepEqual(Object.keys(failure), expectedTerminalKeys);
+  assert.equal(failure.result, "V38_FRESH_LISTING_SHAPE_DIAGNOSTIC_FAILED_STOP");
+  assert.equal(failure.errorClass, "Error");
+  assert.equal(failure.consumed, true);
+  assert.equal(failure.bindingEligible, false);
+  assert.equal(failure.bindingNull, true);
+  assert.equal(failure.state, "V38_DIAGNOSTIC_FAILED_INELIGIBLE");
+  assert.equal(JSON.stringify(failure).includes("ASecretLikeToken"), false);
+  for (const key of [
+    "importAttempted", "importFulfilled",
+    "setupAttempted", "setupFulfilled",
+    "connectAttempted", "connectFulfilled",
+    "documentationAttempted", "documentationFulfilled",
+    "documentationWriteAttempted", "documentationWriteFulfilled",
+    "nameAttempted", "nameFulfilled",
+    "openTabsAttempted", "openTabsFulfilled", "writeAttempted",
+  ]) assert.equal(failure[key], 1);
+  for (const key of [
+    "claimAttempted", "navigationAttempted", "urlAttempted", "snapshotAttempted",
+  ]) assert.equal(failure[key], 0);
+};
+
+await assertFixedFailure({ name: "ASecretLikeToken" });
+let thrownNameGetterCalls = 0;
+const getterThrown = {};
+Object.defineProperty(getterThrown, "name", {
+  get() {
+    thrownNameGetterCalls++;
+    throw new Error("thrown name getter invoked");
+  },
+});
+await assertFixedFailure(getterThrown);
+assert.equal(thrownNameGetterCalls, 0);
+
 const report = {
   result: "V38_PURE_FIXTURES_PASS",
   briefBytes: Buffer.byteLength(brief),
@@ -348,6 +406,7 @@ const report = {
   syntax: "PASS",
   moduleShape: true,
   fixedSchema: true,
-  getterCalls: indexGetterCalls + arrayGetCalls + recordGetCalls,
+  getterCalls:
+    indexGetterCalls + arrayGetCalls + recordGetCalls + thrownNameGetterCalls,
 };
 console.log(JSON.stringify(report));

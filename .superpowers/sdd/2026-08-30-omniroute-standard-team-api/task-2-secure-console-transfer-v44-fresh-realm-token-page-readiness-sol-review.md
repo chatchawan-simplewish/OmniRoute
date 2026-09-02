@@ -1,16 +1,16 @@
 ---
-status: issues_found
+status: clean
 depth: deep
 files_reviewed: 3
 findings:
   critical: 0
   high: 0
-  important: 1
+  important: 0
   minor: 0
-  total: 1
+  total: 0
 ---
 
-# OmniRoute V44 fresh-realm token-page readiness package — Sol High review
+# OmniRoute V44 fresh-realm token-page readiness package fix1 — Sol High review
 
 Date: `2026-09-02` (`Asia/Bangkok`)
 
@@ -18,134 +18,121 @@ Date: `2026-09-02` (`Asia/Bangkok`)
 
 ## Verdict
 
-**FAIL**
+**PASS**
 
-The V44 executable preserves the independently reviewed V43 behavior and adds
-the intended new gate identity, installed runtime path, and explicit V43
-predecessor-declaration rejection. The inert fixture passes its implemented
-matrix. The package nevertheless fails its own immutable-output contract: the
-brief requires the fixture terminal to print the directly computed fixture
-byte/hash tuple, but the fixture neither reads nor hashes itself and its terminal
-omits both fields. V44 must not be classified or consumed from this package.
+V44-001 is closed. The fixture now reads its own raw bytes, proves its exact
+byte/hash tuple is present in the brief, and emits `fixtureBytes` and
+`fixtureSha256` in the passing terminal. The V44 executable is unchanged from
+the prior review and preserves the exact intended V43 semantic inheritance,
+new V44 identity, installed runtime path, explicit V43 declaration rejection,
+one-shot behavior, secret/privacy boundary, and terminal cleanup. No unresolved
+Critical, HIGH, IMPORTANT, or Minor finding remains.
 
-This is a static package-quality review only. It authorizes no CUA, Chrome,
-provider, live-resource, VM, secret, confirmation, or authority-gate action.
+This PASS is a static package-quality verdict only. It does not authorize live
+execution, consume V44, satisfy action-time pins, or replace any external
+confirmation.
 
 ## Reviewed lineage and exact package
 
-- Candidate commit: `03124f13fedd4474eef57dc13f678b7fed7999bd`.
-- Direct parent and V43 runtime-path drift incident commit:
-  `f41691acb307954a28c131e12658fd1857e33838`.
-- The candidate adds exactly the assigned V44 brief, executable, and fixture.
+- Initial candidate: `03124f13fedd4474eef57dc13f678b7fed7999bd`.
+- Initial FAIL review: `6ea1e74a7af9137663ba09e37dc08b92e028a5aa`.
+- Reviewed fix1 candidate: `3fed766dd6aadef89167c490f0ca232ffd041def`.
+- The fix1 candidate is directly parented by the initial FAIL review and changes
+  exactly the V44 brief and fixture. The V44 executable is unchanged.
 - Brief: `6165` bytes; SHA-256
-  `96E790BD29EDB388399366B8AA064B7A65383235FAF1B0D05CE93E1D576D794D`;
-  blob `9cbd2292a3ff668d2c466a7c5a8b0c78d350c78a`.
+  `90BAAB60D82767F5EC7B13920556D47A9BE0767E2F257FF8B963865AB1A46FFB`;
+  blob `1bc32e7143ed03981048d85089f77deae6652018`.
 - Executable: `39687` bytes; SHA-256
   `75F4700B6519A1EA519FE509053735B85E1690A25D5C302B566293A86BF82F67`;
   blob `1a085198bbf6a7a4bbd898290e70fac2d6645d21`.
-- Pure fixture: `45955` bytes; SHA-256
-  `E63752DD544605D64DDB43F79CDF60D24B9E413F9E8F7C75499B2EA7BB16EA40`;
-  blob `bf1177df84b1ea8e0c33b1b3bdddaa0c370f8161`.
-- Each candidate file has exactly one final LF and no CRLF. The candidate diff
-  passes `git diff --check`.
-- The installed browser module at the newly pinned `26.831.21537` path is
+- Pure fixture: `46332` bytes; SHA-256
+  `C9CA54C48A846B83C7D31F72EE609C40088A8B669C6A6AE90B4643AF1762F799`;
+  blob `13cd9d625a78c1b195ab10ec59dd5f2a308164dc`.
+- Each package file has exactly one final LF and no CRLF. The fix1 diff passes
+  `git diff-tree --check`.
+- The installed browser module at the pinned `26.831.21537` path remains
   `149771` bytes / SHA-256
   `A50E341988B45C547B02DB74787AA64AFFC64F42B5C605308823EEC853179298`.
-- The installed API documentation at the newly pinned `26.831.21537` path is
+- The installed API documentation at the pinned `26.831.21537` path remains
   `58480` bytes / SHA-256
   `A7C8D53096EA2563CF939D5F7A37DFC2AE0701E891510566930868D04CE0F5DF`.
-- Both former `26.831.20005` paths are absent, matching the committed V43 drift
-  incident. The new module was not imported and the documentation was not
-  invoked during review.
-- The prior V43 PASS review at
-  `a3603b212749d4b3a2195dadfb8d7c126ee70b47` and classification at
-  `5bec70c591e7ab020b3605f8442942faf0fe16f1` were treated only as static
-  predecessor evidence.
+- The prior V43 review/classification were used only as static evidence. The
+  current V43 runtime-path drift incident remains the replacement basis; no V43
+  package was executed or made eligible by this review.
 - The index was empty before review work. The exact pre-existing 12-path dirty
   product baseline was not edited or staged.
 
-## Exact semantic delta from V43
+## V44-001 closure
 
-A direct-byte normalization proves the V44 executable is exactly the reviewed
-V43 executable with only:
+The fix adds only the missing immutable self-tuple proof:
 
-1. every V43 gate/result/local identifier renamed to V44;
-2. Chrome runtime `26.831.20005` changed to `26.831.21537`; and
-3. seven V43 top-level predecessor declarations added to the absence predicate:
-   owned tab, eligibility, state, both detach flags, Cloudflare-read consumed,
-   and overall consumed.
+- `fixturePath` is derived from `import.meta.url` and read as a raw `Buffer`;
+- `fixtureBytes` uses the raw buffer length;
+- `fixtureSha256` hashes those same raw bytes directly;
+- the fixture requires the brief to contain the exact length line and digest;
+- the terminal emits both values; and
+- the brief pins the newly computed `46332`-byte / `C9CA...F799` tuple.
 
-After applying only those transformations, the expected and actual executable
-are byte-identical at `39687` bytes.
+The fresh inert run exited `0` and emitted exactly the direct package tuple:
 
-The V44 fixture is likewise exactly the V43 fixture with the corresponding V44
-renames, runtime/executable-hash pin changes, seven individual V43 declaration-
-contamination cases, and the terminal `v43PredecessorsAbsent: true` claim. After
-those transformations, expected and actual fixture bytes are identical at
-`45955` bytes. Each added contamination case stops before setup and `openTabs`,
-leaves V44 consumed/ineligible, and requires fixed cleanup.
+`briefBytes=6165`,
+`briefSha256=90BAAB60D82767F5EC7B13920556D47A9BE0767E2F257FF8B963865AB1A46FFB`,
+`executableBytes=39687`,
+`executableSha256=75F4700B6519A1EA519FE509053735B85E1690A25D5C302B566293A86BF82F67`,
+`fixtureBytes=46332`, and
+`fixtureSha256=C9CA54C48A846B83C7D31F72EE609C40088A8B669C6A6AE90B4643AF1762F799`.
 
-## Static and inert checks
+The fixture also retained `V44_PURE_FIXTURES_PASS`, all declared matrix/cleanup
+claims true, and all three getter counters zero. This directly closes the prior
+immutable-terminal discrepancy without weakening any existing assertion.
 
-- Executable and fixture syntax checks passed.
-- The inert fixture exited `0` with `V44_PURE_FIXTURES_PASS` and zero listing,
-  thrown-value, and output getter calls.
-- The one-shot flag is set before predecessor validation and dynamic import.
-- The executable retains one import, one `openTabs`, one rank-zero cached-ID
+## Preserved V44 security and semantic contract
+
+- The executable remains byte-identical to the initial V44 candidate. Relative
+  to reviewed V43 bytes, its only changes remain the V44 identity/result rename,
+  runtime `26.831.21537` pin, and seven explicit V43 top-level predecessor-
+  declaration absence checks.
+- The seven fixture contamination branches cover V43 owned tab, eligibility,
+  state, both detach flags, Cloudflare-read consumed, and overall consumed.
+  Each stops before setup/listing/claim/navigation and leaves V44 consumed,
+  ineligible, and fully cleaned.
+- V44 consumes before predecessor validation and dynamic import. Any failure,
+  uncertainty, output failure, or cleanup doubt remains spent with no retry,
+  fallback, reinterpretation, continuation, override, or verdict relaxation.
+- The executable retains exactly one import, one `openTabs`, one cached rank-zero
   `claimTab`, one account-home navigation, one token-page navigation, one fixed
-  non-secret filter fill, and read-only token-page semantic checks.
-- Create is counted but never clicked. No Copy, Paste, clipboard, credential,
-  cookie/storage, provider mutation, retry, fallback, reconnect, new/close-tab,
-  or manual-integration action is present.
-- Success retains only the V44 continuation tab and required state flags.
-  Ordinary, documentation-output, and final-output failures clear both phase
-  bindings, broad runtime/controller aliases, evidence, and raw-error holders.
-- Hostile thrown values are rethrown by identity only on terminal-output paths;
-  they are not inspected, logged, serialized, or retained.
-
-## Finding
-
-### V44-001 — IMPORTANT — Required fixture byte/hash tuple is absent from the fixture terminal
-
-The brief says the fixture **must** print directly computed byte/hash tuples for
-the executable, fixture, and brief. The committed fixture reads only the brief
-and executable. Its final object reports only `briefBytes`, `briefSha256`,
-`executableBytes`, and `executableSha256`; there is no fixture path/read, no
-direct fixture hash calculation, and no `fixtureBytes` or `fixtureSha256` field.
-The observed passing terminal confirms the omission.
-
-This breaks the immutable candidate-package and later non-self-referential
-classification contract. A classifier could repeat the separately supplied
-fixture digest, but it cannot cite the fixture's promised direct terminal proof.
-The discrepancy is especially material for a one-shot gate because package-byte
-identity must be settled before any live action.
-
-Required correction:
-
-1. Read the fixture's own committed file bytes in the inert fixture and compute
-   its length and SHA-256 directly.
-2. Add `fixtureBytes` and `fixtureSha256` to the terminal object and assert their
-   expected values without weakening the existing checks.
-3. Update the brief's exact fixture tuple and terminal contract if the correction
-   changes fixture bytes, then commit a new immutable candidate and obtain a new
-   independent review. Do not amend, reinterpret, or consume this failed V44
-   package.
+  non-secret filter fill, and read-only semantic token-page checks.
+- Create is counted but never clicked. There is no Copy, Paste, clipboard,
+  credential, cookie/storage, provider mutation, reconnect, new/close-tab,
+  fallback, retry, or manual-integration path.
+- The trusted listing remains bounded, complete, duplicate-free, descriptor-
+  checked, cross-realm safe, and nonobservant of later record values. The owned
+  controller ID must equal the cached rank-zero ID.
+- Success retains only the eligible V44 continuation tab and required state
+  flags. Ordinary, documentation-output, and final-output failures clear both
+  phase tab bindings, broad runtime/controller aliases, attachment evidence,
+  and raw-error holders.
+- Thrown values are neither inspected, logged, serialized, nor retained.
+  Terminal-output failures rethrow by identity only after cleanup.
+- No browser module was imported, no API documentation method was invoked, and
+  no CUA, Chrome, provider, credential, DNS, VM, network, live-resource,
+  confirmation, or authority-gate action occurred during this review.
 
 ## Severity counts
 
-| Severity | Count |
-| --- | ---: |
-| Critical | 0 |
-| HIGH | 0 |
-| IMPORTANT | 1 |
-| Minor | 0 |
+| Severity | Count | Unresolved findings |
+| --- | ---: | --- |
+| Critical | 0 | None |
+| HIGH | 0 | None |
+| IMPORTANT | 0 | None |
+| Minor | 0 | None |
 
 ## Authorization statement
 
 `authorizes_live_execution=false`
 
-This FAIL review authorizes no V44 classification, live browser send, provider
-action, secret operation, authority-gate consumption, retry, fallback, or
-confirmation consumption. A corrected immutable replacement requires a fresh
-independent review and all later classification, tuple, action-time pin,
-no-residue, and external-confirmation boundaries.
+This PASS review authorizes no V44 live browser send, provider action, secret
+operation, authority-gate consumption, or confirmation consumption. A separate
+non-self-referential classification, post-commit coordinator tuple, all
+action-time pins, fresh realm and exact external Chrome-selection confirmation,
+plus both later external confirmations remain mandatory.

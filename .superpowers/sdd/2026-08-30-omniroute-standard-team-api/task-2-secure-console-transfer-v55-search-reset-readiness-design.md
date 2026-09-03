@@ -22,15 +22,25 @@ After exact API Tokens navigation, V55 requires exactly one visible
 
 1. read the input value; if nonempty, perform exactly one `fill("")`; if empty,
    perform no fill;
-2. after a fill, wait for the exact base URL
+2. on both branches, wait/read the exact base URL
    `https://dash.cloudflare.com/profile/api-tokens` with no query or fragment;
-3. wait until the exact sentinel `No results found for your search` is hidden
-   or detached from that same table; and
-4. only then read the empty input and evaluate the existing non-busy,
+3. on both branches, wait/read until the exact sentinel `No results found for
+   your search` is hidden or detached from that same table; and
+4. on both branches, read the input again and require empty before evaluating
+   the existing non-busy,
    1..1000-row, ordered-header, zero-target unfiltered baseline.
 
-Every reset read, fill, URL wait/read, and sentinel wait/read has exact
-attempted/fulfilled counters. A duplicate/missing/unsafe input or table,
+The initially-empty success vector is `initialRead 1/1`, `resetFill 0/0`,
+`resetUrlWait 1/1`, `resetUrlRead 1/1`, `resetSentinelWait 1/1`,
+`resetSentinelRead 1/1`, `finalRead 1/1`, and `baselineRead 1/1`; the stale
+nonempty success vector differs only by `resetFill 1/1`. Each boundary
+increments attempted before its effect and fulfilled only after success. For a
+false completed read, that boundary is `1/1`; for throw, timeout, or malformed
+URL/result it is `1/0`. Each such earliest stop retains only its reviewed
+attempted/fulfilled prefix, makes every later reset counter `0/0`, and makes
+every target filter/Create/name/row/binding counter `0/0`. Fixtures enumerate
+both success vectors and every earliest-stop vector.
+A duplicate/missing/unsafe input or table,
 wrong/reset-stale URL, visible sentinel, counter mismatch, throw, or uncertainty
 fails before the target-name filter, Create read, or retained binding. Fixtures
 must cover initially empty and stale-filter success; field-only clear with stale
@@ -41,25 +51,36 @@ counter vectors; cleanup/output failure; and the existing current-table matrix.
 
 The V55 source and candidate remain ASCII. The session name must use
 `String.fromCodePoint(0x1F510)+" OmniRoute secure console"`; no literal emoji
-or Unicode escape is permitted in the candidate. The direct-cell send contract
-must preserve the committed UTF-8 bytes exactly: action-time transport proof
-uses an inert literal payload at least candidate length, records byte count and
-fixed PASS, resets the disposable realm, and any byte discrepancy stops before
-the one V55 send.
+or Unicode escape is permitted in the candidate. The inert literal payload is
+capacity-only: it proves acceptance at least as large as the candidate and is
+then reset. Separately, the coordinator compares actual literal-cell payload
+UTF-8 bytes and SHA-256 with the committed candidate blob before execution;
+transform, mismatch, absence, or uncertainty stops before import or browser
+effect. Fixtures assert ASCII source/candidate, the exact construction, and no
+literal emoji or Unicode escape.
 
 V55 retains V54's source projection and runtime/documentation pins; complete
 ordinary-array descriptor validation; exact URL selection and claim; account
 signature; current table, target filter, and Create-never-clicked contract;
 fixed sanitized output; success-only binding; one-proof cleanup; no retry,
 fallback, mutation, clipboard, credential, secret, storage, provider, DNS, VM,
-tab, or external communication action. The fresh audit covers all fixed 125
-V35-V53 predecessor declarations. Failure clears every binding and spends V55.
+tab, or external communication action. The fresh audit covers `132`
+predecessor declarations: the inherited `125` V35-V53 names plus
+`secureConsoleOwnedTaskTabV54`, `secureConsoleOwnedTaskTabV54Eligible`,
+`secureConsoleOwnedTaskTabV54State`,
+`secureConsoleOwnedTaskTabV54PreCreateDetachConsumed`,
+`secureConsoleOwnedTaskTabV54PostNativeDetachConsumed`,
+`secureConsoleCloudflareReadsV54Consumed`, and `secureConsoleV54Consumed`.
+Each fixture contamination fails before import, attachment, browser effect, or
+page mutation. Failure clears every binding and spends V55.
 
 ## Evidence and later gate
 
 Implementation must provide candidate-derived pure fixtures for all retained
 and reset cases, syntax/ASCII/byte-ceiling proof, and an independent Sol High
 zero-finding review. A later non-self-referential classification, fresh pins,
-exact external browser confirmation, and byte-preserving transport proof remain
-mandatory before any send. Final Create/copy/paste and row deletion remain
-separate external confirmations.
+exact action-time tool-state self-verification of browser/profile/window/tab
+ID/URL/provider object and exclusive control, and byte-fidelity comparison
+remain mandatory before any send. Ambiguity or a higher-priority rule pauses
+fail-closed. Final Create/copy/paste and row deletion remain separate external
+confirmations.

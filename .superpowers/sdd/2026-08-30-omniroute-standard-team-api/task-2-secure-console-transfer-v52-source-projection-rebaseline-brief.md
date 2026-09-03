@@ -9,8 +9,10 @@ import. This brief is offline only and grants no live authority.
 
 V52 design provenance is commit `b3fb1b2ce53b0ae0e14e7eef4c8feca0adce2eb1`;
 its independent Sol High design PASS is
-`06cff4158e1c5b31fe6f2c083e1a2bdd2582e5b8`. This new candidate directly
-follows that offline design review; V51 remains immutable evidence only.
+`06cff41585f3118a5fda03c64467ef9a01915ec2`. The reviewed pre-fix candidate
+is `fe6b9618cfbf46b55b4a55908b37acd9de6c7fab`; its direct-byte package is
+`9b956bd4d47fa686474c645bd9e10e7507e6741d`. This fix changes only this
+quartet after that review; V51 remains immutable evidence only.
 
 ## Evidence and narrow decision
 
@@ -88,7 +90,16 @@ manual-continuation path.
 ## Fresh-realm and predecessor guards
 
 V52 is consumed before validation or import. Its fresh-realm guard retains all
-historic V35-V49 declarations and adds all seven V51 globals:
+historic declarations through both V50 and V51, including all seven globals of
+each version:
+
+- `secureConsoleOwnedTaskTabV50`
+- `secureConsoleOwnedTaskTabV50Eligible`
+- `secureConsoleOwnedTaskTabV50State`
+- `secureConsoleOwnedTaskTabV50PreCreateDetachConsumed`
+- `secureConsoleOwnedTaskTabV50PostNativeDetachConsumed`
+- `secureConsoleCloudflareReadsV50Consumed`
+- `secureConsoleV50Consumed`
 
 - `secureConsoleOwnedTaskTabV51`
 - `secureConsoleOwnedTaskTabV51Eligible`

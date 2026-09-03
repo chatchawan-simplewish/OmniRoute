@@ -16,18 +16,36 @@ use, retry, continuation, reinterpretation, or fallback. V53 is a new one-shot
 gate, consumed before its first import or validation. This design is offline
 only and grants no live authority.
 
-## Smallest viable execution surface
+## Smallest viable execution surface and measurable transport proof
 
 V53 must be one literal, directly submitted JavaScript cell. It must not read
 source from disk, call `eval`, construct code from strings, dynamically import
 the candidate itself, use `vm`, use a wrapper, or split execution across cells.
 Only the pinned browser-client module import remains dynamic.
 
-The implementation may delete duplicated internal proof scaffolding where the
-same fact is already established by the mandatory separate action-time tuple or
-fresh direct declaration audit. It may not simplify input validation, exact URL
-selection, unique-match requirements, no-retry behavior, secret boundaries,
-cleanup, output privacy, or persistent continuation state.
+The committed executable must be ASCII and no more than **16,000 UTF-8 bytes**.
+Before implementation review, a disposable freshly reset browser-control realm
+must accept and execute one inert literal cell whose actual tool `code` payload
+is at least the candidate's exact byte length. The inert cell may contain only
+an ASCII block comment plus one fixed `nodeRepl.write` marker; it must not import,
+attach, enumerate, claim, navigate, inspect a page, create a binding, or perform
+any provider action. Record the tested payload byte count and PASS marker in the
+direct-byte review package, then reset that disposable realm. Candidate syntax
+must also pass `node --check`. Failure or uncertainty blocks classification and
+live use; it does not consume V53.
+
+Compression is mechanical only: shorten local identifiers, share pure local
+helpers, remove comments/whitespace, and consolidate duplicate sanitized-output
+assembly. V53 must retain runtime enforcement for every V52 trust boundary:
+consumed-before-import; fresh declarations; pinned import/API shapes; complete
+documentation signature; bounded ordinary-array and descriptor validation of
+every offered record; unique exact-URL selection; claimed-ID equality; tab API
+shape; account-home URL and DOM signature; token-page URL, filter binding,
+pagination completeness, exact query echo, terminal-zero result, Create count,
+name count, row count, exact operation counters; success-only persistent binding;
+failure and output-failure cleanup; and fixed sanitized output. The external
+tuple and direct audit supplement these checks and never replace runtime
+enforcement.
 
 ## Retained pins and semantics
 
@@ -85,4 +103,3 @@ deletion confirmation remain separate, mandatory, and unreached.
    118-name direct declaration audit.
 
 Any false, stale, unavailable, or uncertain condition stops before V53 is sent.
-

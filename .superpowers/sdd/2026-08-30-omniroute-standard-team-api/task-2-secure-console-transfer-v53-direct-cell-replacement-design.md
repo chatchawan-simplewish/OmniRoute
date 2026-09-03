@@ -29,10 +29,13 @@ V52 compression while retaining room for the required V53 corrections.
 Before implementation review, a disposable freshly reset browser-control realm
 must accept and execute one inert literal cell whose actual tool `code` payload
 is at least the candidate's exact byte length. The inert cell may contain only
-an ASCII block comment plus one fixed `nodeRepl.write` marker; it must not import,
-attach, enumerate, claim, navigate, inspect a page, create a binding, or perform
-any provider action. Record the tested payload byte count and PASS marker in the
-direct-byte review package, then reset that disposable realm. Candidate syntax
+one ASCII string literal and one `nodeRepl.write` call that emits a fixed PASS
+marker plus the literal's measured `.length`; it must not import, attach,
+enumerate, claim, navigate, inspect a page, create a browser binding, or perform
+any provider action. The measured literal length alone must be at least the
+candidate's exact bytes, so the complete submitted code payload is necessarily
+larger. Record the measured length and PASS marker in the direct-byte review
+package, then reset that disposable realm. Candidate syntax
 must also pass `node --check`. Failure or uncertainty blocks classification and
 live use; it does not consume V53.
 

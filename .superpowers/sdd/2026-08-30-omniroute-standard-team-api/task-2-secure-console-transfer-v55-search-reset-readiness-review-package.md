@@ -16,7 +16,7 @@ fallback.
 | --- | ---: | --- |
 | V55 source | 46758 | `ABFE257FCD6EEA7F128621ACEC40F1773B5EF54DE20C394334B193EF8CB4F889` |
 | V55 executable | 26597 | `A9692FFBB688DB244566FCE68D84C08686A7B1D0D4D0FAA587187D8135FB286A` |
-| V55 pure fixture | 31113 | `1A49BF68D22A618075F996FD12ABAD500350DDB14F19FF7D46851BF4AD77604E` |
+| V55 pure fixture | 32289 | `3E1D9886F44960B44FC831AC0AD7B1C55770E91248134DE3FDC4C0122871F486` |
 
 The executable is the Terser output of the V55 source with `evaluate:false`,
 ASCII-only formatting, and all seven V55 persistent names reserved. It contains
@@ -46,8 +46,12 @@ node .superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-conso
 The pure fixture regenerates and compares candidate bytes, checks syntax and
 ASCII, exercises empty and stale-reset success, reset/retained earliest
 failures, trusted-listing variants, 132 inert contaminations, counter vectors,
-ordinary/documentation/final-output cleanup, sanitized output, field-only stale
-transition, reset timeout/wrong settlement/reset-read stops, and prohibited
+ordinary/documentation/final-output cleanup, sanitized output, and an
+independently seeded stale input/query/table state. Its candidate-derived stale
+case proves clear changes only input before `waitForURL`, then exact settlement
+restores base URL, hidden/detached sentinel, and full rows; timeout, wrong
+settlement, and reset-read stops retain exact counters and cleanup. It also
+retains prohibited
 effects. Its result is `PASS`; it performs no CUA, browser, provider, network,
 DNS, VM, clipboard, credential, secret, or live action.
 

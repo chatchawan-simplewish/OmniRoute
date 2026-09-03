@@ -145,13 +145,14 @@ const defaults = {
   filteredTargetCount: 0, filteredActions: 0, filteredBusy: false,
   createButtonCount: 1, createLinkCount: 0, tokenNameCount: 0,
   matchingRowCount: 0, createVisible: true, throwAt: null, failFinalWrite: false,
-  resetConverges: true, resetSettledUrl: tokenUrl,
+  initialUrl: tokenUrl, initialTableFiltered: false, staleAfterNavigationRead: false,
+  resetConverges: true, resetSettledUrl: tokenUrl, resetSettledTableFiltered: false,
 };
 
 function makeFixture(overrides = {}) {
   const config = { ...defaults, ...overrides };
   const effects = { setup: 0, connect: 0, docs: 0, names: 0, openTabs: 0,
-    claims: 0, gotos: [], fills: 0, outputs: [], probes: [], ops: {},
+    claims: 0, gotos: [], fills: 0, resetSnapshots: [], outputs: [], probes: [], ops: {},
     finalWriteFailed: false };
   const state = { currentUrl: tokenUrl, filterValue: config.initialValue, filtered: false };
   let inputEvalNumber = 0;
@@ -182,7 +183,8 @@ function makeFixture(overrides = {}) {
       tagName: config.inputTagName, type: config.inputType, disabled: config.inputDisabled }));
     },
     fill: async (value) => operate(value === "" ? "resetFill" : "fill", () => { effects.fills++; state.filterValue = value;
-      if (value !== "") { state.filtered = true; state.currentUrl = config.filteredUrl; } }),
+      if (value === "") effects.resetSnapshots.push({ input: state.filterValue, url: state.currentUrl, filtered: state.filtered });
+      else { state.filtered = true; state.currentUrl = config.filteredUrl; } }),
   };
   const makeTableDom = () => {
     const cell = (textContent) => ({ textContent });
@@ -224,7 +226,7 @@ function makeFixture(overrides = {}) {
     waitForURL: async (url) => operate("resetUrlWait", () => {
       if (!config.resetConverges) throw new Error("reset timeout");
       state.currentUrl = config.resetSettledUrl;
-      state.filtered = state.currentUrl !== tokenUrl;
+      state.filtered = config.resetSettledTableFiltered;
       if (state.currentUrl !== url) throw new Error("wrong reset url");
     }),
     locator: (selector) => {
@@ -243,10 +245,13 @@ function makeFixture(overrides = {}) {
   const tab = { id: config.claimId, playwright,
     goto: async (url) => operate(url === "https://dash.cloudflare.com/" ? "gotoHome" : "gotoToken", () => {
       effects.gotos.push(url); state.currentUrl = url === "https://dash.cloudflare.com/" ?
-        accountHomeUrl : tokenUrl; state.filterValue = config.initialValue; state.filtered = false; }),
-    url: async () => operate(state.filtered ? "filteredUrl" :
-      state.currentUrl === accountHomeUrl ? "homeUrl" :
-      baseUrlReadNumber++ === 0 ? "navigationUrl" : "resetUrlRead", () => state.currentUrl) };
+      accountHomeUrl : tokenUrl; state.filterValue = config.initialValue; state.filtered = false; }),
+    url: async () => { const current = state.currentUrl;
+      const name = state.filtered ? "filteredUrl" : current === accountHomeUrl ? "homeUrl" :
+        baseUrlReadNumber++ === 0 ? "navigationUrl" : "resetUrlRead";
+      return operate(name, () => { if (name === "navigationUrl" && config.staleAfterNavigationRead) {
+        state.currentUrl = config.initialUrl; state.filtered = config.initialTableFiltered;
+      } return current; }); } };
   const chrome = { documentation: async () => operate("docs", () => { effects.docs++; return config.docs; }),
     nameSession: async () => operate("name", () => { effects.names++; }),
     user: { openTabs: async () => operate("openTabs", () => { effects.openTabs++; return config.offered; }),
@@ -388,14 +393,19 @@ const linkOnlySuccess = await run({ createButtonCount: 0, createLinkCount: 1 });
 assert.equal(linkOnlySuccess.output.result, "EXACT_V55_TOKEN_PAGE_SEMANTIC_READINESS_PASS");
 assertCounterEvidence(linkOnlySuccess);
 assertPersistentProbe(linkOnlySuccess, true);
-const staleSuccess = await run({ initialValue: "stale" });
+const staleSuccess = await run({ initialValue: "stale", initialUrl: `${tokenUrl}?search=stale`,
+  initialTableFiltered: true, staleAfterNavigationRead: true, resetSettledUrl: tokenUrl, resetSettledTableFiltered: false });
 assert.equal(staleSuccess.output.result, "EXACT_V55_TOKEN_PAGE_SEMANTIC_READINESS_PASS");
 assert.deepEqual([staleSuccess.output.resetFillAttempted, staleSuccess.output.resetFillFulfilled], [1, 1]);
+assert.deepEqual(staleSuccess.fixture.effects.resetSnapshots, [{ input: "", url: `${tokenUrl}?search=stale`, filtered: true }]);
+assert.equal(staleSuccess.fixture.effects.ops.resetUrlWait.fulfilled, 1);
+assert.equal(staleSuccess.fixture.effects.ops.resetSentinelWait.fulfilled, 1);
 assertCounterEvidence(staleSuccess);
 assertPersistentProbe(staleSuccess, true);
 for (const resetFailure of [
-  { initialValue: "stale", resetConverges: false },
-  { initialValue: "stale", resetSettledUrl: `${tokenUrl}?search=stale` },
+  { initialValue: "stale", initialUrl: `${tokenUrl}?search=stale`, initialTableFiltered: true, staleAfterNavigationRead: true, resetConverges: false },
+  { initialValue: "stale", initialUrl: `${tokenUrl}?search=stale`, initialTableFiltered: true,
+    staleAfterNavigationRead: true, resetSettledUrl: `${tokenUrl}?search=stale`, resetSettledTableFiltered: true },
 ]) {
   const failed = await run(resetFailure);
   assert.equal(failed.output.result, "V55_TOKEN_PAGE_SEMANTIC_READINESS_FAILED_STOP");

@@ -78,7 +78,9 @@ Immediately before the one V57 send, prove:
 2. syntax and fixture PASS, empty index, exact 12-path baseline, projection,
    runtime/docs, evidence worktree, DNS, residue, and VM pins;
 3. a fresh CUA realm whose first call is exactly `await cua.getState();`, then
-   a direct audit proving all 140 predecessors plus
+   a same-realm fixed capability check proving `createContext`,
+   `SourceTextModule`, and `SyntheticModule` are functions, followed by a
+   direct audit proving all 140 predecessors plus
    `secureConsoleV57Module` absent;
 4. current state proves Chrome profile `Codex-Chrome-Bell-PC2`, exactly one API
    Tokens tab at the exact URL, and a disjoint provider/tab lane; and

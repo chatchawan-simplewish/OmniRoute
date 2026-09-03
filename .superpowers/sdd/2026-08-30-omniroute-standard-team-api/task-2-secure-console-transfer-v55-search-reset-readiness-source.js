@@ -251,7 +251,7 @@ await (async () => {
           if (typeof descriptor.value !== "string" ||
               descriptor.value.length === 0 ||
               descriptor.value.length > limit ||
-              /[\u0000-\u001f\u007f]/.test(descriptor.value)) return null;
+              /[\x00-\x1f\x7f]/.test(descriptor.value)) return null;
           if (key === "id") validatedId = descriptor.value;
           if (key === "url") validatedUrl = descriptor.value;
         }
@@ -407,11 +407,12 @@ await (async () => {
       controllerOwnership = typeof adopted === "object" && adopted !== null &&
         typeof adopted.id === "string" && adopted.id === candidate.id &&
         adopted.id.length > 0 && adopted.id.length <= 512 &&
-        !/[\u0000-\u001f\u007f]/.test(adopted.id);
+        !/[\x00-\x1f\x7f]/.test(adopted.id);
       tabShape = controllerOwnership && typeof adopted.goto === "function" &&
         typeof adopted.url === "function" &&
         typeof adopted.playwright?.waitForTimeout === "function" &&
-        typeof adopted.playwright?.locator === "function";
+        typeof adopted.playwright?.locator === "function" &&
+        typeof adopted.playwright?.waitForURL === "function";
       if (!tabShape) throw new Error("ClaimedTabOwnershipError");
 
       counters.navigationAttempted++;
@@ -645,7 +646,7 @@ await (async () => {
         typeof adopted === "object" && adopted !== null &&
         typeof adopted.id === "string" &&
         adopted.id.length > 0 && adopted.id.length <= 512 &&
-        !/[\u0000-\u001f\u007f]/.test(adopted.id);
+        !/[\x00-\x1f\x7f]/.test(adopted.id);
       tabShape =
         controllerOwnership &&
         typeof adopted.goto === "function" &&
@@ -698,7 +699,9 @@ await (async () => {
         counters.resetFillFulfilled++;
       }
       counters.resetUrlWaitAttempted++;
-      await adopted.playwright.waitForTimeout(0);
+      await adopted.playwright.waitForURL(
+        "https://dash.cloudflare.com/profile/api-tokens", { timeoutMs: 20000 },
+      );
       counters.resetUrlWaitFulfilled++;
       counters.resetUrlReadAttempted++;
       const resetUrl = new URL(await adopted.url());

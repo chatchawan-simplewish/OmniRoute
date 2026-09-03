@@ -14,15 +14,18 @@ fallback.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| V55 source | 46630 | `A272F1B52D7841E10FFF7C31E0BCBA0DD1C9A64FE3457944A7E6B1D45A483DF8` |
-| V55 executable | 26511 | `C528D16CE12F4BBEBF77925646663BF8BCA3C09CE4F7EAD6FC5045E325546A33` |
-| V55 pure fixture | 29676 | `CF69D25EB76D86CD3A714A45E077FAEC02F25AFC70FEF9AA4E1D1EB97A4B9B02` |
+| V55 source | 46758 | `ABFE257FCD6EEA7F128621ACEC40F1773B5EF54DE20C394334B193EF8CB4F889` |
+| V55 executable | 26597 | `A9692FFBB688DB244566FCE68D84C08686A7B1D0D4D0FAA587187D8135FB286A` |
+| V55 pure fixture | 31113 | `1A49BF68D22A618075F996FD12ABAD500350DDB14F19FF7D46851BF4AD77604E` |
 
 The executable is the Terser output of the V55 source with `evaluate:false`,
 ASCII-only formatting, and all seven V55 persistent names reserved. It contains
 the fixed source projection `10619` / `89D36435A31AE04E560A27D53D8A0953F19E837DF60837FADCF3DC174C0B9477`,
 all 132 predecessor declaration guards (125 inherited plus the seven V54
 globals), and `String.fromCodePoint(0x1F510)+" OmniRoute secure console"`.
+It contains no literal emoji or `\\uXXXX` escape; control rejection uses ASCII
+`\\x00` ranges. Reset convergence uses exact `waitForURL` with a 20-second
+bound, then a separately counted URL read.
 
 The only runtime delta is conditional one-time empty reset followed on both
 branches by exact base-URL, hidden/detached sentinel, final-empty-input, and
@@ -43,7 +46,8 @@ node .superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-conso
 The pure fixture regenerates and compares candidate bytes, checks syntax and
 ASCII, exercises empty and stale-reset success, reset/retained earliest
 failures, trusted-listing variants, 132 inert contaminations, counter vectors,
-ordinary/documentation/final-output cleanup, sanitized output, and prohibited
+ordinary/documentation/final-output cleanup, sanitized output, field-only stale
+transition, reset timeout/wrong settlement/reset-read stops, and prohibited
 effects. Its result is `PASS`; it performs no CUA, browser, provider, network,
 DNS, VM, clipboard, credential, secret, or live action.
 

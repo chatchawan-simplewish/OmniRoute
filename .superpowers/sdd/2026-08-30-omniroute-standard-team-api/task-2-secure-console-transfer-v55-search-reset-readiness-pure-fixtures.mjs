@@ -38,6 +38,10 @@ assert.equal(minimized.error, undefined);
 assert.equal(candidate, minimized.code + "\n");
 assert.ok(Buffer.byteLength(candidate) <= 27000);
 assert.match(candidate, /^[\x00-\x7F]*$/);
+assert.equal((candidate.match(/\\u[0-9a-fA-F]{4}/g) ?? []).length, 0);
+assert.equal([...candidate].filter((character) => character.codePointAt(0) > 127).length, 0);
+assert.equal((candidate.match(/String\.fromCodePoint\(/g) ?? []).length, 1);
+assert.ok(source.includes('String.fromCodePoint(0x1F510) + " OmniRoute secure console"'));
 for (const binding of persistentBindings) assert.match(candidate, new RegExp(`\\b${binding}\\b`));
 for (const pin of [
   "10619", "89D36435A31AE04E560A27D53D8A0953F19E837DF60837FADCF3DC174C0B9477",
@@ -141,6 +145,7 @@ const defaults = {
   filteredTargetCount: 0, filteredActions: 0, filteredBusy: false,
   createButtonCount: 1, createLinkCount: 0, tokenNameCount: 0,
   matchingRowCount: 0, createVisible: true, throwAt: null, failFinalWrite: false,
+  resetConverges: true, resetSettledUrl: tokenUrl,
 };
 
 function makeFixture(overrides = {}) {
@@ -151,6 +156,7 @@ function makeFixture(overrides = {}) {
   const state = { currentUrl: tokenUrl, filterValue: config.initialValue, filtered: false };
   let inputEvalNumber = 0;
   let textLocatorNumber = 0;
+  let baseUrlReadNumber = 0;
   const fail = (name) => { if (config.throwAt === name) throw Object.create(null); };
   const operate = async (name, action) => {
     const counts = effects.ops[name] ??= { attempted: 0, fulfilled: 0 };
@@ -163,7 +169,7 @@ function makeFixture(overrides = {}) {
   const countLocator = (count, waitName, visible = true) => ({
     count: async () => operate(`${waitName}Count`, () => count),
     waitFor: async (options) => operate(options?.state === "hidden" ? "resetSentinelWait" : waitName, () => {
-      if (!visible) throw new Error("not visible");
+      if (options?.state === "hidden" ? visible : !visible) throw new Error("locator state");
     }),
     or(other) { return countLocator(count + other._count, "createWait", config.createVisible); },
     _count: count,
@@ -176,7 +182,7 @@ function makeFixture(overrides = {}) {
       tagName: config.inputTagName, type: config.inputType, disabled: config.inputDisabled }));
     },
     fill: async (value) => operate(value === "" ? "resetFill" : "fill", () => { effects.fills++; state.filterValue = value;
-      state.filtered = value !== ""; state.currentUrl = value === "" ? tokenUrl : config.filteredUrl; }),
+      if (value !== "") { state.filtered = true; state.currentUrl = config.filteredUrl; } }),
   };
   const makeTableDom = () => {
     const cell = (textContent) => ({ textContent });
@@ -208,13 +214,19 @@ function makeFixture(overrides = {}) {
     evaluate: async (fn) => operate(state.filtered ? "terminalEval" : "initialEval",
       () => fn(makeTableDom())),
     getByText: () => countLocator(config.noResultsCount,
-      textLocatorNumber++ === 0 ? "resetSentinelWait" : "noResultsWait"),
+      textLocatorNumber++ === 0 ? "resetSentinelWait" : "noResultsWait", state.filtered),
     locator: () => ({ getByText: () => countLocator(config.tokenNameCount, "nameRead") }),
     getByRole: () => ({ filter: () => countLocator(config.matchingRowCount, "rowRead") }),
   };
   const body = { evaluate: async () => operate("homeSnapshot", () => config.homeSnapshot) };
   const playwright = {
     waitForTimeout: async (ms) => operate(ms === 0 ? "resetUrlWait" : "homeWait", () => undefined),
+    waitForURL: async (url) => operate("resetUrlWait", () => {
+      if (!config.resetConverges) throw new Error("reset timeout");
+      state.currentUrl = config.resetSettledUrl;
+      state.filtered = state.currentUrl !== tokenUrl;
+      if (state.currentUrl !== url) throw new Error("wrong reset url");
+    }),
     locator: (selector) => {
       if (selector === "body") return body;
       if (selector === "#user-api-tokens-search") return input;
@@ -233,7 +245,8 @@ function makeFixture(overrides = {}) {
       effects.gotos.push(url); state.currentUrl = url === "https://dash.cloudflare.com/" ?
         accountHomeUrl : tokenUrl; state.filterValue = config.initialValue; state.filtered = false; }),
     url: async () => operate(state.filtered ? "filteredUrl" :
-      state.currentUrl === accountHomeUrl ? "homeUrl" : "tokenUrl", () => state.currentUrl) };
+      state.currentUrl === accountHomeUrl ? "homeUrl" :
+      baseUrlReadNumber++ === 0 ? "navigationUrl" : "resetUrlRead", () => state.currentUrl) };
   const chrome = { documentation: async () => operate("docs", () => { effects.docs++; return config.docs; }),
     nameSession: async () => operate("name", () => { effects.names++; }),
     user: { openTabs: async () => operate("openTabs", () => { effects.openTabs++; return config.offered; }),
@@ -301,9 +314,9 @@ function assertCounterEvidence(runResult) {
   assertPair(output, "binding", bindingExpected);
   assertPair(output, "navigation", pair(effects, "gotoToken"));
   const resetUrlReads = pair(effects, "resetUrlWait")[1];
-  const tokenUrl = pair(effects, "tokenUrl");
-  assertPair(output, "url", [tokenUrl[0] - resetUrlReads + pair(effects, "filteredUrl")[0],
-    tokenUrl[1] - resetUrlReads + pair(effects, "filteredUrl")[1]]);
+  const navigationUrl = pair(effects, "navigationUrl");
+  assertPair(output, "url", [navigationUrl[0] + pair(effects, "filteredUrl")[0],
+    navigationUrl[1] + pair(effects, "filteredUrl")[1]]);
   assertPair(output, "readiness",
     sumPairs(effects, ["searchWait", "tableWait", "noResultsWait"]));
   assertPair(output, "initialRead", pair(effects, "initialInputEval"));
@@ -311,7 +324,7 @@ function assertCounterEvidence(runResult) {
   assertPair(output, "resetFill", pair(effects, "resetFill"));
   assertPair(output, "resetUrlWait", pair(effects, "resetUrlWait"));
   const resetWait = pair(effects, "resetUrlWait");
-  const resetReads = [resetWait[1], Math.max(0, pair(effects, "tokenUrl")[1] - 1)];
+  const resetReads = pair(effects, "resetUrlRead");
   assertPair(output, "resetUrlRead", resetReads);
   assertPair(output, "resetSentinelWait", pair(effects, "resetSentinelWait"));
   assertPair(output, "resetSentinelRead", pair(effects, "resetSentinelWaitCount"));
@@ -380,6 +393,17 @@ assert.equal(staleSuccess.output.result, "EXACT_V55_TOKEN_PAGE_SEMANTIC_READINES
 assert.deepEqual([staleSuccess.output.resetFillAttempted, staleSuccess.output.resetFillFulfilled], [1, 1]);
 assertCounterEvidence(staleSuccess);
 assertPersistentProbe(staleSuccess, true);
+for (const resetFailure of [
+  { initialValue: "stale", resetConverges: false },
+  { initialValue: "stale", resetSettledUrl: `${tokenUrl}?search=stale` },
+]) {
+  const failed = await run(resetFailure);
+  assert.equal(failed.output.result, "V55_TOKEN_PAGE_SEMANTIC_READINESS_FAILED_STOP");
+  assert.deepEqual([failed.output.resetUrlWaitAttempted, failed.output.resetUrlWaitFulfilled], [1, 0]);
+  assert.deepEqual([failed.output.resetUrlReadAttempted, failed.output.resetUrlReadFulfilled], [0, 0]);
+  assert.deepEqual([failed.output.baselineReadAttempted, failed.output.baselineReadFulfilled], [0, 0]);
+  assertPersistentProbe(failed, false);
+}
 
 const failureCases = [
   { docs: "bad" }, { offered: [] },
@@ -419,9 +443,9 @@ for (const overrides of failureCases) {
 }
 
 const throwStages = ["setup", "connect", "docs", "name", "openTabs", "claim", "gotoHome",
-  "homeWait", "homeUrl", "homeSnapshot", "gotoToken", "tokenUrl", "searchWait",
+  "homeWait", "homeUrl", "homeSnapshot", "gotoToken", "navigationUrl", "searchWait",
   "searchCount", "tableCount", "tableWait", "initialInputEval", "resetFill", "resetUrlWait",
-  "tokenUrl", "resetSentinelWait", "resetSentinelWaitCount", "finalInputEval", "initialEval", "fill",
+  "resetUrlRead", "resetSentinelWait", "resetSentinelWaitCount", "finalInputEval", "initialEval", "fill",
   "noResultsWait", "noResultsWaitCount", "filteredUrl", "terminalEval",
   "createWait", "createWaitCount", "nameReadCount", "rowReadCount"];
 for (const throwAt of throwStages) {

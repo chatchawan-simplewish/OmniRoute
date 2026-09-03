@@ -414,6 +414,19 @@ for (const resetFailure of [
   assert.deepEqual([failed.output.baselineReadAttempted, failed.output.baselineReadFulfilled], [0, 0]);
   assertPersistentProbe(failed, false);
 }
+const visibleSentinel = await run({ initialValue: "stale", initialUrl: `${tokenUrl}?search=stale`,
+  initialTableFiltered: true, staleAfterNavigationRead: true, resetSettledUrl: tokenUrl,
+  resetSettledTableFiltered: true });
+assert.equal(visibleSentinel.output.result, "V55_TOKEN_PAGE_SEMANTIC_READINESS_FAILED_STOP");
+for (const [prefix, vector] of Object.entries({
+  resetUrlWait: [1, 1], resetUrlRead: [1, 1], resetSentinelWait: [1, 0],
+  resetSentinelRead: [0, 0], finalRead: [0, 0], baselineRead: [0, 0],
+  fill: [0, 0], filteredRead: [0, 0], createRead: [0, 0], nameRead: [0, 0], rowRead: [0, 0],
+})) assert.deepEqual([visibleSentinel.output[`${prefix}Attempted`], visibleSentinel.output[`${prefix}Fulfilled`]], vector, prefix);
+assert.equal(visibleSentinel.output.bindingEligible, false);
+assert.equal(visibleSentinel.output.bindingNull, true);
+assert.equal(visibleSentinel.output.failureCleanupComplete, true);
+assertPersistentProbe(visibleSentinel, false);
 
 const failureCases = [
   { docs: "bad" }, { offered: [] },

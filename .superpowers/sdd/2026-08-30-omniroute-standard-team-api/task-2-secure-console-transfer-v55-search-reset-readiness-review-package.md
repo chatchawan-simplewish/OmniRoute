@@ -16,7 +16,7 @@ fallback.
 | --- | ---: | --- |
 | V55 source | 46758 | `ABFE257FCD6EEA7F128621ACEC40F1773B5EF54DE20C394334B193EF8CB4F889` |
 | V55 executable | 26597 | `A9692FFBB688DB244566FCE68D84C08686A7B1D0D4D0FAA587187D8135FB286A` |
-| V55 pure fixture | 32289 | `3E1D9886F44960B44FC831AC0AD7B1C55770E91248134DE3FDC4C0122871F486` |
+| V55 pure fixture | 33256 | `4DCB11F11620575C9EF12B26FCC728ED82385ACA1752052222304F2DF6AC5B51` |
 
 The executable is the Terser output of the V55 source with `evaluate:false`,
 ASCII-only formatting, and all seven V55 persistent names reserved. It contains
@@ -49,9 +49,11 @@ failures, trusted-listing variants, 132 inert contaminations, counter vectors,
 ordinary/documentation/final-output cleanup, sanitized output, and an
 independently seeded stale input/query/table state. Its candidate-derived stale
 case proves clear changes only input before `waitForURL`, then exact settlement
-restores base URL, hidden/detached sentinel, and full rows; timeout, wrong
-settlement, and reset-read stops retain exact counters and cleanup. It also
-retains prohibited
+restores base URL, hidden/detached sentinel, and full rows. A separate exact
+base-URL/filtered-table case proves visible sentinel residue stops at
+`resetSentinelWait 1/0` before final input, baseline, target, Create, or
+retention. Timeout, wrong settlement, reset-read, and sentinel throw/read stops
+retain their exact counter and cleanup vectors. It also retains prohibited
 effects. Its result is `PASS`; it performs no CUA, browser, provider, network,
 DNS, VM, clipboard, credential, secret, or live action.
 

@@ -598,54 +598,75 @@ const completeCounterVector = true;
 assert.equal(behavioralExecutions, 212);
 
 const expectedModulePath = "C:/ChatGPT Projects/SW-Selfhosted-Network/.worktrees/omniroute-agent-routing-source/.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v56-disk-module-executable.mjs";
-const expectedModuleUrl = "file:///C:/ChatGPT%20Projects/SW-Selfhosted-Network/.worktrees/omniroute-agent-routing-source/.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-console-transfer-v56-disk-module-executable.mjs";
 const expectedModuleSha256 = sha256(candidate);
-const targetImport = 'import(moduleUrl + "?sha256=" + moduleSha256)';
+const dataUrlPrefix = "data:text/javascript;base64,";
+const targetImport = 'import(moduleDataUrl + "#sha256=" + moduleSha256)';
 assert.equal(loader.split('import("node:fs")').length - 1, 1);
 assert.equal(loader.split('import("node:crypto")').length - 1, 1);
+assert.equal(loader.split("readFileSync(modulePath)").length - 1, 1);
 assert.equal(loader.split(targetImport).length - 1, 1);
 assert.ok(loader.includes(`const expectedBytes = ${Buffer.byteLength(candidate)};`));
 assert.ok(loader.includes(`const expectedSha256 = "${expectedModuleSha256}";`));
 assert.ok(loader.includes(`const modulePath = "${expectedModulePath}";`));
-assert.ok(loader.includes(`const moduleUrl = "${expectedModuleUrl}";`));
-for (const prohibited of ["Promise.race", ".catch(", "while (", "for (", "http://", "https://"])
+assert.ok(loader.includes(`const moduleDataUrl = "${dataUrlPrefix}" + moduleBytes.toString("base64");`));
+for (const prohibited of ["Promise.race", ".catch(", "while (", "for (", "file://", "http://", "https://"])
   assert.equal(loader.includes(prohibited), false, prohibited);
 
 const loaderExecutable = loader
   .replace('import("node:fs")', "Promise.resolve(__fs)")
   .replace('import("node:crypto")', "Promise.resolve(__crypto)")
-  .replace(targetImport, '__load(moduleUrl + "?sha256=" + moduleSha256)')
+  .replace(targetImport, '__load(moduleDataUrl + "#sha256=" + moduleSha256)')
   .replaceAll("globalThis.secureConsoleV56Module", "__global.secureConsoleV56Module");
 async function runLoader({ bytes = Buffer.from(candidate), readError = false,
-  hashOverride = null, importError = false } = {}) {
+  hashOverride = null, importError = false, replaceAfterRead = null } = {}) {
   const namespace = Object.freeze({ secureConsoleV56Consumed: true });
   const state = { secureConsoleV56Module: "residue" };
   const reads = [];
   const imports = [];
+  let backingBytes = bytes;
+  let loadedBytes = null;
   const __fs = { readFileSync(filePath) {
     reads.push(filePath);
     if (readError) throw new Error("fixture read failure");
-    return bytes;
+    const readBytes = backingBytes;
+    if (replaceAfterRead !== null) backingBytes = replaceAfterRead;
+    return readBytes;
   } };
   const __crypto = { createHash: hashOverride === null ? crypto.createHash : () => ({
     update() { return this; }, digest() { return hashOverride; },
   }) };
   const __load = async (url) => {
     imports.push(url);
+    const match = /^data:text\/javascript;base64,([^#]+)#sha256=([A-F0-9]{64})$/.exec(url);
+    if (match === null) throw new Error("fixture data URL failure");
+    loadedBytes = Buffer.from(match[1], "base64");
+    if (match[2] !== expectedModuleSha256) throw new Error("fixture cache key failure");
     if (importError) throw new Error("fixture import failure");
     return namespace;
   };
   let caught = null;
   try { await new AsyncFunction("__fs", "__crypto", "__load", "__global", loaderExecutable)(
     __fs, __crypto, __load, state); } catch (error) { caught = error; }
-  return { caught, imports, namespace, reads, state };
+  return { backingBytes, caught, imports, loadedBytes, namespace, reads, state };
 }
 
+const expectedDataUrl = `${dataUrlPrefix}${Buffer.from(candidate).toString("base64")}#sha256=${expectedModuleSha256}`;
 const loaderSuccess = await runLoader();
 assert.equal(loaderSuccess.caught, null);
 assert.deepEqual(loaderSuccess.reads, [expectedModulePath]);
-assert.deepEqual(loaderSuccess.imports, [`${expectedModuleUrl}?sha256=${expectedModuleSha256}`]);
+assert.deepEqual(loaderSuccess.imports, [expectedDataUrl]);
+assert.deepEqual(loaderSuccess.loadedBytes, Buffer.from(candidate));
 assert.equal(loaderSuccess.state.secureConsoleV56Module, loaderSuccess.namespace);
+const replacementBytes = Buffer.from("replacement after verified read");
+const loaderMutationSuccess = await runLoader({ replaceAfterRead: replacementBytes });
+assert.equal(loaderMutationSuccess.caught, null);
+assert.equal(loaderMutationSuccess.reads.length, 1);
+assert.equal(loaderMutationSuccess.imports.length, 1);
+assert.deepEqual(loaderMutationSuccess.loadedBytes, Buffer.from(candidate));
+assert.deepEqual(loaderMutationSuccess.backingBytes, replacementBytes);
+assert.notDeepEqual(loaderMutationSuccess.loadedBytes, loaderMutationSuccess.backingBytes);
+assert.equal(loaderMutationSuccess.state.secureConsoleV56Module,
+  loaderMutationSuccess.namespace);
 
 const loaderByteFailure = await runLoader({
   bytes: Buffer.concat([Buffer.from(candidate), Buffer.from(" ")]),
@@ -673,7 +694,7 @@ console.log(JSON.stringify({ result: "PASS", executableBytes: Buffer.byteLength(
   sourceSha256: sha256(source), fixtureBytes: fs.statSync(fileURLToPath(import.meta.url)).size,
   fixtureSha256: sha256(fs.readFileSync(fileURLToPath(import.meta.url))),
   loaderBytes: Buffer.byteLength(loader), loaderSha256: sha256(loader), moduleExports: 7,
-  moduleExecutions: 1, loaderCases: 6, loaderTargetImports: loaderSuccess.imports.length,
+  moduleExecutions: 1, loaderCases: 7, loaderTargetImports: loaderSuccess.imports.length,
   predecessorContaminations: predecessorNames.length,
   behavioralExecutions,
   terminalOutputCleanup, completeCounterVector }));

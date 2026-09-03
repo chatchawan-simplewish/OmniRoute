@@ -37,9 +37,11 @@ output failure retains only the reviewed null/ineligible failure state.
 
 The short ASCII loader uses only `node:fs` and `node:crypto` before the target
 import. It reads the exact absolute executable path, requires the pinned byte
-count, SHA-256, and ASCII bytes, and then imports the matching file URL exactly
-once with `?sha256=<verified hash>` as its cache key. The resulting module
-namespace is retained as `globalThis.secureConsoleV56Module`.
+count, SHA-256, and ASCII bytes, converts that same verified buffer to one
+base64 `data:` URL, and imports it exactly once with
+`#sha256=<verified hash>` as its cache key. The importer cannot reopen the path.
+The resulting module namespace is retained as
+`globalThis.secureConsoleV56Module`.
 
 The namespace is set to null before verification and reset to null on any read,
 fidelity, parse, execution, or import failure. There is no retry, alternate
@@ -54,7 +56,8 @@ bytes; prove ASCII and syntax; retain all V55 behavioral matrices and exact 132
 predecessor contaminations under V56 labels; prove the exact named exports;
 and exercise a transformed loader with in-memory file/import doubles. Loader
 cases cover success, byte mismatch, hash mismatch, non-ASCII input, one target
-import, exact hash cache key, no fallback, namespace retention, and cleanup.
+import, exact hash cache key, path-backing replacement after the sole read, no
+fallback, namespace retention, and cleanup.
 
 No fixture may use CUA, browser, provider, network, clipboard, credential,
 secret, DNS, VM, or live-resource access. Independent review remains required

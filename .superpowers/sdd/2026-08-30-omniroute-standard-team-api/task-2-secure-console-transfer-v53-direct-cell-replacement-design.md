@@ -23,7 +23,9 @@ source from disk, call `eval`, construct code from strings, dynamically import
 the candidate itself, use `vm`, use a wrapper, or split execution across cells.
 Only the pinned browser-client module import remains dynamic.
 
-The committed executable must be ASCII and no more than **16,000 UTF-8 bytes**.
+The committed executable must be ASCII and no more than **24,000 UTF-8 bytes**;
+this is the smallest rounded ceiling above the measured 21,703-byte mechanical
+V52 compression while retaining room for the required V53 corrections.
 Before implementation review, a disposable freshly reset browser-control realm
 must accept and execute one inert literal cell whose actual tool `code` payload
 is at least the candidate's exact byte length. The inert cell may contain only

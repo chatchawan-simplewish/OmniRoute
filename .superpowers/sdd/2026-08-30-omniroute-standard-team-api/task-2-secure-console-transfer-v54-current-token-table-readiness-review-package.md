@@ -17,9 +17,9 @@ is commit `52a9096db`.
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `task-2-secure-console-transfer-v54-current-token-table-readiness-design.md` | 5291 | `06E79FB51FA5F90D7F59812FB4CBCD5A6D3A105DEA3756A1FE4FA2FEF9E74B77` |
-| `task-2-secure-console-transfer-v54-current-token-table-readiness-source.js` | 43249 disk / 43245 normalized LF | `7CE510D9B38474EE3F1623C90972B223A672EBB0DDDB2C5C86705B32E03A0A8C` disk / `54E006ECBD2496D8FC076D21394C03935D9F54349FB7F3FD91E8D06C782EAD33` normalized LF |
-| `task-2-secure-console-transfer-v54-current-token-table-readiness-executable.js` | 24311 | `B85D778166B7A58CB1494DCD89B54C7FD1C40440ACA6026854B5751DEB4AD79A` |
-| `task-2-secure-console-transfer-v54-current-token-table-readiness-pure-fixtures.mjs` | 13809 | `E05128A5AA05FD9CBA33D0BEA558A00242A51DE9D03F557177D141D10CFE458A` |
+| `task-2-secure-console-transfer-v54-current-token-table-readiness-source.js` | 43481 disk / 43477 normalized LF | `B00AFE1DFA9195F1F6818B196E2052AAAE290A227E0690B27D76C2A77AD08F30` disk / `29E41E2BCA86AC60C82AF5D360E0F9C1E17170ABAACF2124E21D08000AD379AD` normalized LF |
+| `task-2-secure-console-transfer-v54-current-token-table-readiness-executable.js` | 24436 | `794D23BD77254822FF02DA1EF9A66ACD2049DB6BEDBA2B8C46F7FCEFADA79DA6` |
+| `task-2-secure-console-transfer-v54-current-token-table-readiness-pure-fixtures.mjs` | 26654 | `638DBA5921210850C677221363C5187E7918CF998E7A36A5852FD9CF8CE23A9D` |
 
 The fixture mechanically minimizes the normalized source with the reviewed
 Terser settings and asserts byte equality with the committed executable. The
@@ -56,16 +56,24 @@ node '.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-cons
 Result:
 
 ```json
-{"result":"PASS","executableBytes":24311,"executableSha256":"B85D778166B7A58CB1494DCD89B54C7FD1C40440ACA6026854B5751DEB4AD79A","sourceBytes":43245,"sourceSha256":"54E006ECBD2496D8FC076D21394C03935D9F54349FB7F3FD91E8D06C782EAD33","fixtureBytes":13809,"predecessorContaminations":125,"behavioralExecutions":166,"terminalOutputCleanup":true,"completeCounterVector":true}
+{"result":"PASS","executableBytes":24436,"executableSha256":"794D23BD77254822FF02DA1EF9A66ACD2049DB6BEDBA2B8C46F7FCEFADA79DA6","sourceBytes":43477,"sourceSha256":"29E41E2BCA86AC60C82AF5D360E0F9C1E17170ABAACF2124E21D08000AD379AD","fixtureBytes":26654,"predecessorContaminations":125,"behavioralExecutions":195,"terminalOutputCleanup":true,"completeCounterVector":true}
 ```
 
-The matrix covers exact PASS, attachment failures, duplicate/missing listing,
+The fixture executes the exact candidate-supplied input and table DOM callbacks
+against controlled DOM doubles; no precomputed baseline or terminal result is
+returned. The matrix covers button-only and link-only PASS, attachment failures,
+duplicate/missing listing,
 claimed-ID mismatch, account-home mismatch, missing/duplicate search or table,
 nonempty initial filter, malformed/busy/empty/oversized/pre-existing-target
 baseline, missing terminal row, wrong filtered query, target/action residue,
 missing Create control, hostile thrown values at every major stage, all 125
 predecessor contaminations before import/browser effects, and terminal-output
-failure.
+failure. Every ordinary and hostile failure compares the candidate's exact
+attempted/fulfilled counter vector with independently instrumented mock effects.
+Post-execution probes assert all seven persistent bindings on PASS and ordinary
+failure. Candidate-derived probe builds assert persistent, attachment,
+runtime/browser, and tab cleanup for both documentation-output and final-output
+failure paths before emitting the two derived PASS flags.
 
 ## Live compatibility evidence
 

@@ -660,7 +660,11 @@ await (async () => {
       await tokenTable.waitFor({ state: "visible", timeoutMs: 20000 });
       counters.readinessFulfilled++;
       tokenInitialFilterEmpty =
-        await tokenFilter.evaluate((input) => input.value === "");
+        await tokenFilter.evaluate((input) =>
+          input.tagName === "INPUT" &&
+          (input.type === "search" || input.type === "text") &&
+          input.disabled === false && input.value === ""
+        );
       if (!tokenInitialFilterEmpty) {
         throw new Error("TokenInitialFilterStateError");
       }
@@ -737,13 +741,13 @@ await (async () => {
       actionResidueCount = tokenTerminal.actions;
 
       counters.createReadAttempted++;
-      createControlCount =
-        await adopted.playwright.getByRole(
-          "button", { name: "Create Token", exact: true },
-        ).count() +
-        await adopted.playwright.getByRole(
-          "link", { name: "Create Token", exact: true },
-        ).count();
+      const createControl = adopted.playwright.getByRole(
+        "button", { name: "Create Token", exact: true },
+      ).or(adopted.playwright.getByRole(
+        "link", { name: "Create Token", exact: true },
+      ));
+      await createControl.waitFor({ state: "visible", timeoutMs: 20000 });
+      createControlCount = await createControl.count();
       counters.createReadFulfilled++;
       counters.nameReadAttempted++;
       tokenNameCount = await tokenTable.locator("tbody").getByText(

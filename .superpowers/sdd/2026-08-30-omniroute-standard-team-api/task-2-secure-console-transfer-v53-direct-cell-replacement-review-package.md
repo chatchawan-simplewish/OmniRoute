@@ -4,15 +4,17 @@
 
 ## Boundary and lineage
 
-- Fix-1 candidate commit: `298626e18245e959a8930b7bc9ccf6d2e32cbb43`
-- Direct parent / 25,000-byte ceiling Sol High PASS:
+- Fix-2 fixture commit / current HEAD: `3f4f6a3fa0e88d80f188bf65df92220655c9e765`
+- Executable candidate commit: `298626e18245e959a8930b7bc9ccf6d2e32cbb43`
+- Executable candidate parent / 25,000-byte ceiling Sol High PASS:
   `05fa7d9b1272d56c9b0dfa143a251d6a3fa4cc4e`
 - V53 design: `9e68ea7d55828f574a8253acf43e72ff80ba1e2d`
 - V53 final design Sol High PASS: `1695afe9965e30393e33d82167165cb565b947bd`
 - Ceiling calibration Sol High PASS: `3ebe77c2da36becdc590d25dafaf643fdc9f1586`
 - Capacity-proof Sol High PASS: `4c971a98e533a264cacc66aba5ac908c2ddbf90b`
 
-The fix-1 candidate changes exactly the V53 literal-cell executable and pure fixture.
+Fix 2 changes only the V53 pure fixture; the executable candidate remains the
+reviewed fix-1 byte-identical cell.
 This package is offline evidence only. It neither classifies nor authorizes a
 live V53 send.
 
@@ -22,7 +24,7 @@ live V53 send.
 | --- | ---: | --- | --- |
 | Final design | 7041 | `6F200046866705101460D2CAB1C40F9E8FB108F62EB9FBDB8BD5B686F785071B` | `cb3f8d9c5da29880b1c27ba015d031763d6a249d` |
 | Executable | 24290 | `8B842EBA101352BF34FC98BE649F13896DA934E50350DC7641E44CCB4B0A424A` | `6f743af636a4dd83cd9a3b6b1144b4f76e75637f` |
-| Pure fixture | 53015 | `B4DB8AB3420C76B1FD5E080391B12C93D47CB4B6945054B63F9FAAE97D8B60F8` | `267212ae59d9e3844ef026d139d6f6bbc7fd687f` |
+| Pure fixture | 56260 | `7F85FB256CB9B362F2CFE6A8B486DD64020F1202897E7362E9D84187B4CF16A1` | `903e204c1f31733666d04a1ac36491d8738012e7` |
 
 ## Verification evidence
 
@@ -41,6 +43,12 @@ live V53 send.
   continuation declarations and runtime reads (owned tab, eligibility, state,
   consumption, pre-Create detach, post-native detach, and Cloudflare-read),
   while executing the exact candidate-derived mutations and behavioral matrix.
+- V53-IMP-001 is addressed. Fix 2 closes V53-IMP-002 with unique exact
+  candidate-site instrumentation and candidate-derived assertions for all seven
+  retained success bindings, final-output-failure cleanup, and
+  documentation-output-failure cleanup plus its exact counter vector.
+  `terminalOutputCleanup` is derived from those assertions rather than a
+  hard-coded value.
 - The disposable inert direct-CUA literal proof passed with actual payload
   length `25351` (greater than `24290`), then `js_reset` completed. It did not
   import, bind a tab, enumerate, claim, navigate, inspect a page, or perform a
@@ -61,10 +69,10 @@ live V53 send.
 ## Independent review command set
 
 ```powershell
-git show --format=fuller --stat 298626e18245e959a8930b7bc9ccf6d2e32cbb43
-git diff --check 05fa7d9b1272d56c9b0dfa143a251d6a3fa4cc4e..298626e18245e959a8930b7bc9ccf6d2e32cbb43
+git show --format=fuller --stat 3f4f6a3fa0e88d80f188bf65df92220655c9e765
+git diff --check 298626e18245e959a8930b7bc9ccf6d2e32cbb43..3f4f6a3fa0e88d80f188bf65df92220655c9e765
 git cat-file -s 6f743af636a4dd83cd9a3b6b1144b4f76e75637f
-git cat-file -s 267212ae59d9e3844ef026d139d6f6bbc7fd687f
+git cat-file -s 903e204c1f31733666d04a1ac36491d8738012e7
 ```
 
 Review the committed bytes directly against the final V53 design and all
@@ -74,7 +82,7 @@ descriptor-safe selection, exact URL/claim, account and token readiness,
 counters, sanitized output, retention, cleanup, one-proof-only behavior, and
 the no-retry/no-mutation/external-confirmation boundaries.
 
-An independent Sol High fix-1 implementation/security review with zero unresolved
+An independent Sol High fix-2 implementation/security review with zero unresolved
 Critical, HIGH, IMPORTANT, and Minor findings, followed by a later
 non-self-referential classification, remains required. Neither this package
 nor that review authorizes live execution until its separate classification;

@@ -38,8 +38,12 @@ increments attempted before its effect and fulfilled only after success. For a
 false completed read, that boundary is `1/1`; for throw, timeout, or malformed
 URL/result it is `1/0`. Each such earliest stop retains only its reviewed
 attempted/fulfilled prefix, makes every later reset counter `0/0`, and makes
-every target filter/Create/name/row/binding counter `0/0`. Fixtures enumerate
-both success vectors and every earliest-stop vector.
+every target filter/Create/name/row counter `0/0`. The inherited local
+`bindingAttempted/bindingFulfilled` counter is already `1/1` before API Tokens
+navigation and therefore remains `1/1` on both success vectors and every
+reached reset earliest-stop vector; its persistent success-only binding remains
+null and ineligible on every reset failure. Fixtures enumerate both success
+vectors and every earliest-stop vector with those local and persistent states.
 A duplicate/missing/unsafe input or table,
 wrong/reset-stale URL, visible sentinel, counter mismatch, throw, or uncertainty
 fails before the target-name filter, Create read, or retained binding. Fixtures

@@ -92,9 +92,12 @@ deletion confirmation remain separate, mandatory, and unreached.
    success retention, failure cleanup, hostile thrown values, terminal-output
    failure, one-proof-only cleanup, absence of prohibited calls, every exact
    operation-counter and completeness vector, and contamination by each of the
-   fixed 118 V35-V51 predecessor declarations. Every counter/completeness or
-   predecessor-contamination failure must occur before import, attachment, or
-   browser effects and leave V53 consumed, ineligible, cleaned, and sanitized.
+   fixed 118 V35-V51 predecessor declarations. Every predecessor-contamination
+   case must fail before import, attachment, or browser effects. Every
+   operation-counter or completeness mismatch must fail at the earliest
+   checkpoint after its relevant attempted effect, permit no subsequent effect,
+   and preserve exact attempted/fulfilled vectors for every permitted stage.
+   All such failures leave V53 consumed, ineligible, cleaned, and sanitized.
 3. Commit a direct-byte review package and obtain independent `gpt-5.6-sol`
    High implementation/security PASS with zero findings.
 4. Commit a later non-self-referential execution classification, then record a

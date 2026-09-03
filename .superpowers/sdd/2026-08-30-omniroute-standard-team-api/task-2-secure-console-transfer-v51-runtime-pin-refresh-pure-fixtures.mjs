@@ -860,6 +860,13 @@ for (const prelude of [
   "let secureConsoleOwnedTaskTabV49PostNativeDetachConsumed = false;\n",
   "let secureConsoleCloudflareReadsV49Consumed = false;\n",
   "let secureConsoleV49Consumed = false;\n",
+  "let secureConsoleOwnedTaskTabV50 = null;\n",
+  "let secureConsoleOwnedTaskTabV50Eligible = false;\n",
+  "let secureConsoleOwnedTaskTabV50State = \"DIRTY\";\n",
+  "let secureConsoleOwnedTaskTabV50PreCreateDetachConsumed = false;\n",
+  "let secureConsoleOwnedTaskTabV50PostNativeDetachConsumed = false;\n",
+  "let secureConsoleCloudflareReadsV50Consumed = false;\n",
+  "let secureConsoleV50Consumed = false;\n",
 ]) {
   const contaminated = await run({}, prelude);
   assert.equal(contaminated.caught, null);

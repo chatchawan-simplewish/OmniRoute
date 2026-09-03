@@ -2,10 +2,10 @@
 
 ## Inputs and boundary
 
-- Corrected design commit:
-  `22ed4ee1ce6e5263aa7b285330797de7951f0cdf`
-- Independent design PASS review commit:
-  `be427102721e31d86a95d2a0309e46bea3dbb71a`
+- V51 design commit: `06c792a0b0c9aa6bb59684431a7a5a8f48068948`
+- Independent V51 design PASS: `86001a8e8fdc8f5fe50394f8cf152f0d0217c1c9`
+- Candidate lineage: `adf131f77340a14bd1f602b9d49ea8de34ba8f2b`
+- Direct-byte package: `f5a82e99f8fbb3824453b0238b4af816081c81a4`
 - Source executable: final committed V50 executable
 - Source fixture: final committed V50 pure fixture
 - New predecessor boundary: all seven persistent V50 declarations
@@ -17,10 +17,10 @@ provider, network, DNS, VM, clipboard, credential, secret, or live-gate action.
 
 Create or replace only:
 
-- `task-2-secure-console-transfer-v51-unique-url-token-page-reacquisition-brief.md`
-- `task-2-secure-console-transfer-v51-unique-url-token-page-reacquisition-implementation-plan.md`
-- `task-2-secure-console-transfer-v51-unique-url-token-page-reacquisition-executable.js`
-- `task-2-secure-console-transfer-v51-unique-url-token-page-reacquisition-pure-fixtures.mjs`
+- `task-2-secure-console-transfer-v51-runtime-pin-refresh-brief.md`
+- `task-2-secure-console-transfer-v51-runtime-pin-refresh-implementation-plan.md`
+- `task-2-secure-console-transfer-v51-runtime-pin-refresh-executable.js`
+- `task-2-secure-console-transfer-v51-runtime-pin-refresh-pure-fixtures.mjs`
 
 Mechanically rename final V50 ownership, state, result, and marker literals to
 V51. Preserve all downstream browser, account-home, token-page, counter,
@@ -47,7 +47,8 @@ Run:
 1. Node syntax validation of the V51 executable;
 2. the V51 pure fixture, requiring `V51_PURE_FIXTURES_PASS`;
 3. a direct normalized executable comparison to final V50 after removing only
-   the reviewed selection block, seven V49 guards, and renamed evidence fields;
+   only the seven V50 predecessor guards, V51 ownership literals, and refreshed
+   runtime/documentation provenance;
 4. source scans for exact operation counts and prohibited behavior; and
 5. Git status/index checks proving the 12 product paths are unchanged and only
    the four V51 candidate paths enter the index.

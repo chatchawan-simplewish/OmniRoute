@@ -2,14 +2,16 @@
 
 ## Status and authority
 
-V49 was consumed once, failed closed before claim, and is permanently
-ineligible. Its sanitized live result is committed at `d1c70a8a0`. V49 may not
-be retried, continued, reused, reinterpreted, or relaxed.
+V50 is the immediately preceding consumed gate and is permanently ineligible.
+It may not be retried, continued, reused, reinterpreted, relaxed, or made
+eligible by V51. V51 is a new replacement gate, consumed before validation or
+import. This brief is offline only and grants no live authority.
 
-V51 is a new one-shot replacement. This design does not authorize live
-execution. Live execution requires committed candidates, independent Sol High
-PASS review, a later non-self-referential execution classification, a separate
-post-commit coordinator tuple, and fresh action-time pins.
+V51 design provenance is commit `06c792a0b0c9aa6bb59684431a7a5a8f48068948`;
+its independent Sol High design PASS is
+`86001a8e8fdc8f5fe50394f8cf152f0d0217c1c9`. The candidate lineage begins at
+`adf131f77340a14bd1f602b9d49ea8de34ba8f2b`; its direct-byte package is
+`f5a82e99f8fbb3824453b0238b4af816081c81a4`.
 
 ## Evidence and narrow decision
 
@@ -20,21 +22,12 @@ candidate import: `scripts/browser-client.mjs` is 150611 bytes, SHA-256
 `FC7966FFBC9010252AD3EA745E061068BEC3919EFFF860A87E6013A38A7E277F`.
 Missing, substituted, or mismatched pins stop V51 before import with no retry.
 
-V49 completed import, setup, Chrome connection, documentation validation,
-session naming, and exactly one `openTabs` call. It stopped with
-`listingValidated=false`, sanitized `offeredCount=-1`, and zero claim or later
-actions. The exact rejecting property is **NOT PROVEN** because V49 prohibited
-raw-listing output.
-
-The owner has confirmed that other tasks may use other tabs in the same Chrome
-profile, while no other task controls the intended Cloudflare API Tokens tab or
-Cloudflare token object. Therefore recency rank is not a stable ownership
-predicate. V51 removes only the rank-zero assumption and selects exactly one
-fully validated record whose URL is exactly:
+V51 retains V50's exact one-record URL selection and selects exactly one fully
+validated returned record whose URL is:
 
 `https://dash.cloudflare.com/profile/api-tokens`
 
-It does not diagnose, reinterpret, or retry V49.
+It does not diagnose, reinterpret, or retry V50.
 
 ## Trusted listing and candidate selection
 
@@ -60,10 +53,10 @@ Every offered record is validated before selection:
 Zero or multiple exact matches fail closed. Only that exact returned record is
 claimed, exactly once. No tab id is guessed, reconstructed, or emitted.
 
-## Preserved V49 and V4 semantics
+## Preserved V50, V49, and V4 semantics
 
-After unique candidate selection, V51 mechanically preserves V49's reviewed
-flow and all inherited V4 semantic signatures:
+After unique candidate selection, V51 mechanically preserves V50's reviewed
+flow and all inherited V49/V4 semantic signatures:
 
 1. one pinned runtime import, setup, Chrome connection, complete documentation
    read/write, session name, `openTabs`, and exact-record claim;
@@ -89,17 +82,16 @@ manual-continuation path.
 
 ## Fresh-realm and predecessor guards
 
-V51 is consumed before validation or import. Its fresh-realm guard requires all
-established persistent V35-V49 declarations absent, including all seven V49
-globals:
+V51 is consumed before validation or import. Its fresh-realm guard retains all
+historic V35-V49 declarations and adds all seven V50 globals:
 
-- `secureConsoleOwnedTaskTabV49`
-- `secureConsoleOwnedTaskTabV49Eligible`
-- `secureConsoleOwnedTaskTabV49State`
-- `secureConsoleOwnedTaskTabV49PreCreateDetachConsumed`
-- `secureConsoleOwnedTaskTabV49PostNativeDetachConsumed`
-- `secureConsoleCloudflareReadsV49Consumed`
-- `secureConsoleV49Consumed`
+- `secureConsoleOwnedTaskTabV50`
+- `secureConsoleOwnedTaskTabV50Eligible`
+- `secureConsoleOwnedTaskTabV50State`
+- `secureConsoleOwnedTaskTabV50PreCreateDetachConsumed`
+- `secureConsoleOwnedTaskTabV50PostNativeDetachConsumed`
+- `secureConsoleCloudflareReadsV50Consumed`
+- `secureConsoleV50Consumed`
 
 A separate direct declaration audit must prove the same set absent immediately
 before the live send.

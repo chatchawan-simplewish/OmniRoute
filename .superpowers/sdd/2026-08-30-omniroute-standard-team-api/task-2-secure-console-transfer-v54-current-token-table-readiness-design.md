@@ -51,6 +51,12 @@ the separately reviewed creation gate can still use the unique Create control.
 - Candidate size must remain within the already proven `25000`-byte transport
   ceiling; `node --check` and a candidate-length inert direct-cell proof remain
   mandatory.
+- Source projection remains exactly `10619` records at SHA-256
+  `89D36435A31AE04E560A27D53D8A0953F19E837DF60837FADCF3DC174C0B9477`.
+- Browser client remains `150611` bytes at SHA-256
+  `B9B9BC2319D5EE6AA0B1E481D63BB2130D28102FC7C9080803AB5552185D9037`;
+  documentation remains `59294` bytes at SHA-256
+  `FC7966FFBC9010252AD3EA745E061068BEC3919EFFF860A87E6013A38A7E277F`.
 - Consumed before import or validation; no retry, fallback, correction,
   reconnect, alternate selection, or manual continuation.
 - The pinned source projection, browser-client module, documentation, exact

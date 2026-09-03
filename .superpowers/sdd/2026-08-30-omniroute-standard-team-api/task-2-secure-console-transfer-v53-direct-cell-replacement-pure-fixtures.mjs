@@ -290,7 +290,7 @@ const documentationFailureHook =
   "    evidenceNull: secureConsoleV53AttachmentEvidence === null,\n" +
   "    outputErrorNull: secureConsoleV53TerminalOutputFailure === null,\n" +
   "  };\n";
-const instrumented = executable
+let instrumented = executable
   .replace(
     'await import("file:///C:/Users/chatc/.codex/plugins/cache/openai-bundled/chrome/26.901.20858/scripts/browser-client.mjs")',
     "globalThis.__v53Fixture.imported",
@@ -336,6 +336,26 @@ const instrumented = executable
   );
 assert.notEqual(instrumented, executable);
 assert.equal(instrumented.includes("await import("), false);
+const replaceCandidateSite = (before, after) => {
+  assert.equal(instrumented.split(before).length - 1, 1, before);
+  instrumented = instrumented.replace(before, after);
+};
+replaceCandidateSite(
+  't=e,Error("V53DocumentationOutputError")',
+  't=e,globalThis.__v53Fixture.documentationCounters={...d},Error("V53DocumentationOutputError")',
+);
+replaceCandidateSite(
+  'V?secureConsoleOwnedTaskTabV53State="TOKEN_PAGE_SEMANTIC_READY_ELIGIBLE":',
+  'V?(secureConsoleOwnedTaskTabV53State="TOKEN_PAGE_SEMANTIC_READY_ELIGIBLE",globalThis.__v53Fixture.successStable={tab:secureConsoleOwnedTaskTabV53,eligible:secureConsoleOwnedTaskTabV53Eligible,state:secureConsoleOwnedTaskTabV53State,consumed:secureConsoleV53Consumed,pre:secureConsoleOwnedTaskTabV53PreCreateDetachConsumed,post:secureConsoleOwnedTaskTabV53PostNativeDetachConsumed,reads:secureConsoleCloudflareReadsV53Consumed}):',
+);
+replaceCandidateSite(
+  'e=null,t=null,s}})()})();',
+  'e=null,t=null,globalThis.__v53Fixture.finalCleanup={tab:secureConsoleOwnedTaskTabV53,eligible:secureConsoleOwnedTaskTabV53Eligible,state:secureConsoleOwnedTaskTabV53State,attachment:u,runtime:n,agent:o,chrome:l,evidence:e,error:t},s}})()})();',
+);
+replaceCandidateSite(
+  '})(),null!==t){const n=t;throw t=null,e=null,n}',
+  '})(),null!==t){const q=t;throw t=null,e=null,globalThis.__v53Fixture.documentationCleanup={tab:secureConsoleOwnedTaskTabV53,eligible:secureConsoleOwnedTaskTabV53Eligible,state:secureConsoleOwnedTaskTabV53State,attachment:u,attachmentEligible:r,attachmentState:a,runtime:n,agent:o,chrome:l,evidence:e,error:q,counters:globalThis.__v53Fixture.documentationCounters},q}',
+);
 
 const account = "0".repeat(32);
 const accountUrl = `https://dash.cloudflare.com/${account}/home`;
@@ -758,6 +778,16 @@ assert.equal(successRun.caught, null);
 assert.equal(successRun.fixture.writes.length, 2);
 assert.equal(successRun.fixture.writes[0], documentation);
 const success = successRun.output;
+assert.notEqual(successRun.fixture.successStable.tab, null);
+assert.deepEqual({ ...successRun.fixture.successStable, tab: null }, {
+  tab: null,
+  eligible: true,
+  state: "TOKEN_PAGE_SEMANTIC_READY_ELIGIBLE",
+  consumed: true,
+  pre: false,
+  post: false,
+  reads: false,
+});
 assert.deepEqual(Object.keys(success).sort(), expectedTopKeys);
 assert.deepEqual(Object.keys(success.attachment).sort(), expectedAttachmentKeys);
 assert.equal(success.result, "EXACT_V53_TOKEN_PAGE_SEMANTIC_READINESS_PASS");
@@ -1242,6 +1272,11 @@ const finalOutputFailure = await run({ failWriteAt: 2 });
 assert.equal(finalOutputFailure.caught, finalOutputFailure.fixture.outputThrown);
 assert.equal(finalOutputFailure.fixture.writeCalls, 2);
 assert.equal(finalOutputFailure.fixture.writes.length, 1);
+assert.deepEqual(finalOutputFailure.fixture.finalCleanup, {
+  tab: null, eligible: false, state: "V53_FINAL_OUTPUT_FAILED_STOP",
+  attachment: null, runtime: null, agent: null, chrome: null,
+  evidence: null, error: null,
+});
 const documentationOutputFailure = await run({ failWriteAt: 1 });
 assert.equal(
   documentationOutputFailure.caught,
@@ -1249,6 +1284,25 @@ assert.equal(
 );
 assert.equal(documentationOutputFailure.fixture.writeCalls, 1);
 assert.equal(documentationOutputFailure.fixture.writes.length, 0);
+assert.deepEqual(documentationOutputFailure.fixture.documentationCleanup, {
+  tab: null, eligible: false, state: "UNADOPTED", attachment: null,
+  attachmentEligible: false, attachmentState: "V53Attachment_REACQUISITION_OR_READINESS_FAILED", runtime: null,
+  agent: null, chrome: null, evidence: null,
+  error: documentationOutputFailure.fixture.outputThrown,
+  counters: {
+    importAttempted: 1, importFulfilled: 1, setupAttempted: 1,
+    setupFulfilled: 1, connectAttempted: 1, connectFulfilled: 1,
+    documentationAttempted: 1, documentationFulfilled: 1,
+    documentationWriteAttempted: 1, documentationWriteFulfilled: 0,
+    nameAttempted: 0, nameFulfilled: 0, openTabsAttempted: 0,
+    openTabsFulfilled: 0, claimAttempted: 0, claimFulfilled: 0,
+    navigationAttempted: 0, navigationFulfilled: 0, waitAttempted: 0,
+    waitFulfilled: 0, urlAttempted: 0, urlFulfilled: 0,
+    snapshotAttempted: 0, snapshotFulfilled: 0, writeAttempted: 0,
+  },
+});
+const terminalOutputCleanup = finalOutputFailure.fixture.finalCleanup !== undefined &&
+  documentationOutputFailure.fixture.documentationCleanup !== undefined;
 assert.equal(outputGetterCalls, 0);
 
 const modelCoordinatorCleanup = (proofFails) => {
@@ -1299,7 +1353,7 @@ console.log(JSON.stringify({
   fullCellSuccess: true,
   fixedFailureCleanup: true,
   hostileThrownValues: true,
-  terminalOutputCleanup: true,
+  terminalOutputCleanup,
   oneProofOnlyCleanup: true,
   cleanupProofScenarioCount: 2,
   cleanupProofAttempts: 2,

@@ -276,7 +276,9 @@ function makeFixture(overrides = {}) {
   return { effects, module, nodeRepl };
 }
 
+let behavioralExecutions = 0;
 async function run(overrides = {}, prelude = "", mode = "ordinary") {
+  behavioralExecutions++;
   const fixture = makeFixture(overrides);
   let caught = null;
   const body = mode === "exact" ? executable :
@@ -541,10 +543,11 @@ assertCounterEvidence({ fixture: outputFailure.fixture,
 
 const terminalOutputCleanup = true;
 const completeCounterVector = true;
+assert.equal(behavioralExecutions, 212);
 
 console.log(JSON.stringify({ result: "PASS", executableBytes: Buffer.byteLength(candidate),
   executableSha256: sha256(candidate), sourceBytes: Buffer.byteLength(source),
   sourceSha256: sha256(source), fixtureBytes: fs.statSync(fileURLToPath(import.meta.url)).size,
   predecessorContaminations: predecessorNames.length,
-  behavioralExecutions: 3 + failureCases.length + throwStages.length + predecessorNames.length + 2,
+  behavioralExecutions,
   terminalOutputCleanup, completeCounterVector }));

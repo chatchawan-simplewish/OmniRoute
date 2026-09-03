@@ -16,7 +16,7 @@ fallback.
 | --- | ---: | --- |
 | V55 source | 46758 | `ABFE257FCD6EEA7F128621ACEC40F1773B5EF54DE20C394334B193EF8CB4F889` |
 | V55 executable | 26597 | `A9692FFBB688DB244566FCE68D84C08686A7B1D0D4D0FAA587187D8135FB286A` |
-| V55 pure fixture | 33256 | `4DCB11F11620575C9EF12B26FCC728ED82385ACA1752052222304F2DF6AC5B51` |
+| V55 pure fixture | 33277 | `F6AF0A88B5F83C49A223A858D787763B7155672A0AB480369BF20D5D12BFA525` |
 
 The executable is the Terser output of the V55 source with `evaluate:false`,
 ASCII-only formatting, and all seven V55 persistent names reserved. It contains
@@ -54,7 +54,8 @@ base-URL/filtered-table case proves visible sentinel residue stops at
 `resetSentinelWait 1/0` before final input, baseline, target, Create, or
 retention. Timeout, wrong settlement, reset-read, and sentinel throw/read stops
 retain their exact counter and cleanup vectors. It also retains prohibited
-effects. Its result is `PASS`; it performs no CUA, browser, provider, network,
+effects. Its shared runner derives the behavioral execution count and asserts
+the final total is exactly 212. Its result is `PASS`; it performs no CUA, browser, provider, network,
 DNS, VM, clipboard, credential, secret, or live action.
 
 ## Later gate

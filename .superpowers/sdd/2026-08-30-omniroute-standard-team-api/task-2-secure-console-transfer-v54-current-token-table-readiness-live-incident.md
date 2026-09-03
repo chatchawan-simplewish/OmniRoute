@@ -44,6 +44,16 @@ This localizes the semantic failure to the initial search-input state check
 after the input and table became visible. The precise UI-state persistence
 mechanism is not yet proven.
 
+## Post-stop read-only diagnosis
+
+A fresh non-consuming browser realm reproduced the transition without touching
+Create Token. After setting the target search and then clearing it, the input
+became empty before the URL and table settled: the URL still carried the target
+`search` query and the table still showed the no-results row. The next settled
+state had the exact base URL and the full token rows restored. This proves the
+replacement must wait for both the base URL and removal of the no-results
+sentinel after clearing; an immediate empty-input assertion is insufficient.
+
 ## Send-byte discrepancy
 
 The live cell did not reproduce the reviewed candidate bytes exactly: the

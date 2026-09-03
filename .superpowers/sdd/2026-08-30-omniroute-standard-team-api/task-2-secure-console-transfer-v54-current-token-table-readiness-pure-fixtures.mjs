@@ -62,8 +62,6 @@ for (const prohibited of [
 const importLiteral = 'import("file:///C:/Users/chatc/.codex/plugins/cache/openai-bundled/chrome/26.901.20858/scripts/browser-client.mjs")';
 assert.equal(candidate.split(importLiteral).length - 1, 1);
 const executable = candidate.replace(importLiteral, "Promise.resolve(__module)");
-const persistentProbe = `await nodeRepl.capture({tabNull:secureConsoleOwnedTaskTabV54===null,eligible:secureConsoleOwnedTaskTabV54Eligible,state:secureConsoleOwnedTaskTabV54State,preCreate:secureConsoleOwnedTaskTabV54PreCreateDetachConsumed,postNative:secureConsoleOwnedTaskTabV54PostNativeDetachConsumed,cloudflareReads:secureConsoleCloudflareReadsV54Consumed,consumed:secureConsoleV54Consumed});`;
-const executableWithProbe = `${executable}\n${persistentProbe}`;
 const terminalNeedle = `secureConsoleV54AttachmentEvidence = null;
       secureConsoleV54TerminalOutputFailure = null;
       throw terminalError;`;
@@ -101,6 +99,24 @@ const documentationProbeMinimized = await terser.minify(documentationProbeSource
 });
 assert.equal(documentationProbeMinimized.error, undefined);
 const documentationProbeExecutable = documentationProbeMinimized.code.replace(
+  importLiteral, "Promise.resolve(__module)");
+const ordinaryNeedle = `    counters.writeAttempted++;
+    try {`;
+assert.equal(source.split(ordinaryNeedle).length - 1, 1);
+const ordinaryProbeSource = source.replace(ordinaryNeedle,
+  `    await nodeRepl.capture({tabNull:secureConsoleOwnedTaskTabV54===null,eligible:secureConsoleOwnedTaskTabV54Eligible,state:secureConsoleOwnedTaskTabV54State,preCreate:secureConsoleOwnedTaskTabV54PreCreateDetachConsumed,postNative:secureConsoleOwnedTaskTabV54PostNativeDetachConsumed,cloudflareReads:secureConsoleCloudflareReadsV54Consumed,consumed:secureConsoleV54Consumed,attachmentBindingNull:secureConsoleOwnedTaskTabV54Attachment===null,attachmentEligible:secureConsoleOwnedTaskTabV54AttachmentEligible,chromeNull:secureConsoleChromeV54Attachment===null,agentNull:secureConsoleAgentV54Attachment===null,setupNull:secureConsoleSetupBrowserRuntimeV54Attachment===null});
+    counters.writeAttempted++;
+    try {`);
+const ordinaryProbeMinimized = await terser.minify(ordinaryProbeSource, {
+  module: true,
+  compress: { passes: 10, toplevel: true, top_retain: persistentBindings,
+    unsafe: true, unsafe_comps: true, hoist_props: true, hoist_vars: true,
+    evaluate: false },
+  mangle: { toplevel: true, reserved: persistentBindings },
+  format: { ascii_only: true, comments: false },
+});
+assert.equal(ordinaryProbeMinimized.error, undefined);
+const ordinaryProbeExecutable = ordinaryProbeMinimized.code.replace(
   importLiteral, "Promise.resolve(__module)");
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const targetName = "OmniRoute secure console R5 20260901";
@@ -239,11 +255,12 @@ function makeFixture(overrides = {}) {
   return { effects, module, nodeRepl };
 }
 
-async function run(overrides = {}, prelude = "") {
+async function run(overrides = {}, prelude = "", mode = "ordinary") {
   const fixture = makeFixture(overrides);
   let caught = null;
-  const body = overrides.throwAt === "docsWrite" ? documentationProbeExecutable :
-    overrides.failFinalWrite ? terminalProbeExecutable : executableWithProbe;
+  const body = mode === "exact" ? executable :
+    overrides.throwAt === "docsWrite" ? documentationProbeExecutable :
+    overrides.failFinalWrite ? terminalProbeExecutable : ordinaryProbeExecutable;
   try { await new AsyncFunction("__module", "nodeRepl", `${prelude}${body}`)(
     fixture.module, fixture.nodeRepl); } catch (error) { caught = error; }
   const output = fixture.effects.outputs.find((value) => typeof value === "object" && value !== null) ?? null;
@@ -297,16 +314,14 @@ function assertCounterEvidence(runResult) {
 function assertPersistentProbe(runResult, successful) {
   assert.equal(runResult.fixture.effects.probes.length, 1);
   const probe = runResult.fixture.effects.probes[0];
-  assert.deepEqual(probe, {
-    tabNull: !successful,
+  for (const [key, value] of Object.entries({ tabNull: !successful,
     eligible: successful,
     state: successful ? "TOKEN_PAGE_SEMANTIC_READY_ELIGIBLE" :
       "V54_TOKEN_PAGE_SEMANTIC_READINESS_FAILED",
-    preCreate: false,
-    postNative: false,
-    cloudflareReads: false,
-    consumed: true,
-  });
+    preCreate: false, postNative: false, cloudflareReads: false, consumed: true,
+    attachmentBindingNull: true, attachmentEligible: false, chromeNull: true,
+    agentNull: true, setupNull: true,
+  })) assert.equal(probe[key], value, key);
 }
 
 const success = await run();
@@ -336,6 +351,11 @@ assert.deepEqual({
   nameRead: [1, 1], rowRead: [1, 1] });
 assertCounterEvidence(success);
 assertPersistentProbe(success, true);
+const exactCandidateSuccess = await run({}, "", "exact");
+assert.equal(exactCandidateSuccess.caught, null);
+assert.deepEqual(exactCandidateSuccess.output, success.output);
+assert.equal(exactCandidateSuccess.fixture.effects.probes.length, 0);
+assertCounterEvidence(exactCandidateSuccess);
 const linkOnlySuccess = await run({ createButtonCount: 0, createLinkCount: 1 });
 assert.equal(linkOnlySuccess.output.result, "EXACT_V54_TOKEN_PAGE_SEMANTIC_READINESS_PASS");
 assertCounterEvidence(linkOnlySuccess);
@@ -458,5 +478,5 @@ console.log(JSON.stringify({ result: "PASS", executableBytes: Buffer.byteLength(
   executableSha256: sha256(candidate), sourceBytes: Buffer.byteLength(source),
   sourceSha256: sha256(source), fixtureBytes: fs.statSync(fileURLToPath(import.meta.url)).size,
   predecessorContaminations: predecessorNames.length,
-  behavioralExecutions: 2 + failureCases.length + throwStages.length + predecessorNames.length + 2,
+  behavioralExecutions: 3 + failureCases.length + throwStages.length + predecessorNames.length + 2,
   terminalOutputCleanup, completeCounterVector }));

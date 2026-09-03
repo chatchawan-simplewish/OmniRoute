@@ -19,7 +19,7 @@ is commit `52a9096db`.
 | `task-2-secure-console-transfer-v54-current-token-table-readiness-design.md` | 5291 | `06E79FB51FA5F90D7F59812FB4CBCD5A6D3A105DEA3756A1FE4FA2FEF9E74B77` |
 | `task-2-secure-console-transfer-v54-current-token-table-readiness-source.js` | 43481 disk / 43477 normalized LF | `B00AFE1DFA9195F1F6818B196E2052AAAE290A227E0690B27D76C2A77AD08F30` disk / `29E41E2BCA86AC60C82AF5D360E0F9C1E17170ABAACF2124E21D08000AD379AD` normalized LF |
 | `task-2-secure-console-transfer-v54-current-token-table-readiness-executable.js` | 24436 | `794D23BD77254822FF02DA1EF9A66ACD2049DB6BEDBA2B8C46F7FCEFADA79DA6` |
-| `task-2-secure-console-transfer-v54-current-token-table-readiness-pure-fixtures.mjs` | 26654 | `638DBA5921210850C677221363C5187E7918CF998E7A36A5852FD9CF8CE23A9D` |
+| `task-2-secure-console-transfer-v54-current-token-table-readiness-pure-fixtures.mjs` | 28143 | `1B26FA37D0ED92F262BE4BC03FFA2843B67D838392E8D7B99E10E22FD8700013` |
 
 The fixture mechanically minimizes the normalized source with the reviewed
 Terser settings and asserts byte equality with the committed executable. The
@@ -56,7 +56,7 @@ node '.superpowers/sdd/2026-08-30-omniroute-standard-team-api/task-2-secure-cons
 Result:
 
 ```json
-{"result":"PASS","executableBytes":24436,"executableSha256":"794D23BD77254822FF02DA1EF9A66ACD2049DB6BEDBA2B8C46F7FCEFADA79DA6","sourceBytes":43477,"sourceSha256":"29E41E2BCA86AC60C82AF5D360E0F9C1E17170ABAACF2124E21D08000AD379AD","fixtureBytes":26654,"predecessorContaminations":125,"behavioralExecutions":195,"terminalOutputCleanup":true,"completeCounterVector":true}
+{"result":"PASS","executableBytes":24436,"executableSha256":"794D23BD77254822FF02DA1EF9A66ACD2049DB6BEDBA2B8C46F7FCEFADA79DA6","sourceBytes":43477,"sourceSha256":"29E41E2BCA86AC60C82AF5D360E0F9C1E17170ABAACF2124E21D08000AD379AD","fixtureBytes":28143,"predecessorContaminations":125,"behavioralExecutions":196,"terminalOutputCleanup":true,"completeCounterVector":true}
 ```
 
 The fixture executes the exact candidate-supplied input and table DOM callbacks
@@ -70,10 +70,13 @@ missing Create control, hostile thrown values at every major stage, all 125
 predecessor contaminations before import/browser effects, and terminal-output
 failure. Every ordinary and hostile failure compares the candidate's exact
 attempted/fulfilled counter vector with independently instrumented mock effects.
-Post-execution probes assert all seven persistent bindings on PASS and ordinary
-failure. Candidate-derived probe builds assert persistent, attachment,
-runtime/browser, and tab cleanup for both documentation-output and final-output
-failure paths before emitting the two derived PASS flags.
+One exact committed-candidate success execution is byte-for-byte compared with
+the probed success result. A uniquely injected candidate-derived pre-output
+probe directly asserts all seven persistent bindings plus attachment tab,
+eligibility, runtime setup, agent, and browser cleanup on every ordinary and
+hostile failure. Separate candidate-derived probe builds assert the same state
+for documentation-output and final-output failures before emitting the two
+derived PASS flags.
 
 ## Live compatibility evidence
 

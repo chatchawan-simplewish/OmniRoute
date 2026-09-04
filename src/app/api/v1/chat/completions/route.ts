@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAgentRouteAlias } from "@omniroute/open-sse/services/agentRoute.ts";
 import { CORS_HEADERS, handleCorsOptions } from "@/shared/utils/cors";
 import { callCloudWithMachineId } from "@/shared/utils/cloud";
 import { handleChat } from "@/sse/handlers/chat";
@@ -123,7 +124,7 @@ export async function POST(request) {
     // residency on the hot path and fed the OOM crash-loop (#4380). #7862 parse-once over
     // the admission-rebuilt request: the bytes are already buffered in memory by
     // admitChatRequest(), so json() parses them directly — no clone(), no second stream read.
-    let parsedBody = null;
+    let parsedBody: Record<string, any> | null = null;
     try {
       parsedBody = await request.json().catch(() => null);
       if (parsedBody) {
@@ -183,7 +184,7 @@ export async function POST(request) {
     // paths) drop the meta the docs promise.
     const compressionRequestHeader = readCompressionRequestHeader(request);
 
-    if (wantsStreaming) {
+    if (wantsStreaming && !isAgentRouteAlias(request.headers.get("x-route-model") || parsedBody?.model)) {
       const reqId = generateRequestId();
       // Wrap the real handler response, not the synthetic early-keepalive response. If the
       // client cancels while handleChat is still pending, earlyStreamKeepalive will cancel the

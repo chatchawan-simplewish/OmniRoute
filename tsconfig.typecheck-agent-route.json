@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.typecheck-core.json",
+  "files": [
+    "src/app/api/v1/chat/completions/route.ts",
+    "src/app/api/v1/responses/route.ts",
+    "src/app/api/v1/agent-routes/events/route.ts",
+    "src/sse/handlers/chat.ts",
+    "src/sse/services/auth.ts",
+    "src/lib/db/agentRouteRuns.ts",
+    "src/lib/db/providers.ts",
+    "src/shared/utils/logger.ts",
+    "open-sse/services/agentRoute.ts",
+    "open-sse/services/agentRouteContext.ts",
+    "open-sse/services/agentRouteEnvelope.ts",
+    "open-sse/services/agentRouteObjectives.ts",
+    "open-sse/services/codexQuotaFetcher.ts",
+    "open-sse/executors/base.ts",
+    "open-sse/handlers/chatCore.ts",
+    "open-sse/handlers/chatCore/attemptLogging.ts",
+    "tests/integration/agent-route-api.test.ts",
+    "tests/unit/services/agent-route.test.ts",
+    "tests/unit/db/agent-route-runs.test.ts"
+  ]
+}

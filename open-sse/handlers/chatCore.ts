@@ -1,4 +1,6 @@
 import { injectMemoryAndSkills } from "./chatCore/memorySkillsInjection.ts";
+import { agentRouteContext, guardAgentRouteExecutor } from "../services/agentRouteContext.ts";
+import { getExecutor } from "../executors/index.ts";
 import { resolveChatCoreRequestSetup } from "./chatCore/requestSetup.ts";
 import { buildFailureUsageRecord } from "./chatCore/failureUsage.ts";
 import { extractSystemRoleMessages } from "./chatCore/claudeSystemRole.ts";
@@ -417,6 +419,7 @@ export async function handleChatCore({
   modelPinned = false,
 }) {
   let { provider, model, extendedContext } = modelInfo;
+  const controlledRoute = !!agentRouteContext.getStore()?.target;
   // ── Memory pressure guard ────────────────────────────────────────────
   // Reject early if V8 heap is already near the 256MB limit. Prevents
   // cascading OOM when many large-context requests arrive concurrently.
@@ -473,7 +476,7 @@ export async function handleChatCore({
   {
     const _s = cachedSettings ?? (await getCachedSettings());
     if (
-      _s.customSystemPromptEnabled === true &&
+      !controlledRoute && _s.customSystemPromptEnabled === true &&
       typeof _s.customSystemPrompt === "string" &&
       _s.customSystemPrompt
     ) {
@@ -483,7 +486,7 @@ export async function handleChatCore({
   }
   // ── Plugin onRequest hook ──
   // Dynamic import cached by Node.js after first call — minimal overhead
-  const pluginGate = await runPluginOnRequestHook({
+  const pluginGate = controlledRoute ? { blocked: false as const, body } : await runPluginOnRequestHook({
     requestId: traceId,
     body,
     model,
@@ -505,7 +508,7 @@ export async function handleChatCore({
       response: pluginGate.response,
     };
   }
-  if (pluginGate.body) {
+  if ("body" in pluginGate && pluginGate.body) {
     body = pluginGate.body;
   }
   // Per-API-key device/connection tracking (port of upstream 9router#931,
@@ -605,7 +608,7 @@ export async function handleChatCore({
   // ── Phase 9.2: Idempotency check ──
   // Resolve the idempotency key once here and reuse it at the Phase 9.2 save site below,
   // rather than re-deriving it. (#3821-review LEDGER-6)
-  const { hit: idempotencyHit, idempotencyKey } = await checkIdempotencyCache({
+  const { hit: idempotencyHit, idempotencyKey } = controlledRoute ? { hit: null, idempotencyKey: null } : await checkIdempotencyCache({
     clientRawRequest,
     provider,
     model,
@@ -648,7 +651,7 @@ export async function handleChatCore({
   );
 
   // Check for bypass patterns (warmup, skip) - return fake response
-  const bypassResponse = handleBypassRequest(body, model, userAgent);
+  const bypassResponse = controlledRoute ? null : handleBypassRequest(body, model, userAgent);
   if (bypassResponse) {
     return bypassResponse;
   }
@@ -663,7 +666,7 @@ export async function handleChatCore({
   {
     const classifierSettings = cachedSettings ?? (await getCachedSettings());
     if (
-      shouldDefaultAllowClassifier(
+      !controlledRoute && shouldDefaultAllowClassifier(
         sourceFormat,
         body as Record<string, unknown>,
         classifierSettings.claudeClassifierCompat as string | undefined
@@ -688,7 +691,7 @@ export async function handleChatCore({
     headers: clientRawRequest?.headers,
     model,
   });
-  if (bgRedirect) {
+  if (bgRedirect && !controlledRoute) {
     const originalModel = model;
     log?.info?.(
       "BACKGROUND",
@@ -715,7 +718,7 @@ export async function handleChatCore({
   // Custom aliases take priority over built-in and must be resolved here so the
   // downstream getModelTargetFormat() lookup AND the actual provider request use
   // the correct, aliased model ID. Without this, aliases only affect format detection.
-  const resolvedModel = resolveModelAlias(model);
+  const resolvedModel = controlledRoute ? model : resolveModelAlias(model);
   // Use resolvedModel for all downstream operations (routing, provider requests, logging)
   let effectiveModel = resolvedModel === model ? model : resolvedModel;
   if (resolvedModel !== model) {
@@ -1002,7 +1005,7 @@ export async function handleChatCore({
   });
   effectiveServiceTier = resolveEffectiveServiceTier(body);
   setGeminiThoughtSignatureMode(settings.antigravitySignatureCacheMode);
-  const semanticCacheEnabled = settings.semanticCacheEnabled !== false;
+  const semanticCacheEnabled = !controlledRoute && settings.semanticCacheEnabled !== false;
 
   const reqLogger = await createRequestLogger(sourceFormat, targetFormat, model, {
     enabled: detailedLoggingEnabled,
@@ -1059,7 +1062,7 @@ export async function handleChatCore({
   // Per-request opt-out: clients that manage their own context send
   // `x-omniroute-no-memory: true` to skip memory+skills injection (a null owner
   // disables both branches in injectMemoryAndSkills). See PRD-2026-06-19-no-memory-header.
-  const memoryOwnerId = isNoMemoryRequested(clientRawRequest?.headers ?? null)
+  const memoryOwnerId = controlledRoute || isNoMemoryRequested(clientRawRequest?.headers ?? null)
     ? null
     : resolveMemoryOwnerId(apiKeyInfo as Record<string, unknown> | null);
   const injectionResult = await injectMemoryAndSkills({
@@ -1096,7 +1099,7 @@ export async function handleChatCore({
   // further down — see #8378 (context limit resolved by the combo was silently
   // discarded because it only existed inside this `if` block).
   let contextLimit = getTokenLimit(provider, effectiveModel);
-  if (body && Array.isArray(allMessages) && allMessages.length > 0) {
+  if (!controlledRoute && body && Array.isArray(allMessages) && allMessages.length > 0) {
     let estimatedTokens = estimateTokens(allMessages);
     const compressionSettingsResult = await resolveCompressionSettings(log);
     const compressionSettings: CompressionConfig | null = compressionSettingsResult.settings;
@@ -2532,7 +2535,7 @@ export async function handleChatCore({
   // cliproxyapiMode="claude-native" override can deep-route this single connection
   // through CLIProxyAPI regardless of the provider-level upstream_proxy_config mode.
   const resolveExecutorWithProxy = (prov: string) =>
-    resolveExecutorWithProxyFor(
+    controlledRoute ? Promise.resolve(getExecutor(prov)) : resolveExecutorWithProxyFor(
       prov,
       log,
       (credentials?.providerSpecificData as Record<string, unknown> | null | undefined) ?? null
@@ -2617,7 +2620,7 @@ export async function handleChatCore({
   // === /Quota Share enforcement PRE-hook ===
 
   // Get executor for this provider (with optional upstream proxy routing)
-  const executor = await resolveExecutorWithProxy(provider);
+  const executor = guardAgentRouteExecutor(await resolveExecutorWithProxy(provider));
   const getExecutionCredentials = () =>
     resolveExecutionCredentialsFor({
       credentials,
@@ -2692,7 +2695,7 @@ export async function handleChatCore({
         const rawResult = await (async () => {
           let attempts = 0;
           const isModelScopeForRequest = isModelScope();
-          const maxAttempts = isModelScopeForRequest ? 3 : provider === "codex" ? 3 : 1;
+          const maxAttempts = controlledRoute ? 1 : isModelScopeForRequest ? 3 : provider === "codex" ? 3 : 1;
 
           // ── Codex 429 account-rotation state ─────────────────────────────────
           // Track excluded connection IDs for codex failover across attempts.
@@ -3382,7 +3385,7 @@ export async function handleChatCore({
       failureStatus,
       upstreamErrorCode || (error instanceof Error && error.name ? error.name : "upstream_error")
     );
-    console.log(`${COLORS.red}[ERROR] ${failureMessage}${COLORS.reset}`);
+    if (!controlledRoute) console.log(`${COLORS.red}[ERROR] ${failureMessage}${COLORS.reset}`);
     if (stream && upstreamErrorCode) {
       const result = createStreamingErrorResult(
         failureStatus,
@@ -3789,7 +3792,7 @@ export async function handleChatCore({
     }).catch(() => {});
 
     const errMsg = formatProviderError(new Error(message), provider, model, statusCode);
-    console.log(`${COLORS.red}[ERROR] ${errMsg}${COLORS.reset}`);
+    if (!controlledRoute) console.log(`${COLORS.red}[ERROR] ${errMsg}${COLORS.reset}`);
 
     // Log Antigravity retry time if available
     if (retryAfterMs && provider === "antigravity") {
@@ -3816,7 +3819,7 @@ export async function handleChatCore({
     // Before returning a model-unavailable error upstream, try sibling models
     // from the same family. This keeps the request alive on the same account
     // instead of failing the entire combo.
-    if (isModelUnavailableError(statusCode, message)) {
+    if (!controlledRoute && isModelUnavailableError(statusCode, message)) {
       const nextModel = getNextFamilyFallback(currentModel, triedModels);
       if (nextModel) {
         triedModels.add(nextModel);
@@ -3902,7 +3905,7 @@ export async function handleChatCore({
           { passthrough: sourceFormat === FORMATS.CLAUDE }
         );
       }
-    } else if (isContextOverflowError(statusCode, message)) {
+    } else if (!controlledRoute && isContextOverflowError(statusCode, message)) {
       const familyCandidates = getModelFamily(currentModel).filter(
         (m) => m !== currentModel && !triedModels.has(m)
       );
@@ -4159,7 +4162,7 @@ export async function handleChatCore({
       persistFailureUsage(HTTP_STATUS.BAD_GATEWAY, "empty_content");
 
       // Trigger non-recursive fallback for empty content
-      const nextModel = getNextFamilyFallback(currentModel, triedModels);
+      const nextModel = controlledRoute ? null : getNextFamilyFallback(currentModel, triedModels);
       if (nextModel) {
         triedModels.add(nextModel);
         currentModel = nextModel;
@@ -4605,7 +4608,7 @@ export async function handleChatCore({
     // #8395: the streaming branch below already calls this; the non-streaming
     // (stream:false) branch returned without it, so onResponse never fired for
     // non-streaming requests at all.
-    await runPluginOnResponseHook({
+    if (!controlledRoute) await runPluginOnResponseHook({
       requestId: traceId,
       body,
       model,
@@ -4995,7 +4998,7 @@ export async function handleChatCore({
   await emitRequestGamificationEvent({ apiKeyId: apiKeyInfo?.id, model, provider });
 
   // ── Plugin onResponse hook (fire-and-forget) ──
-  await runPluginOnResponseHook({
+  if (!controlledRoute) await runPluginOnResponseHook({
     requestId: traceId,
     body,
     model,

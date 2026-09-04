@@ -3,6 +3,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
+import { agentRouteContext } from "../../../open-sse/services/agentRouteContext.ts";
 import { getDbInstance, rowToCamel, cleanNulls } from "./core";
 import { backupDbFile } from "./backup";
 import {
@@ -727,6 +728,7 @@ function _updateConnectionRow(db: DbLike, id: string, data: JsonRecord) {
 }
 
 export async function updateProviderConnection(id: string, data: JsonRecord) {
+  if (agentRouteContext.getStore()?.private && data.lastError) data = { ...data, lastError: "agent_route_provider_failure" };
   const db = getDbInstance() as unknown as DbLike;
   const existing = db.prepare("SELECT * FROM provider_connections WHERE id = ?").get(id);
   if (!existing) return null;

@@ -1,4 +1,5 @@
 import { handleChat } from "@/sse/handlers/chat";
+import { isAgentRouteAlias } from "@omniroute/open-sse/services/agentRoute.ts";
 import {
   withEarlyStreamKeepalive,
   RESPONSES_STARTUP_THINKING_FRAME,
@@ -93,7 +94,7 @@ async function postHandler(request: any, context: any, preParsedBody: any = null
     preParsedBody
   );
   const accept = String(request.headers?.get?.("accept") || "").toLowerCase();
-  if (accept.includes("text/event-stream")) {
+  if (accept.includes("text/event-stream") && !isAgentRouteAlias(request.headers.get("x-route-model") || resolvedBody?.model)) {
     // Adaptive threshold: web-session and anonymous-fallback providers are slower
     // to produce the first byte, so use a longer keepalive threshold (15s vs 2s).
     // Reuse resolvedBody.model — no extra clone/parse needed (#4041).

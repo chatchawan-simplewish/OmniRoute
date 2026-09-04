@@ -74,5 +74,6 @@ export async function POST(request: Request) {
     idempotencyKey: body.idempotency_key,
   });
   if (result === "forbidden") return reject(403, "agent_route_run_forbidden");
+  if (result === "conflict") return reject(409, "agent_route_event_conflict");
   return Response.json({ accepted: true }, { status: 202 });
 }

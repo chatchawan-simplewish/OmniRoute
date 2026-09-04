@@ -185,7 +185,7 @@ export function persistAttemptLogs(args: PersistAttemptLogsArgs, ctx: PersistAtt
     finalConnectionId
   );
 
-  const providerWarnings = extractProviderWarnings(providerResponse, clientResponse, responseBody);
+  const providerWarnings = noLogEnabled ? [] : extractProviderWarnings(providerResponse, clientResponse, responseBody);
   if (providerWarnings.length > 0) {
     logAuditEvent({
       action: "provider.warning",
@@ -242,13 +242,13 @@ export function persistAttemptLogs(args: PersistAttemptLogsArgs, ctx: PersistAtt
     connectionId: finalConnectionId || undefined,
     duration: Date.now() - startTime,
     tokens: tokens || {},
-    requestBody: cloneBoundedChatLogPayload(
+    requestBody: noLogEnabled ? null : cloneBoundedChatLogPayload(
       attachLogMeta(truncateForLog(body as Record<string, unknown>), {
         ...accountRotationMeta,
         claudePromptCache: claudeCacheMeta,
       })
     ),
-    responseBody: cloneBoundedChatLogPayload(
+    responseBody: noLogEnabled ? null : cloneBoundedChatLogPayload(
       attachLogMeta(truncateForLog(responseBody as Record<string, unknown>), {
         ...accountRotationMeta,
         claudePromptCache: claudeCacheMeta
@@ -261,7 +261,7 @@ export function persistAttemptLogs(args: PersistAttemptLogsArgs, ctx: PersistAtt
         claudePromptCacheUsage: claudeCacheUsageMeta,
       })
     ),
-    error: error || null,
+    error: noLogEnabled && error ? "upstream_failure" : error || null,
     sourceFormat,
     targetFormat,
     comboName,
@@ -287,7 +287,7 @@ export function persistAttemptLogs(args: PersistAttemptLogsArgs, ctx: PersistAtt
     const lifecycle = resolveRequestLifecycleEvent({
       traceId,
       status,
-      error,
+      error: noLogEnabled && error ? "upstream_failure" : error,
       model,
       provider,
       comboName,

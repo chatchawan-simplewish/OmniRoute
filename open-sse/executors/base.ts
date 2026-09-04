@@ -1,4 +1,5 @@
 import { HTTP_STATUS, FETCH_TIMEOUT_MS } from "../config/constants.ts";
+import { agentRouteBeforeFetch, agentRouteAfterFetch, agentRouteContext } from "../services/agentRouteContext.ts";
 import { getRegistryEntry } from "../config/providerRegistry.ts";
 import {
   resolveAlternateFormat,
@@ -855,6 +856,9 @@ export class BaseExecutor {
         stream,
         requestCredentials
       );
+      // Streaming upstream exposes admission before generation finishes. The
+      // existing core translates/buffers SSE for a non-streaming client too.
+      if (agentRouteContext.getStore()?.options?.local && rawTransformedBody && typeof rawTransformedBody === "object") (rawTransformedBody as Record<string, unknown>).stream = true;
       let transformedBody = sanitizeReasoningEffortForProvider(
         rawTransformedBody,
         this.provider,
@@ -900,7 +904,10 @@ export class BaseExecutor {
             : requestOptions;
 
           try {
-            return await fetch(requestUrl, optionsWithSignal);
+            await agentRouteBeforeFetch(requestUrl, optionsWithSignal.headers);
+            const response = await fetch(requestUrl, optionsWithSignal);
+            agentRouteAfterFetch(response);
+            return response;
           } finally {
             if (timeoutId) clearTimeout(timeoutId);
           }

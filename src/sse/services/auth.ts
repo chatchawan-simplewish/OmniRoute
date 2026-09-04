@@ -96,6 +96,7 @@ interface CredentialSelectionOptions {
   allowRateLimitedConnections?: boolean;
   bypassQuotaPolicy?: boolean;
   forcedConnectionId?: string | null;
+  hardConnectionPin?: boolean;
   excludeConnectionIds?: string[] | null;
   sessionKey?: string | null;
   sessionAffinityTtlMs?: number | null;
@@ -1021,6 +1022,7 @@ export async function getProviderCredentials(
       WEB_COOKIE_PROVIDERS as Record<string, { noAuth?: boolean } | undefined>,
     ];
     if (providerMaps.some((map) => map[resolvedId]?.noAuth)) {
+      if (options.hardConnectionPin) return null;
       if (await isNoAuthProviderBlockedBySettings(resolvedId)) return null;
       // #3061: there is only one synthetic "noauth" connection for a no-auth
       // provider. If the caller already tried and excluded it (account-fallback
@@ -1070,7 +1072,7 @@ export async function getProviderCredentials(
 
     // #5903: an active session-affinity pin outranks a per-request reset-aware
     // forcedConnectionId (see sessionAffinityPin leaf for the full rationale).
-    forcedConnectionId =
+    if (!options.hardConnectionPin) forcedConnectionId =
       applySessionAffinityPin({
         forcedConnectionId,
         options,
@@ -2302,7 +2304,7 @@ export async function markAccountUnavailable(
       }
     }
 
-    if (provider && status && errorMsg) {
+    if (!agentRouteContext.getStore()?.private && provider && status && errorMsg) {
       console.error(`❌ ${provider} [${status}]: ${errorMsg}`);
     }
 
@@ -2501,3 +2503,4 @@ export async function isValidApiKey(apiKey: string) {
 
   return await validateApiKey(apiKey);
 }
+import { agentRouteContext } from "@omniroute/open-sse/services/agentRouteContext.ts";

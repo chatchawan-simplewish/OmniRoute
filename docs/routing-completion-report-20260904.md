@@ -1,43 +1,141 @@
-# OmniRoute routing completion report
+# OmniRoute routing completion candidate
 
-## Changed paths
+Updated 20260904 175159 Asia/Bangkok. Product owner: routing_completion_specialist
+(fresh Sol High following the prior implementer's explicit release). Checkout:
+`C:/ChatGPT Projects/SW-Selfhosted-Network/.worktrees/omniroute-routing-completion`.
+Starting commit: `914b3e8d1ae6cc794e080e9ec90c782ea3f730db`.
 
-- `open-sse/services/agentRoute.ts`: deterministic alias ladder, strict fresh
-  subscription evidence validation, buffered candidate handling, objective gates,
-  reviewer independence, repair dispatch, and native dispatch boundary.
-- `src/sse/handlers/chat.ts`: intercepts only `agent/normal` and `agent/high`
-  after existing authentication, policy, guardrails, hooks, and session checks;
-  each dispatch uses the existing `handleSingleModelChat` pipeline with a forced
-  binding connection and `skipUpstreamRetry: true`.
-- Existing baseline paths retain the no-log event route, metadata-only SQLite
-  ledger, migration, model discovery, and provider-live Codex evidence adapter.
+## Status and authority
 
-## Verified offline
+Corrected offline candidate ready for the coordinator's one independent scoped
+R1-R10 re-review. This is not deployment, live acceptance, or independent PASS.
+No dependency install, provider request, credential access/change, VM action,
+image build, live database access, or deployment was performed by this lane.
+Network responses in native integration tests are in-memory synthetic fixtures.
 
-`C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --import file:///C:/ChatGPT%20Projects/SW-Selfhosted-Network/.worktrees/omniroute-routing-completion/node_modules/tsx/dist/loader.mjs --import ./tests/_setup/isolateDataDir.ts --test tests/unit/services/agent-route.test.ts tests/unit/db/agent-route-runs.test.ts tests/unit/api/agent-route-events.test.ts tests/unit/api/models-agent-route-aliases.test.ts`
+The earlier report and partial migration were preserved as history in Git and
+superseded here. Earlier claims of 29 tests and a clean broad TypeScript check
+must not be used: those claims were not reliable acceptance evidence.
 
-Historical result superseded: the prior 29-test run included twenty vacuous
-string-verdict tests and is not acceptance evidence. The current focused run has
-eight behavioral tests; it is partial evidence only. `node
-node_modules/typescript/bin/tsc --noEmit --pretty false --incremental false`
-completed successfully at the preceding checkpoint.
+## Findings addressed
 
-## Remaining live requirements
+| Finding | Production correction and direct evidence |
+| --- | --- |
+| R1 | Behavioral controller cases replace placeholders; both actual public Chat and Responses endpoint modules dispatch through `handleChat`, credential selection, native executor, core response conversion, and SQLite. Tests assert outputs, exact upstream identities, counts, state, errors, and absence of retained payload. |
+| R2 | Bell is inserted only after normal Q6 full/offline admission. Technical/objective/reviewer REVISE allows one feedback-bearing free repair; repaired output receives a new independent review. BLOCKED stops. Technical/malformed reviewer output tries the next eligible independent reviewer. Counters charge admitted attempts, not selections. |
+| R3 | One monotonic five-second local admission deadline spans authorization/precheck/native dispatch. A two-slot, zero-queue semaphore and fresh same-origin `/slots` check precede generation. Native HTTP uses the same abort signal; upstream local SSE exposes acceptance before generation completion. Full/deadline before acceptance costs zero attempts; submission failures after dispatch remain charged. Cancellation and complete response consumption settle before releasing the dispatch claim or selecting another target. A real-handler five-second fixture proves cancellation, zero charge, then Bell after settlement. Physical overlap remains a live gate. |
+| R4 | Private request-scoped controlled dispatch retains native key/quota/circuit checks but pins model and connection. It disables enclosing cooldown retries, account rotation, emergency/family/context/empty-content fallback, proxy-executor substitution, model mutation, cache substitution, plugins, hosted tools, background redirects, and memory/skill injection. Native executor and actual HTTP-fetch guards reject second execution/fetch and identity drift. Ordinary callers retain their existing paths. Native HTTP402 fixture proves one generation and no hidden reroute. |
+| R5 | The routing adapter validates raw weekly values without display-parser zero defaults, rejects missing/malformed/nonweekly/reached-limit evidence, returns a distinct evidence ID and exact connection ID, and bypasses cache. Every provider=`codex` target (including another pool object) is gated; reused IDs, mismatched account, >=80%, stale/future and missing evidence fail closed. The exact active connection is authorized/resolved before token refresh/evidence, and freshness/account is checked again immediately before HTTP dispatch. Existing native session-quota enforcement remains. |
+| R6 | Explicit `agent:route` harness scope plus no-log, alias permission, concrete provider/model permission and connection/quota allowlists are required. Exact hard pin bypasses affinity substitution, not permission checks. Synthetic no-auth selection is rejected. Native tests cover a restricted key, missing reviewer permission, conflicting affinity, and synthetic no-auth. |
+| R7 | Strict validated objective extension is stripped upstream. Chat JSON/SSE and Responses JSON/SSE are decoded semantically; incomplete/malformed envelopes cannot pass as nonempty wire bytes. Supported JSON types/enums/additional-properties, exact tool names, evidence hashes, duplicate/unknown checks are validated. Unimplemented policy IDs fail closed at request validation. Review uses isolated fresh Chat messages without original tools/input; only strict structured verdict/findings are accepted, never a PASS substring. |
+| R8 | Exact HTTP409 `error.code=agent_route_resume_required`. Canonical `(key,task)` owns one stable run; child turns have independently unique turn and idempotency IDs. New tuple after terminal prior turn is accepted; every exact/reused tuple is rejected. Run risk is monotonic. Binding/reviewer readiness validation precedes creation. Public keepalive wrappers do not convert controlled failures to HTTP200. |
+| R9 | Run/turn admission, dispatch claims, lifecycle events+latches, and output release are transactional with a SQLite write reservation before state reads. Full key/task/run/turn/idempotency ownership is checked. One active/stopping child turn per run; late events strengthen only their old turn. Latches cancel in-flight I/O and prohibit further attempts; dispatch claim clears only after I/O settles. Output latch commits before response release; terminal state is set on body consumption/cancel/failure. Orphaned active claims remain fail-closed; there is no timer-based unsafe reclaim. Tests include rollback on interrupted latch update. |
+| R10 | Fixed metadata columns receive actual dispatch/admission/busy-slot/processing/latency/token/objective/reviewer/subscription decisions and counters. Responses include task/run/turn/virtual route/resolved provider+model/candidate-attempt/reviewer-verdict/fallback headers. Private logger suppression, disabled content hooks/caches, no-log attempt bodies/errors/warnings, and sanitized provider error persistence prevent candidate/reviewer payload retention. Native tests inspect every SQLite table and captured console sinks; provider-error echo fixture also checks every table. |
 
-No provider, credential, VM, deployment, or live paid request was made. Live
-enablement still requires reviewed bindings, provider-live Codex evidence for
-each routing/reviewer decision, physical local admission evidence, and the
-separate deployment/acceptance owner gate. The feature remains inert unless the
-exact bindings environment setting is supplied and callers use authorized no-log
-keys with the UUID protocol.
+## Explicit binding and permission contract delta
 
-## Review round 1 status
+`OMNIROUTE_AGENT_ROUTE_BINDINGS_JSON` keeps `vm1201`, `bellPc`, ordered
+three-entry `free`, ordered `cheapChineseReviewers`, and ordered
+`strongChineseReviewers`. It now requires two explicit Codex role objects:
 
-R1 placeholder tests were removed and replaced with behavioral controller/objective
-tests. R2 capacity-versus-quality Bell-PC routing, R5 strict raw weekly evidence,
-R7 objective enforcement and strict reviewer verdict decoding, R8 machine-readable
-resume errors, R9 transactional event latching/identity verification, and Docker
-context exclusion were corrected. R3/R4/R6/R10 still need a second implementation
-round for native admission cancellation, controlled-handler no-fallback mode, exact
-pre-dispatch account authorization, and persistent per-attempt metadata. This branch
-is not ready for deployment or enablement.
+```json
+{
+  "codexNormal": { "provider": "codex", "model": "gpt-5.6-terra", "reasoningEffort": "medium", "connectionId": "REVIEWED_ACCOUNT_ID" },
+  "codex": { "provider": "codex", "model": "gpt-5.6-sol", "reasoningEffort": "high", "connectionId": "REVIEWED_ACCOUNT_ID" }
+}
+```
+
+This is a partial illustration, not a complete runnable binding. Missing or
+ambiguous single-Codex configurations fail closed; they are not silently
+flattened. Both roles must use the same explicitly approved account. This
+implements the accepted binding-selection review; no actual model inventory or
+live binding was inferred or changed here. Normal candidate uses Terra-medium;
+high candidate and high-risk reviewer use Sol-high. A normal alias with a stored
+high-risk floor also receives Sol-high review, else ordered strong Chinese;
+Terra is never an automatic high-risk reviewer. Independence uses concrete
+model identity across provider/account/effort aliases. Every Codex dispatch has
+its own fresh exact-account evidence.
+
+The dedicated harness key must have `noLog=true`, scope `agent:route`, both slash
+aliases as appropriate, exact permitted resolved provider/model names, and the
+reviewed connection allowlist (plus any intended quota restrictions). Existing
+hyphen aliases and a no-log flag alone do not grant policy/paid access. Public
+team keys must not receive this scope or paid permissions by implication.
+
+Controlled Codex transport is HTTP/SSE; an explicitly configured Codex WebSocket
+connection is ineligible rather than silently entering an unguarded transport.
+Provider proxy-executor substitution is not part of the controlled ladder.
+
+Migration134 is rewritten before deployment to create canonical runs, child
+turns and metadata events. Coordinator evidence says live schema is133 with no
+agent_route tables. An installation that already applied a different134 must
+not use this migration as an in-place upgrade; it needs separately reviewed
+schema reconciliation. No destructive or automatic repair is included.
+
+## Lifecycle wire and client compatibility
+
+`POST /v1/agent-routes/events`: bearer same owning no-log key; four matching
+`x-omniroute-{task-id,run-id,turn-id,idempotency-key}` headers; strict body:
+`event_id`, `task_id`, `run_id`, `turn_id`, `idempotency_key` (UUID strings),
+`kind` (`output_started` or `tool_started`), and `occurred_at` (ISO UTC datetime).
+Acknowledgement is HTTP202 with `{"accepted":true}`. Identical event replay is
+idempotent; event-ID conflict is409; foreign identity is403. No query or
+secondary credentials are accepted. Clients await the authenticated ack before
+side effects. Old terminal events cannot latch a newer child turn.
+
+The approved original Hermes client reused one tuple across its internal tool
+loop. That is not compatible with the corrected replay guard. The separate
+client lane is implementing fresh persisted per-logical-step turn+idempotency
+IDs after prior accepted response and committed tool results, keeping stable
+run/task/risk and frozen IDs across retries. No server replay relaxation was
+made. Combined live/native harness workflow acceptance is still required.
+
+## Reproducible verification
+
+Run in PowerShell from the assigned checkout; existing bundled Node and tsx only:
+
+```powershell
+& 'C:/Users/chatc/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe' --import file:///C:/ChatGPT%20Projects/SW-Selfhosted-Network/.worktrees/omniroute-routing-completion/node_modules/tsx/dist/loader.mjs --import ./tests/_setup/isolateDataDir.ts --test tests/unit/services/agent-route.test.ts tests/unit/db/agent-route-runs.test.ts tests/unit/api/agent-route-events.test.ts tests/unit/api/models-agent-route-aliases.test.ts tests/integration/agent-route-api.test.ts tests/unit/chatcore-attempt-logging.test.ts
+```
+
+Latest corrected candidate result at 20260904 175135 Bangkok: exit0, **32 passed,
+0 failed, 0 cancelled/skipped**, 16.018 seconds. Native deadline case took
+5.445 seconds and verified the cancelled Q6 consumed no candidate before Bell.
+The four ordinary attempt-logging cases pass unchanged. Earlier intermediate
+failures led to native deadline/fixture-account-state corrections; only this
+final candidate result is the acceptance receipt.
+
+```powershell
+& 'C:/Users/chatc/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe' scripts/check-agent-route-type-delta.mjs 914b3e8d1ae6cc794e080e9ec90c782ea3f730db
+```
+
+Result exit0: **731 baseline diagnostics, 728 current diagnostics, 0 introduced
+diagnostics**. This read-only script compiles all19 named changed/native/test
+roots and their dependency graph from `tsconfig.typecheck-agent-route.json`,
+then repeats with exact starting-commit bytes in an in-memory compiler host.
+It compares complete messages, source expressions, error codes and counts;
+only two equivalent displayed union-order variations are canonicalized.
+It does not suppress newly introduced diagnostics or mutate the worktree.
+
+This is a passing diagnostic-delta check, **not a clean TypeScript build**.
+The expanded native graph still has728 attributable baseline errors; direct
+`tsc -p tsconfig.typecheck-agent-route.json` is not green. Earlier broad `tsc`
+also failed; its entire repository-wide error set was not independently
+classified. The narrower pre-existing core check alone is not claimed to cover
+native seams. Production image build remains the separate build owner's gate.
+`git diff --check` exits0.
+
+## Remaining gates
+
+- One independent scoped code/security/specification re-review of this candidate.
+- Corrected client commits and exact deployed/imported runtime identity receipts.
+- Reviewed real bindings and least-privilege harness permission configuration.
+- Actual private connectivity/authentication, exact-account live quota evidence,
+  VM1201 three-overlap admission with correlated busy/deferred/token-rate/latency
+  metrics, Bell current health, and normal/high multi-step workflows per harness.
+- Separate reviewed image build, migration/restore/rollback and deployment gates.
+
+No server-side timeout unlock, synthetic quota evidence, paid test dispatch,
+permission broadening, or fallback outside the reviewed ladder was used to
+remove those gates. Keep this feature disabled until the coordinator accepts
+the independent review and subsequent live/deployment contracts.

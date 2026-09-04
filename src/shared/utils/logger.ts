@@ -14,6 +14,7 @@
  * as JSON lines to the file specified by APP_LOG_FILE_PATH.
  */
 import pino from "pino";
+import { agentRouteContext } from "../../../open-sse/services/agentRouteContext.ts";
 import { resolve } from "path";
 import { getLogConfig, initLogRotation } from "@/lib/logRotation";
 import { getAppLogLevel } from "@/lib/logEnv";
@@ -34,6 +35,7 @@ const baseConfig: pino.LoggerOptions = {
   // scrubs credentials that slip into any log message/object/error. See logRedaction.ts.
   hooks: {
     logMethod(inputArgs: unknown[], method: (...args: unknown[]) => void) {
+      if (agentRouteContext.getStore()?.private) return;
       return (method as (...a: unknown[]) => void).apply(this, redactLogArgs(inputArgs));
     },
   },

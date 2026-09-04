@@ -66,6 +66,7 @@ interface CacheEntry {
 
 export type CodexWeeklyEvidence = {
   evidenceId: string;
+  connectionId: string;
   source: "provider-live";
   weeklyPercentUsed: number;
   fetchedAt: string;
@@ -296,17 +297,20 @@ async function requestCodexQuotaDirect(
   } catch { return null; }
 }
 
-function normalizeProviderLiveWeeklyEvidence(response: unknown): CodexWeeklyEvidence | null {
+function normalizeProviderLiveWeeklyEvidence(response: unknown, connectionId: string): CodexWeeklyEvidence | null {
   // Deliberately do not reuse the display parser here: it defaults absent or
   // malformed windows to zero, which would incorrectly authorize a paid route.
   const record = toRecord(response);
   const limit = toRecord(record["rate_limit"] ?? record["rateLimit"]);
+  if (limit.allowed === false || limit.limit_reached === true) return null;
   const weekly = limit["secondary_window"] ?? limit["secondaryWindow"];
   const weeklyRecord = toRecord(weekly);
+  const windowSeconds = weeklyRecord["limit_window_seconds"] ?? weeklyRecord["limitWindowSeconds"];
+  if (windowSeconds !== undefined && Number(windowSeconds) !== 604800) return null;
   const raw = weeklyRecord["used_percent"] ?? weeklyRecord["usedPercent"];
   const numeric = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
   if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) return null;
-  return { evidenceId: crypto.randomUUID(), source: "provider-live", weeklyPercentUsed: numeric, fetchedAt: new Date().toISOString() };
+  return { evidenceId: crypto.randomUUID(), connectionId, source: "provider-live", weeklyPercentUsed: numeric, fetchedAt: new Date().toISOString() };
 }
 
 export async function fetchProviderLiveCodexWeeklyEvidence(
@@ -314,7 +318,7 @@ export async function fetchProviderLiveCodexWeeklyEvidence(
   connection?: Record<string, unknown>
 ): Promise<CodexWeeklyEvidence | null> {
   const response = await requestCodexQuotaDirect(connectionId, connection, { cache: "no-store" });
-  return response ? normalizeProviderLiveWeeklyEvidence(response) : null;
+  return response ? normalizeProviderLiveWeeklyEvidence(response, connectionId) : null;
 }
 
 // ─── Response Parser ─────────────────────────────────────────────────────────

@@ -1,4 +1,14 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
+
+const property = z.object({ type: z.enum(["string", "number", "boolean", "array", "object"]), enum: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional() }).strict();
+export const agentRouteExtensionSchema = z.object({ checks: z.array(z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("nonempty") }).strict(),
+  z.object({ kind: z.literal("json_schema"), schema: z.object({ type: z.literal("object"), required: z.array(z.string()).optional(), properties: z.record(z.string(), property).optional(), additionalProperties: z.literal(false).optional() }).strict() }).strict(),
+  z.object({ kind: z.literal("tool_call"), required_names: z.array(z.string().min(1)).min(1), allow_unrequested: z.literal(false) }).strict(),
+  z.object({ kind: z.literal("evidence_hash"), algorithm: z.literal("sha256"), expected: z.array(z.string().regex(/^[a-f0-9]{64}$/)).min(1) }).strict(),
+  z.object({ kind: z.literal("policy"), policy_ids: z.array(z.string().min(1)).min(1) }).strict(),
+])).max(8).default([]) }).strict();
 
 export type ObjectiveCheck =
   | { kind: "nonempty" }
@@ -20,6 +30,7 @@ export function evaluateAgentRouteObjectives(
   allowedPolicyIds: readonly string[] = []
 ): ObjectiveOutcome {
   if (checks.length > 8) return { verdict: "BLOCKED", checkIds: [], hashes: [] };
+  if (!agentRouteExtensionSchema.safeParse({ checks }).success) return { verdict: "BLOCKED", checkIds: [], hashes: [] };
   const seen = new Set<string>();
   const checkIds: string[] = [];
   const hashes: string[] = [];
@@ -31,7 +42,7 @@ export function evaluateAgentRouteObjectives(
     if (seen.has(fingerprint)) return { verdict: "BLOCKED", checkIds, hashes };
     seen.add(fingerprint);
     checkIds.push(id);
-    if (check.kind === "nonempty" && text.trim().length === 0) return { verdict: "REVISE", checkIds, hashes };
+    if (check.kind === "nonempty" && text.trim().length === 0 && toolNames.length === 0) return { verdict: "REVISE", checkIds, hashes };
     if (check.kind === "tool_call") {
       if (check.allow_unrequested !== false || check.required_names.some((name) => !toolNames.includes(name)) || toolNames.some((name) => !check.required_names.includes(name))) return { verdict: "REVISE", checkIds, hashes };
     }

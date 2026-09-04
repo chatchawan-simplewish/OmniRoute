@@ -591,6 +591,10 @@ export async function handleChat(
   // Exact agent aliases bypass every automatic/combo fallback. Authentication,
   // per-key alias policy, guardrails, and session limits above have already run.
   if (isAgentRouteAlias(modelStr)) {
+    const routeExtension = body.omniroute_route;
+    if (routeExtension !== undefined && (!routeExtension || typeof routeExtension !== "object" || Array.isArray((routeExtension as any).checks) || (routeExtension as any).checks !== undefined && !Array.isArray((routeExtension as any).checks))) return errorResponse(400, "invalid omniroute_route");
+    const objectiveChecks = (routeExtension as { checks?: unknown[] } | undefined)?.checks ?? [];
+    delete body.omniroute_route;
     const required = ["x-omniroute-task-id", "x-omniroute-run-id", "x-omniroute-turn-id", "x-omniroute-idempotency-key"] as const;
     const ids = Object.fromEntries(required.map((name) => [name, request.headers.get(name)]));
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -607,7 +611,8 @@ export async function handleChat(
     let bindings;
     try { bindings = getAgentRouteBindings(); } catch { return errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "agent route bindings unavailable"); }
     const routed = await runAgentRoute({
-      alias: modelStr, bindings, reviewClass: effectiveReviewClass,
+      alias: modelStr, bindings, reviewClass: effectiveReviewClass, checks: objectiveChecks as any,
+      toolNames: Array.isArray(body.tools) ? body.tools.map((tool: any) => tool?.function?.name ?? tool?.name).filter((name: unknown): name is string => typeof name === "string") : [],
       fetchEvidence: () => fetchProviderLiveCodexWeeklyEvidence(bindings.codex.connectionId),
       dispatch: async (target, options) => {
         const concreteModel = `${target.provider}/${target.model}`;
@@ -1279,7 +1284,8 @@ async function handleSingleModelChat(
     provider === "claude-web" ||
       isCombo ||
       forceLiveComboTest ||
-      runtimeOptions.emergencyFallbackTried === true
+      runtimeOptions.emergencyFallbackTried === true ||
+      runtimeOptions.controlledDispatch === true
   );
   const requestSignal = request?.signal ?? null;
   // Cumulative cap across all waits for this request (#7360 follow-up) — mirrors

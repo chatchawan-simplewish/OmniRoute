@@ -13,7 +13,7 @@ Review accessed repository evidence only—no inventory, target access, tests, l
 Owner post-check at `20260904 131832` confirmed all 12 product baseline hashes
 unchanged and the same 12 dirty status entries. The checkout index was empty
 before this review-only commit. No residual recheck occurred.
-Only seven V62 artifact paths changed from the V62 base; no shared project-root
+Only six V62 artifact paths changed from the V62 base; no shared project-root
 file, product file, browser/provider configuration, or secret changed in V62.
 Sole ownership remains with `/root/v60_receiver_gate_owner`; no archive or
 ownership transfer is implied by this completed bounded task.

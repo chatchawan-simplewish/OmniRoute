@@ -35,7 +35,7 @@ V58 was read-only readiness evidence; neither is reusable.
    alone performs one native Copy and one masked Paste into only that visible
    retained credential-owner prompt. The agent never reads, types, serializes,
    captures, logs, or commits the token value.
-6. If any action is failed, interrupted, ambiguous, malformed, or uncertain,
+7. If any action is failed, interrupted, ambiguous, malformed, or uncertain,
    mark the gate spent and stop. There is no retry, fallback, second token,
    scope expansion, provider mutation, or secret transfer.
 

@@ -91,6 +91,7 @@ test("existing hyphen aliases remain distinct and catalog lookup cannot dispatch
   });
   const key = await apiKeysDb.createApiKey("agent-route", "agent-route-test");
   await apiKeysDb.updateApiKeyPermissions(key.id, {
+    noLog: true,
     allowedModels: ["agent/normal", "agent/high", "agent-normal", "agent-high"],
   });
 

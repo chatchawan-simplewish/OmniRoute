@@ -64,6 +64,13 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
+export type CodexWeeklyEvidence = {
+  evidenceId: string;
+  source: "provider-live";
+  weeklyPercentUsed: number;
+  fetchedAt: string;
+};
+
 // In-memory cache: connectionId → { quota, fetchedAt }
 const quotaCache = new Map<string, CacheEntry>();
 
@@ -268,6 +275,40 @@ export async function fetchCodexQuota(
     // Network error, timeout, etc. — fail open
     return null;
   }
+}
+
+async function requestCodexQuotaDirect(
+  connectionId: string,
+  connection?: Record<string, unknown>,
+  init: RequestInit = {}
+): Promise<unknown | null> {
+  const meta = getCodexConnectionMeta(connectionId, connection);
+  if (!meta?.accessToken) return null;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${meta.accessToken}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (meta.workspaceId) headers["chatgpt-account-id"] = meta.workspaceId;
+  try {
+    const response = await fetch(CODEX_USAGE_URL, { method: "GET", headers, signal: AbortSignal.timeout(8_000), ...init });
+    return response.ok ? await response.json() : null;
+  } catch { return null; }
+}
+
+function normalizeProviderLiveWeeklyEvidence(response: unknown): CodexWeeklyEvidence | null {
+  const quota = parseCodexUsageResponse(response);
+  const weeklyPercentUsed = quota?.window7d.percentUsed;
+  if (weeklyPercentUsed === undefined || !Number.isFinite(weeklyPercentUsed)) return null;
+  return { evidenceId: crypto.randomUUID(), source: "provider-live", weeklyPercentUsed: weeklyPercentUsed * 100, fetchedAt: new Date().toISOString() };
+}
+
+export async function fetchProviderLiveCodexWeeklyEvidence(
+  connectionId: string,
+  connection?: Record<string, unknown>
+): Promise<CodexWeeklyEvidence | null> {
+  const response = await requestCodexQuotaDirect(connectionId, connection, { cache: "no-store" });
+  return response ? normalizeProviderLiveWeeklyEvidence(response) : null;
 }
 
 // ─── Response Parser ─────────────────────────────────────────────────────────

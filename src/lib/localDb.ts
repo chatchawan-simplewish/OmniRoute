@@ -169,6 +169,7 @@ export {
 } from "./db/databaseSettings";
 
 export type { UserDatabaseSettings } from "./db/databaseSettings";
+export * from "./db/agentRouteRuns";
 
 export {
   // Proxy Registry

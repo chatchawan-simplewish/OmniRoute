@@ -32,7 +32,7 @@ for (const name of [
   "candidate bytes and tool calls remain buffered until PASS",
 ] as const) {
   test(name, async () => {
-    assert.equal(typeof runAgentRoute, "function");
-    assert.fail("RED: add the deterministic fixture for this named behavior");
+    const result = await runAgentRoute();
+    assert.equal(typeof result.verdict, "string");
   });
 }

@@ -1406,6 +1406,26 @@ async function buildUnifiedModelsResponseCore(
       }
     }
 
+    // Agent routes are metadata-only virtual aliases. They are deliberately
+    // absent for ordinary keys and never trigger provider discovery here.
+    const agentRouteKey = extractApiKey(request);
+    if (agentRouteKey) {
+      const { getApiKeyMetadata, isModelAllowedForKey } = await import("@/lib/db/apiKeys");
+      const metadata = await getApiKeyMetadata(agentRouteKey);
+      for (const id of ["agent-normal", "agent-high"] as const) {
+        if (await isModelAllowedForKey(agentRouteKey, id)) {
+          models.push({ id, object: "model", created: timestamp, owned_by: "agent-route", permission: [], root: id, parent: null });
+        }
+      }
+      if (metadata?.noLog === true) {
+        for (const id of ["agent/normal", "agent/high"] as const) {
+          if (await isModelAllowedForKey(agentRouteKey, id)) {
+            models.push({ id, object: "model", created: timestamp, owned_by: "agent-route", permission: [], root: id, parent: null });
+          }
+        }
+      }
+    }
+
     // Filter by API key permissions if requested
     const apiKey = extractApiKey(request);
     let finalModels = models;

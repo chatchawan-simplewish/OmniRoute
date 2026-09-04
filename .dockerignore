@@ -79,6 +79,7 @@ bun.lock
 .gemini
 .claude
 .source
+.superpowers
 
 # Misc
 llm.txt

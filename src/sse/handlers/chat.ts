@@ -603,7 +603,7 @@ export async function handleChat(
       runId: ids["x-omniroute-run-id"]!, taskId: ids["x-omniroute-task-id"]!, turnId: ids["x-omniroute-turn-id"]!,
       idempotencyKey: ids["x-omniroute-idempotency-key"]!, apiKeyId: apiKeyInfo.id, virtualRoute: modelStr, effectiveReviewClass,
     });
-    if (run.kind !== "created") return errorResponse(409, "agent_route_resume_required");
+    if (run.kind !== "created") return Response.json({ error: { message: "agent_route_resume_required", type: "invalid_request_error", code: "agent_route_resume_required" } }, { status: 409 });
     let bindings;
     try { bindings = getAgentRouteBindings(); } catch { return errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "agent route bindings unavailable"); }
     const routed = await runAgentRoute({
@@ -616,14 +616,23 @@ export async function handleChat(
           ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
           ...(options.reviewer ? {
             stream: false,
+            tools: undefined,
+            input: undefined,
             messages: [
-              ...(body.messages ?? []),
               { role: "system", content: `Review this candidate and return exactly PASS or REVISE:\n${new TextDecoder().decode(options.candidate ?? new Uint8Array())}` },
             ],
-          } : {}),
+          } : options.repair ? { messages: [...(body.messages ?? []), { role: "system", content: `Repair the prior candidate using this review feedback:\n${options.feedback ?? "REVISE"}\nPrior candidate:\n${new TextDecoder().decode(options.candidate ?? new Uint8Array())}` }] } : {}),
         }, `${target.provider}/${target.model}`, clientRawRequest, request, null, apiKeyInfo, telemetry,
-        { sessionId, sessionAffinityKey, forcedConnectionId: target.connectionId, providerId: target.provider, skipUpstreamRetry: true, correlationId: reqId }, null, false),
-      review: async (_candidate, reviewerOutput) => new TextDecoder().decode(reviewerOutput).toUpperCase().includes("PASS") ? "PASS" : "REVISE",
+        { sessionId, sessionAffinityKey, forcedConnectionId: target.connectionId, providerId: target.provider, skipUpstreamRetry: true, controlledDispatch: true, correlationId: reqId }, null, false),
+      review: async (_candidate, reviewerOutput) => {
+        const raw = new TextDecoder().decode(reviewerOutput).trim();
+        let verdict = raw;
+        try {
+          const parsed = JSON.parse(raw) as { choices?: Array<{ message?: { content?: unknown } }>; output_text?: unknown };
+          verdict = typeof parsed.output_text === "string" ? parsed.output_text.trim() : typeof parsed.choices?.[0]?.message?.content === "string" ? parsed.choices[0].message.content.trim() : "";
+        } catch {}
+        return verdict === "PASS" ? "PASS" : verdict === "REVISE" ? "REVISE" : "BLOCKED";
+      },
     });
     if (!routed.response) return errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "agent route blocked");
     routed.response.headers.set("x-omniroute-virtual-route", modelStr);
@@ -1071,6 +1080,7 @@ async function handleSingleModelChat(
      * the signal used for the actual dispatch, not left unused.
      */
     modelAbortSignal?: AbortSignal | null;
+    controlledDispatch?: boolean;
   } = {},
   comboStrategy: string | null = null,
   isCombo: boolean = false
@@ -1202,8 +1212,8 @@ async function handleSingleModelChat(
   // 2. Pipeline gates (availability + provider circuit breaker)
   const providerProfile = await getRuntimeProviderProfile(provider);
   const gate = await checkPipelineGates(provider, model, {
-    ignoreCircuitBreaker: forceLiveComboTest || hasForcedConnection,
-    ignoreModelCooldown: forceLiveComboTest || hasForcedConnection,
+    ignoreCircuitBreaker: forceLiveComboTest || (hasForcedConnection && !runtimeOptions.controlledDispatch),
+    ignoreModelCooldown: forceLiveComboTest || (hasForcedConnection && !runtimeOptions.controlledDispatch),
     providerProfile,
     ...(bypassReason ? { bypassReason } : {}),
   });
@@ -1706,7 +1716,7 @@ async function handleSingleModelChat(
       // Combo targets never emergency-hop: the combo is the operator's fallback policy
       // (target-level orchestration plus the global fallback #689 after it), and a
       // per-target hop burns extra upstream calls against exhausted providers (#1731).
-      if (!runtimeOptions.emergencyFallbackTried && !comboName) {
+      if (!runtimeOptions.controlledDispatch && !runtimeOptions.emergencyFallbackTried && !comboName) {
         const fallbackDecision = shouldUseFallback(
           Number(result.status || 0),
           String(result.error || ""),

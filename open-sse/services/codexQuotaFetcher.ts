@@ -297,10 +297,16 @@ async function requestCodexQuotaDirect(
 }
 
 function normalizeProviderLiveWeeklyEvidence(response: unknown): CodexWeeklyEvidence | null {
-  const quota = parseCodexUsageResponse(response);
-  const weeklyPercentUsed = quota?.window7d.percentUsed;
-  if (weeklyPercentUsed === undefined || !Number.isFinite(weeklyPercentUsed)) return null;
-  return { evidenceId: crypto.randomUUID(), source: "provider-live", weeklyPercentUsed: weeklyPercentUsed * 100, fetchedAt: new Date().toISOString() };
+  // Deliberately do not reuse the display parser here: it defaults absent or
+  // malformed windows to zero, which would incorrectly authorize a paid route.
+  const record = toRecord(response);
+  const limit = toRecord(record["rate_limit"] ?? record["rateLimit"]);
+  const weekly = limit["secondary_window"] ?? limit["secondaryWindow"];
+  const weeklyRecord = toRecord(weekly);
+  const raw = weeklyRecord["used_percent"] ?? weeklyRecord["usedPercent"];
+  const numeric = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) return null;
+  return { evidenceId: crypto.randomUUID(), source: "provider-live", weeklyPercentUsed: numeric, fetchedAt: new Date().toISOString() };
 }
 
 export async function fetchProviderLiveCodexWeeklyEvidence(

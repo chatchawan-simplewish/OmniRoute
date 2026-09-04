@@ -53,7 +53,9 @@ export type AgentRouteBindings = {
   strongChineseReviewers: AgentRouteBinding[];
 };
 
-type Dispatch = (target: AgentRouteBinding, options: { reasoningEffort?: "xhigh"; reviewer: boolean; repair: boolean; candidate?: Uint8Array }) => Promise<Response>;
+export type Admission = "admitted" | "full" | "offline" | "failed";
+export type DispatchResult = Response | { response: Response; admission: Admission };
+type Dispatch = (target: AgentRouteBinding, options: { reasoningEffort?: "xhigh"; reviewer: boolean; repair: boolean; candidate?: Uint8Array; feedback?: string }) => Promise<DispatchResult>;
 type Review = (candidate: Uint8Array, reviewerOutput: Uint8Array, target: AgentRouteBinding, reviewClass: ReviewClass) => Promise<RouteVerdict>;
 
 function usable(response: Response) {
@@ -62,6 +64,10 @@ function usable(response: Response) {
 
 function cloneResponse(response: Response, bytes: Uint8Array) {
   return new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
+function dispatched(result: DispatchResult) {
+  return result instanceof Response ? { response: result, admission: "admitted" as const } : result;
 }
 
 /**
@@ -84,47 +90,59 @@ export async function runAgentRoute(input: {
     const reviewClass = resolveEffectiveReviewClass(input.alias, input.reviewClass ?? "standard");
     const candidates = input.alias === "agent/high"
       ? [input.bindings.vm1201, input.bindings.codex, input.bindings.strongChineseReviewers[0]]
-      : [input.bindings.vm1201, input.bindings.bellPc, ...input.bindings.free, input.bindings.codex, input.bindings.cheapChineseReviewers[0]];
+      : [input.bindings.vm1201, ...input.bindings.free, input.bindings.codex, input.bindings.cheapChineseReviewers[0]];
     let freeAttempts = 0;
-    for (const target of candidates) {
+    for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+      const target = candidates[candidateIndex];
       if (!target) continue;
       if (target === input.bindings.codex && !subscriptionEligible(await input.fetchEvidence?.() ?? null)) continue;
-      const response = await input.dispatch(target, {
+      let selectedTarget = target;
+      let attempt = dispatched(await input.dispatch(target, {
         reviewer: false,
         repair: false,
         ...(input.alias === "agent/high" && target === input.bindings.vm1201 ? { reasoningEffort: "xhigh" } : {}),
-      });
+      }));
+      // Bell-PC is capacity escape only, never a quality fallback.
+      if (target === input.bindings.vm1201 && input.alias === "agent/normal" && (attempt.admission === "full" || attempt.admission === "offline")) {
+        attempt = dispatched(await input.dispatch(input.bindings.bellPc, { reviewer: false, repair: false }));
+        selectedTarget = input.bindings.bellPc;
+        if (attempt.admission !== "admitted" || !usable(attempt.response)) continue;
+        // A Bell-PC candidate may be reviewed, but failure proceeds to free A.
+      }
+      if (attempt.admission !== "admitted") continue;
+      const response = attempt.response;
       if (!usable(response)) continue;
       const bytes = new Uint8Array(await response.arrayBuffer());
       const objectives = evaluateAgentRouteObjectives(input.checks ?? [{ kind: "nonempty" }], bytes, input.toolNames, input.allowedPolicyIds);
       if (objectives.verdict === "BLOCKED") return objectives;
-      if (objectives.verdict === "REVISE" && input.alias === "agent/normal" && input.bindings.free.includes(target)) {
-        if (freeAttempts++ >= MAX_FREE_ATTEMPTS) break;
-        continue;
-      }
       if (objectives.verdict === "REVISE") continue;
       const reviewers = reviewClass === "high_risk"
         ? [input.bindings.codex, ...input.bindings.strongChineseReviewers]
         : input.bindings.cheapChineseReviewers;
       const evidence = await input.fetchEvidence?.() ?? null;
       const reviewer = reviewers.find((item) =>
-        `${item.provider}/${item.model}` !== `${target.provider}/${target.model}` &&
+        `${item.provider}/${item.model}` !== `${selectedTarget.provider}/${selectedTarget.model}` &&
         (item !== input.bindings.codex || subscriptionEligible(evidence))
       );
       if (!reviewer) return { ...objectives, verdict: "BLOCKED" };
-      const reviewerResponse = await input.dispatch(reviewer, { reviewer: true, repair: false, candidate: bytes });
-      if (!usable(reviewerResponse)) return { ...objectives, verdict: "BLOCKED" };
-      const reviewerBytes = new Uint8Array(await reviewerResponse.arrayBuffer());
+      const reviewerResult = dispatched(await input.dispatch(reviewer, { reviewer: true, repair: false, candidate: bytes }));
+      if (reviewerResult.admission !== "admitted" || !usable(reviewerResult.response)) continue;
+      const reviewerBytes = new Uint8Array(await reviewerResult.response.arrayBuffer());
       if (await input.review(bytes, reviewerBytes, reviewer, reviewClass) === "PASS") {
-        return { ...objectives, response: cloneResponse(response, bytes), target };
+        return { ...objectives, response: cloneResponse(response, bytes), target: selectedTarget };
       }
-      if (input.alias === "agent/normal" && input.bindings.free.includes(target) && freeAttempts++ < MAX_FREE_ATTEMPTS) {
-        const repair = await input.dispatch(target, { reviewer: false, repair: true });
-        if (usable(repair)) {
-          const repairedBytes = new Uint8Array(await repair.arrayBuffer());
+      if (input.alias === "agent/normal" && input.bindings.free.includes(target) && freeAttempts + 2 <= MAX_FREE_ATTEMPTS) {
+        freeAttempts += 2;
+        const repair = dispatched(await input.dispatch(target, { reviewer: false, repair: true, candidate: bytes, feedback: new TextDecoder().decode(reviewerBytes) }));
+        if (repair.admission === "admitted" && usable(repair.response)) {
+          const repairedBytes = new Uint8Array(await repair.response.arrayBuffer());
           const repairedObjectives = evaluateAgentRouteObjectives(input.checks ?? [{ kind: "nonempty" }], repairedBytes, input.toolNames, input.allowedPolicyIds);
-          if (repairedObjectives.verdict === "PASS" && await input.review(repairedBytes, reviewerBytes, reviewer, reviewClass) === "PASS") {
-            return { ...repairedObjectives, response: cloneResponse(repair, repairedBytes), target };
+          if (repairedObjectives.verdict === "PASS") {
+            const reReviewResult = dispatched(await input.dispatch(reviewer, { reviewer: true, repair: false, candidate: repairedBytes }));
+            if (reReviewResult.admission === "admitted" && usable(reReviewResult.response)) {
+              const reReviewBytes = new Uint8Array(await reReviewResult.response.arrayBuffer());
+              if (await input.review(repairedBytes, reReviewBytes, reviewer, reviewClass) === "PASS") return { ...repairedObjectives, response: cloneResponse(repair.response, repairedBytes), target };
+            }
           }
         }
       }

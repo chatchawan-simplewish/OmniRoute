@@ -69,6 +69,9 @@ export async function POST(request: Request) {
     apiKeyId: metadata.id,
     kind: body.kind,
     occurredAt: body.occurred_at,
+    taskId: body.task_id,
+    turnId: body.turn_id,
+    idempotencyKey: body.idempotency_key,
   });
   if (result === "forbidden") return reject(403, "agent_route_run_forbidden");
   return Response.json({ accepted: true }, { status: 202 });

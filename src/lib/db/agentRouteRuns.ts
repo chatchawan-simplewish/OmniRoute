@@ -16,6 +16,9 @@ export type AgentRouteEventInput = {
   apiKeyId: string;
   kind: "output_started" | "tool_started";
   occurredAt: string;
+  taskId?: string;
+  turnId?: string;
+  idempotencyKey?: string;
 };
 
 const now = () => new Date().toISOString();
@@ -75,21 +78,20 @@ export function getAgentRouteRun(runId: string, apiKeyId: string) {
 export function appendAgentRouteEvent(input: AgentRouteEventInput): "created" | "duplicate" | "forbidden" {
   const db = getDbInstance();
   const owned = db
-    .prepare("SELECT run_id FROM agent_route_runs WHERE run_id = ? AND api_key_id = ?")
-    .get(input.runId, input.apiKeyId);
+    .prepare("SELECT run_id FROM agent_route_runs WHERE run_id = ? AND api_key_id = ? AND (? IS NULL OR task_id = ?) AND (? IS NULL OR turn_id = ?) AND (? IS NULL OR idempotency_key = ?)")
+    .get(input.runId, input.apiKeyId, input.taskId ?? null, input.taskId ?? null, input.turnId ?? null, input.turnId ?? null, input.idempotencyKey ?? null, input.idempotencyKey ?? null);
   if (!owned) return "forbidden";
-  const inserted = db
-    .prepare(
-      "INSERT OR IGNORE INTO agent_route_events (event_id, run_id, kind, occurred_at) VALUES (?, ?, ?, ?)"
-    )
-    .run(input.eventId, input.runId, input.kind, input.occurredAt);
-  if (inserted.changes === 0) return "duplicate";
-  db.prepare(
+  const transaction = db.transaction(() => {
+    const inserted = db.prepare("INSERT OR IGNORE INTO agent_route_events (event_id, run_id, kind, occurred_at) VALUES (?, ?, ?, ?)").run(input.eventId, input.runId, input.kind, input.occurredAt);
+    if (inserted.changes === 0) return "duplicate" as const;
+    db.prepare(
     `UPDATE agent_route_runs
      SET output_started = CASE WHEN ? = 'output_started' THEN 1 ELSE output_started END,
          tool_started = CASE WHEN ? = 'tool_started' THEN 1 ELSE tool_started END,
          updated_at = ?
      WHERE run_id = ? AND api_key_id = ?`
-  ).run(input.kind, input.kind, now(), input.runId, input.apiKeyId);
-  return "created";
+    ).run(input.kind, input.kind, now(), input.runId, input.apiKeyId);
+    return "created" as const;
+  });
+  return transaction();
 }

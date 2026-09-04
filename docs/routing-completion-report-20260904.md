@@ -30,3 +30,14 @@ each routing/reviewer decision, physical local admission evidence, and the
 separate deployment/acceptance owner gate. The feature remains inert unless the
 exact bindings environment setting is supplied and callers use authorized no-log
 keys with the UUID protocol.
+
+## Review round 1 status
+
+R1 placeholder tests were removed and replaced with behavioral controller/objective
+tests. R2 capacity-versus-quality Bell-PC routing, R5 strict raw weekly evidence,
+R7 objective enforcement and strict reviewer verdict decoding, R8 machine-readable
+resume errors, R9 transactional event latching/identity verification, and Docker
+context exclusion were corrected. R3/R4/R6/R10 still need a second implementation
+round for native admission cancellation, controlled-handler no-fallback mode, exact
+pre-dispatch account authorization, and persistent per-attempt metadata. This branch
+is not ready for deployment or enablement.

@@ -45,6 +45,7 @@ COPY open-sse/package.json ./open-sse/package.json
 COPY scripts/build/postinstall.mjs ./scripts/build/postinstall.mjs
 COPY scripts/build/postinstallSupport.mjs ./scripts/build/postinstallSupport.mjs
 COPY scripts/build/native-binary-compat.mjs ./scripts/build/native-binary-compat.mjs
+COPY scripts/build/installPinnedTlsClient.mjs scripts/build/smokePinnedTlsClient.mjs ./scripts/build/
 ENV NPM_CONFIG_LEGACY_PEER_DEPS=true
 # --ignore-scripts blocks broad dependency install/postinstall hooks, closing
 # the supply-chain attack surface where a transitive dep can run arbitrary code
@@ -66,24 +67,17 @@ RUN test -f package-lock.json \
 # instead of `npx --yes`, which would install an arbitrary registry version
 # on-demand and run its lifecycle scripts (Sonar docker:S6505).
 #
-# tls-client-node (chatgpt-web/claude-web/grok-web/lmarena/perplexity-web TLS
-# impersonation) hits the same --ignore-scripts wall: its own postinstall.js
-# fetches a platform .so/.dylib/.dll from the bogdanfinn/tls-client GitHub
-# Releases API and is never invoked when npm ci skips lifecycle scripts. Unlike
-# better-sqlite3 above, that script never throws on failure — it only
-# `console.warn`s and exits 0 — so a rate-limited or offline build would
-# otherwise succeed silently with an empty bin/ and only fail at first request
-# in production (TlsClientUnavailableError, #7802). Run it explicitly here so
-# a broken/rate-limited fetch fails the BUILD loudly instead of shipping a
-# broken image.
+# tls-client-node 0.2.0 assumes legacy release filenames; v1.16.0 uses xgo
+# names. Install only exact official amd64/arm64 assets with pinned SHA256,
+# preserving the loader-compatible filename. Never run its unchecked latest
+# downloader or accept mere bin/ directory presence as native-load proof.
 RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
   npm ci --no-audit --no-fund --legacy-peer-deps --ignore-scripts \
   && (cd node_modules/better-sqlite3 \
       && node /usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js rebuild) \
   && node -e "require('better-sqlite3')(':memory:').close()" \
-  && node node_modules/tls-client-node/scripts/postinstall.js \
-  && (test -n "$(find node_modules/tls-client-node/bin -mindepth 1 -print -quit 2>/dev/null)" \
-      || (echo "tls-client-node native binary missing after postinstall — GitHub API fetch likely rate-limited or failed (#7802)" >&2 && exit 1))
+  && node scripts/build/installPinnedTlsClient.mjs
+RUN --network=none timeout 60 node scripts/build/smokePinnedTlsClient.mjs
 
 # Build with Turbopack (stable in Next 16, the repo default). The v3.8.27-era
 # TurbopackInternalError panic ("entered unreachable code: there must be a path to a
@@ -160,6 +154,14 @@ COPY --from=builder /app/.build/next/standalone ./
 # Next.js tracing. bootstrap-env requires SQLite BEFORE the standalone server
 # starts, so guarantee the complete package independent of trace behaviour.
 COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
+# Keep the genuine TLS loader/FFI package independent of Next's native tracing.
+COPY --from=builder /app/node_modules/tls-client-node ./node_modules/tls-client-node
+COPY --from=builder /app/node_modules/koffi ./node_modules/koffi
+# Exactly one platform .so is installed above; multiple matches fail this COPY.
+# /opt stays root-owned/read-only to the runtime user (unlike /app and DATA_DIR).
+COPY --from=builder /app/node_modules/tls-client-node/bin/*.so /opt/omniroute/tls-client.so
+COPY --from=builder /app/scripts/build/installPinnedTlsClient.mjs /app/scripts/build/smokePinnedTlsClient.mjs ./scripts/build/
+ENV OMNIROUTE_TLS_NATIVE_LIBRARY=/opt/omniroute/tls-client.so
 # migrations land at <standalone>/migrations via assembleStandalone; point the runtime at them.
 ENV OMNIROUTE_MIGRATIONS_DIR=/app/migrations
 
@@ -177,6 +179,7 @@ EXPOSE 20128
 # Drop to non-root before ENTRYPOINT/CMD so every derived stage (runner-cli,
 # runner-web) also runs as a non-root user unless they explicitly switch back.
 USER node
+RUN --network=none timeout 60 node scripts/build/smokePinnedTlsClient.mjs "$OMNIROUTE_TLS_NATIVE_LIBRARY"
 
 # Warns if the mounted data volume has wrong ownership
 COPY --chmod=755 scripts/check-permissions.sh /tmp/check-permissions.sh

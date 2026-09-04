@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { resolveDataDir } from "@/lib/dataPaths";
 
 /**
@@ -14,8 +14,16 @@ export function resolveTlsClientDownloadDir(): string {
 
 export function buildNativeTlsClientOptions(): {
   runtimeMode: "native";
-  downloadDir: string;
+  downloadDir?: string;
+  nativeLibraryPath?: string;
 } {
+  // Docker supplies a checksum-verified, root-owned image asset. An explicit
+  // native path bypasses the package's mutable cache and runtime GitHub lookup.
+  const nativeLibraryPath = process.env.OMNIROUTE_TLS_NATIVE_LIBRARY;
+  if (nativeLibraryPath) {
+    if (!isAbsolute(nativeLibraryPath)) throw new Error("OMNIROUTE_TLS_NATIVE_LIBRARY must be absolute");
+    return { runtimeMode: "native", nativeLibraryPath };
+  }
   return {
     runtimeMode: "native",
     downloadDir: resolveTlsClientDownloadDir(),

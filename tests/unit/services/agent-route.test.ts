@@ -36,3 +36,29 @@ for (const name of [
     assert.equal(typeof result.verdict, "string");
   });
 }
+
+test("normal dispatches VM1201 before Bell-PC and preserves the provider response", async () => {
+  const dispatched: string[] = [];
+  const result = await runAgentRoute({
+    alias: "agent/normal",
+    bindings: {
+      vm1201: { provider: "local", model: "q6", connectionId: "vm" },
+      bellPc: { provider: "bell", model: "q4", connectionId: "bell" },
+      free: [
+        { provider: "free-a", model: "a", connectionId: "a" },
+        { provider: "free-b", model: "b", connectionId: "b" },
+        { provider: "free-c", model: "c", connectionId: "c" },
+      ],
+      codex: { provider: "codex", model: "paid", connectionId: "codex" },
+      cheapChineseReviewers: [{ provider: "cn", model: "cheap", connectionId: "cn" }],
+      strongChineseReviewers: [{ provider: "cn", model: "strong", connectionId: "strong" }],
+    },
+    dispatch: async (target: { provider: string }) => {
+      dispatched.push(target.provider);
+      return new Response("ok", { status: 200 });
+    },
+    review: async () => "PASS",
+  });
+  assert.equal(await result.response?.text(), "ok");
+  assert.deepEqual(dispatched, ["local", "cn"]);
+});

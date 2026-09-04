@@ -27,8 +27,11 @@ export function isAgentRouteAlias(value: unknown): value is AgentRouteAlias {
 }
 
 export function subscriptionEligible(current: CodexWeeklyEvidence | null) {
+  const fetchedAt = current ? Date.parse(current.fetchedAt) : NaN;
+  const age = Date.now() - fetchedAt;
   return current?.source === "provider-live" && Number.isFinite(current.weeklyPercentUsed)
-    && Date.now() - Date.parse(current.fetchedAt) <= 30_000 && current.weeklyPercentUsed < 80;
+    && current.weeklyPercentUsed >= 0 && current.weeklyPercentUsed <= 100
+    && Number.isFinite(fetchedAt) && age >= 0 && age <= 30_000 && current.weeklyPercentUsed < 80;
 }
 
 export function getAgentRouteBindings(raw = process.env.OMNIROUTE_AGENT_ROUTE_BINDINGS_JSON) {
@@ -40,12 +43,94 @@ export function resolveEffectiveReviewClass(alias: AgentRouteAlias, requested: R
   return "standard";
 }
 
+export type AgentRouteBinding = { provider: string; model: string; connectionId: string };
+export type AgentRouteBindings = {
+  vm1201: AgentRouteBinding;
+  bellPc: AgentRouteBinding;
+  free: [AgentRouteBinding, AgentRouteBinding, AgentRouteBinding];
+  codex: AgentRouteBinding;
+  cheapChineseReviewers: AgentRouteBinding[];
+  strongChineseReviewers: AgentRouteBinding[];
+};
+
+type Dispatch = (target: AgentRouteBinding, options: { reasoningEffort?: "xhigh"; reviewer: boolean; repair: boolean; candidate?: Uint8Array }) => Promise<Response>;
+type Review = (candidate: Uint8Array, reviewerOutput: Uint8Array, target: AgentRouteBinding, reviewClass: ReviewClass) => Promise<RouteVerdict>;
+
+function usable(response: Response) {
+  return response.ok && response.status !== 408 && response.status !== 429;
+}
+
+function cloneResponse(response: Response, bytes: Uint8Array) {
+  return new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
+/**
+ * Executes the approved ladder through a caller-supplied native dispatch seam.
+ * The chat handler supplies that seam with forced connection IDs and no retry.
+ */
 export async function runAgentRoute(input: {
   checks?: ObjectiveCheck[];
   output?: Uint8Array;
   toolNames?: string[];
   allowedPolicyIds?: string[];
-} = {}): Promise<{ verdict: RouteVerdict; checkIds: string[]; hashes: string[] }> {
+  alias?: AgentRouteAlias;
+  bindings?: AgentRouteBindings;
+  dispatch?: Dispatch;
+  review?: Review;
+  reviewClass?: ReviewClass;
+  fetchEvidence?: () => Promise<CodexWeeklyEvidence | null>;
+} = {}): Promise<{ verdict: RouteVerdict; checkIds: string[]; hashes: string[]; response?: Response; target?: AgentRouteBinding }> {
+  if (input.alias && input.bindings && input.dispatch && input.review) {
+    const reviewClass = resolveEffectiveReviewClass(input.alias, input.reviewClass ?? "standard");
+    const candidates = input.alias === "agent/high"
+      ? [input.bindings.vm1201, input.bindings.codex, input.bindings.strongChineseReviewers[0]]
+      : [input.bindings.vm1201, input.bindings.bellPc, ...input.bindings.free, input.bindings.codex, input.bindings.cheapChineseReviewers[0]];
+    let freeAttempts = 0;
+    for (const target of candidates) {
+      if (!target) continue;
+      if (target === input.bindings.codex && !subscriptionEligible(await input.fetchEvidence?.() ?? null)) continue;
+      const response = await input.dispatch(target, {
+        reviewer: false,
+        repair: false,
+        ...(input.alias === "agent/high" && target === input.bindings.vm1201 ? { reasoningEffort: "xhigh" } : {}),
+      });
+      if (!usable(response)) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const objectives = evaluateAgentRouteObjectives(input.checks ?? [{ kind: "nonempty" }], bytes, input.toolNames, input.allowedPolicyIds);
+      if (objectives.verdict === "BLOCKED") return objectives;
+      if (objectives.verdict === "REVISE" && input.alias === "agent/normal" && input.bindings.free.includes(target)) {
+        if (freeAttempts++ >= MAX_FREE_ATTEMPTS) break;
+        continue;
+      }
+      if (objectives.verdict === "REVISE") continue;
+      const reviewers = reviewClass === "high_risk"
+        ? [input.bindings.codex, ...input.bindings.strongChineseReviewers]
+        : input.bindings.cheapChineseReviewers;
+      const evidence = await input.fetchEvidence?.() ?? null;
+      const reviewer = reviewers.find((item) =>
+        `${item.provider}/${item.model}` !== `${target.provider}/${target.model}` &&
+        (item !== input.bindings.codex || subscriptionEligible(evidence))
+      );
+      if (!reviewer) return { ...objectives, verdict: "BLOCKED" };
+      const reviewerResponse = await input.dispatch(reviewer, { reviewer: true, repair: false, candidate: bytes });
+      if (!usable(reviewerResponse)) return { ...objectives, verdict: "BLOCKED" };
+      const reviewerBytes = new Uint8Array(await reviewerResponse.arrayBuffer());
+      if (await input.review(bytes, reviewerBytes, reviewer, reviewClass) === "PASS") {
+        return { ...objectives, response: cloneResponse(response, bytes), target };
+      }
+      if (input.alias === "agent/normal" && input.bindings.free.includes(target) && freeAttempts++ < MAX_FREE_ATTEMPTS) {
+        const repair = await input.dispatch(target, { reviewer: false, repair: true });
+        if (usable(repair)) {
+          const repairedBytes = new Uint8Array(await repair.arrayBuffer());
+          const repairedObjectives = evaluateAgentRouteObjectives(input.checks ?? [{ kind: "nonempty" }], repairedBytes, input.toolNames, input.allowedPolicyIds);
+          if (repairedObjectives.verdict === "PASS" && await input.review(repairedBytes, reviewerBytes, reviewer, reviewClass) === "PASS") {
+            return { ...repairedObjectives, response: cloneResponse(repair, repairedBytes), target };
+          }
+        }
+      }
+    }
+    return { verdict: "BLOCKED", checkIds: [], hashes: [] };
+  }
   const result = evaluateAgentRouteObjectives(input.checks ?? [], input.output ?? new Uint8Array(), input.toolNames, input.allowedPolicyIds);
   return result;
 }

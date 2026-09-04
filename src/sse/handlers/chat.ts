@@ -128,6 +128,7 @@ import {
   shouldUseFallback,
 } from "@omniroute/open-sse/services/emergencyFallback.ts";
 import {
+  fetchProviderLiveCodexWeeklyEvidence,
   registerCodexConnection,
   registerCodexQuotaFetcher,
 } from "@omniroute/open-sse/services/codexQuotaFetcher.ts";
@@ -147,6 +148,14 @@ import {
 } from "../services/cooldownAwareRetry";
 import { constrainConnectionsToQuota, resolveQuotaKeyScope } from "../../lib/quota/quotaKey";
 import { checkConnectionCapacity } from "../utils/backpressure";
+import {
+  getAgentRouteBindings,
+  isAgentRouteAlias,
+  resolveEffectiveReviewClass,
+  runAgentRoute,
+  type ReviewClass,
+} from "@omniroute/open-sse/services/agentRoute.ts";
+import { createOrResumeAgentRouteRun } from "@/lib/db/agentRouteRuns";
 
 registerCodexQuotaFetcher();
 
@@ -577,6 +586,50 @@ export async function handleChat(
   // Short-circuit if a hook returned a direct response
   if (hookResponse) {
     return errorResponse(hookResponse.status, hookResponse.body as any);
+  }
+
+  // Exact agent aliases bypass every automatic/combo fallback. Authentication,
+  // per-key alias policy, guardrails, and session limits above have already run.
+  if (isAgentRouteAlias(modelStr)) {
+    const required = ["x-omniroute-task-id", "x-omniroute-run-id", "x-omniroute-turn-id", "x-omniroute-idempotency-key"] as const;
+    const ids = Object.fromEntries(required.map((name) => [name, request.headers.get(name)]));
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const requestedReview = request.headers.get("x-omniroute-review-class");
+    if (!apiKeyInfo?.id || apiKeyInfo.noLog !== true || !required.every((name) => uuid.test(ids[name] ?? "")) || (requestedReview !== "standard" && requestedReview !== "high_risk")) {
+      return errorResponse(HTTP_STATUS.FORBIDDEN, "agent route requires authorized no-log UUID protocol");
+    }
+    const effectiveReviewClass = resolveEffectiveReviewClass(modelStr, requestedReview as ReviewClass);
+    const run = createOrResumeAgentRouteRun({
+      runId: ids["x-omniroute-run-id"]!, taskId: ids["x-omniroute-task-id"]!, turnId: ids["x-omniroute-turn-id"]!,
+      idempotencyKey: ids["x-omniroute-idempotency-key"]!, apiKeyId: apiKeyInfo.id, virtualRoute: modelStr, effectiveReviewClass,
+    });
+    if (run.kind !== "created") return errorResponse(409, "agent_route_resume_required");
+    let bindings;
+    try { bindings = getAgentRouteBindings(); } catch { return errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "agent route bindings unavailable"); }
+    const routed = await runAgentRoute({
+      alias: modelStr, bindings, reviewClass: effectiveReviewClass,
+      fetchEvidence: () => fetchProviderLiveCodexWeeklyEvidence(bindings.codex.connectionId),
+      dispatch: async (target, options) => handleSingleModelChat(
+        {
+          ...body,
+          model: `${target.provider}/${target.model}`,
+          ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
+          ...(options.reviewer ? {
+            stream: false,
+            messages: [
+              ...(body.messages ?? []),
+              { role: "system", content: `Review this candidate and return exactly PASS or REVISE:\n${new TextDecoder().decode(options.candidate ?? new Uint8Array())}` },
+            ],
+          } : {}),
+        }, `${target.provider}/${target.model}`, clientRawRequest, request, null, apiKeyInfo, telemetry,
+        { sessionId, sessionAffinityKey, forcedConnectionId: target.connectionId, providerId: target.provider, skipUpstreamRetry: true, correlationId: reqId }, null, false),
+      review: async (_candidate, reviewerOutput) => new TextDecoder().decode(reviewerOutput).toUpperCase().includes("PASS") ? "PASS" : "REVISE",
+    });
+    if (!routed.response) return errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "agent route blocked");
+    routed.response.headers.set("x-omniroute-virtual-route", modelStr);
+    routed.response.headers.set("x-omniroute-run-id", run.runId);
+    if (routed.target) routed.response.headers.set("x-omniroute-resolved-model", `${routed.target.provider}/${routed.target.model}`);
+    return withCorrelationId(withSessionHeader(routed.response, sessionId), reqId);
   }
 
   // T05 — Task-Aware Smart Routing

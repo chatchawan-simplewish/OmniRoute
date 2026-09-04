@@ -626,7 +626,7 @@ export async function handleChat(
             ],
           } : options.repair ? { messages: [...(body.messages ?? []), { role: "system", content: `Repair the prior candidate using this review feedback:\n${options.feedback ?? "REVISE"}\nPrior candidate:\n${new TextDecoder().decode(options.candidate ?? new Uint8Array())}` }] } : {}),
         }, concreteModel, clientRawRequest, request, null, apiKeyInfo, telemetry,
-        { sessionId, sessionAffinityKey: null, forcedConnectionId: target.connectionId, allowedConnectionIds: [target.connectionId], providerId: target.provider, skipUpstreamRetry: true, controlledDispatch: true, correlationId: reqId }, null, false);
+        { sessionId, sessionAffinityKey: null, forcedConnectionId: target.connectionId, allowedConnectionIds: [target.connectionId], providerId: target.provider, skipUpstreamRetry: true, controlledDispatch: true, modelAbortSignal: options.signal ?? null, correlationId: reqId }, null, false);
       },
       review: async (_candidate, reviewerOutput) => {
         const raw = new TextDecoder().decode(reviewerOutput).trim();

@@ -55,7 +55,7 @@ export type AgentRouteBindings = {
 
 export type Admission = "admitted" | "full" | "offline" | "failed";
 export type DispatchResult = Response | { response: Response; admission: Admission };
-type Dispatch = (target: AgentRouteBinding, options: { reasoningEffort?: "xhigh"; reviewer: boolean; repair: boolean; candidate?: Uint8Array; feedback?: string }) => Promise<DispatchResult>;
+type Dispatch = (target: AgentRouteBinding, options: { reasoningEffort?: "xhigh"; reviewer: boolean; repair: boolean; candidate?: Uint8Array; feedback?: string; signal?: AbortSignal }) => Promise<DispatchResult>;
 type Review = (candidate: Uint8Array, reviewerOutput: Uint8Array, target: AgentRouteBinding, reviewClass: ReviewClass) => Promise<RouteVerdict>;
 
 function usable(response: Response) {
@@ -85,9 +85,12 @@ export async function runAgentRoute(input: {
   review?: Review;
   reviewClass?: ReviewClass;
   fetchEvidence?: () => Promise<CodexWeeklyEvidence | null>;
+  now?: () => number;
 } = {}): Promise<{ verdict: RouteVerdict; checkIds: string[]; hashes: string[]; response?: Response; target?: AgentRouteBinding }> {
   if (input.alias && input.bindings && input.dispatch && input.review) {
     const reviewClass = resolveEffectiveReviewClass(input.alias, input.reviewClass ?? "standard");
+    const now = input.now ?? (() => performance.now());
+    const localDeadline = now() + ADMISSION_MS;
     const candidates = input.alias === "agent/high"
       ? [input.bindings.vm1201, input.bindings.codex, input.bindings.strongChineseReviewers[0]]
       : [input.bindings.vm1201, ...input.bindings.free, input.bindings.codex, input.bindings.cheapChineseReviewers[0]];
@@ -97,11 +100,21 @@ export async function runAgentRoute(input: {
       if (!target) continue;
       if (target === input.bindings.codex && !subscriptionEligible(await input.fetchEvidence?.() ?? null)) continue;
       let selectedTarget = target;
-      let attempt = dispatched(await input.dispatch(target, {
+      const local = target === input.bindings.vm1201 || target === input.bindings.bellPc;
+      const controller = local ? new AbortController() : null;
+      const timeoutMs = local ? Math.max(0, localDeadline - now()) : 0;
+      if (local && timeoutMs === 0) continue;
+      let attempt = dispatched(await (local ? Promise.race([
+        input.dispatch(target, {
+          reviewer: false, repair: false, signal: controller!.signal,
+          ...(input.alias === "agent/high" && target === input.bindings.vm1201 ? { reasoningEffort: "xhigh" } : {}),
+        }),
+        new Promise<DispatchResult>((resolve) => setTimeout(() => { controller!.abort(); resolve({ response: new Response(null, { status: 408 }), admission: "full" }); }, timeoutMs)),
+      ]) : input.dispatch(target, {
         reviewer: false,
         repair: false,
         ...(input.alias === "agent/high" && target === input.bindings.vm1201 ? { reasoningEffort: "xhigh" } : {}),
-      }));
+      })));
       // Bell-PC is capacity escape only, never a quality fallback.
       if (target === input.bindings.vm1201 && input.alias === "agent/normal" && (attempt.admission === "full" || attempt.admission === "offline")) {
         attempt = dispatched(await input.dispatch(input.bindings.bellPc, { reviewer: false, repair: false }));

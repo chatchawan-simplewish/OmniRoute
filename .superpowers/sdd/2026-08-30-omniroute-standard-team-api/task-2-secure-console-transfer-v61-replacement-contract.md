@@ -16,7 +16,9 @@ Their exact paths/hashes are in
 `task-2-secure-console-transfer-v61-product-baseline.json`; verify each at
 action time. `test-v61-static.ps1` is the non-evaluating parser/pin/guard-order
 and product-hash check, run from the source-worktree root using the pinned
-runtime. It starts no receiver, proxy, browser, clipboard, R5, or network work.
+runtime. It also tests only the extracted cleanup helper under isolated,
+fully mocked filesystem cmdlets. It starts no receiver, proxy, browser,
+clipboard, R5, network work, or real filesystem deletion.
 
 One new private `team-api-proxy` start/proof, one exact script preparation,
 one retained visible masked-input receiver, then pause before final Create.
@@ -39,8 +41,8 @@ in this file's directory.
 
 | New source container | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `task-2-secure-console-transfer-v61-live-source.md` | 38868 | `BF377E54C0DA83BF2A182348E4FE5C4F0CB409617D68AE329945555B036AFDD2` |
-| `task-2-secure-console-transfer-v61-scope-source.md` | 20509 | `062B4EC650BF7BEA2F951B9DD4FFD42D4D558A0901C9D6DD5B62DC125A7AC403` |
+| `task-2-secure-console-transfer-v61-live-source.md` | 39022 | `D401185DFD92D36AE3CC019ED3968657B41CAA54AE0C26BF3FD5924ECED6EB28` |
+| `task-2-secure-console-transfer-v61-scope-source.md` | 22572 | `D45A60CE4F96B6B9633E9A6BCF6FF1925831838C781B167E03105EF3855A98F6` |
 
 Only these changes to original executable fences are allowed:
 
@@ -52,10 +54,20 @@ Only these changes to original executable fences are allowed:
 4. Make the receiver's interactive visibility explicit with `-WindowStyle
    Normal`. This is the user-controlled masked input window, not a background
    helper. No native UI keystroke injection is permitted.
+5. Fix review's HIGH wrong-container risk: rollback uses `set -eu`; both
+   destructive paths compare the retained creation ID and delete only that
+   immutable ID, never a same-named replacement. Missing/mismatched ID stops.
+6. Fix review's IMPORTANT preparation gap: preload all counters, cleanup
+   functions, and final/disposition source before proxy or preparation; record
+   temp-root creation attempted/fulfilled; reject a preexisting root; dispatch
+   preparation failures through guarded partial-file cleanup and exact-ID proxy
+   cleanup once. Unknown/partial-hash/reparse-point content is retained and
+   classified NOT PROVEN, never deleted or reinterpreted as PASS.
 
-The private proxy wrapper, deterministic R5 script, final owner cleanup fence,
-and post-launch pre-accept disposition fence are byte-identical to their
-reviewed originals. The fixed temp direct-child guards, same-parent dot-source
+The deterministic R5 script, final owner cleanup fence, and post-launch
+pre-accept disposition fence are byte-identical to their reviewed originals.
+The proxy wrapper changes only its rollback's fail-fast flag and immutable-ID
+deletion. The fixed temp direct-child guards, same-parent dot-source
 semantics, no-reacquisition matrix, timeout budgets, counter tuples, credential
 redaction, revocation hold, and cleanup conditions are not relaxed.
 
@@ -67,14 +79,15 @@ allowed during review; evaluation is forbidden.
 
 | Container / index | Role | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
-| live / 0 | proxy start and 19-label proof | 8380 | `A7C7F04705344160030C3BF1CA383179616507555F56D2288E3BFD9B46FEF2AC` |
-| live / 1 | exact preparation, used only through scope / 0 | 3988 | `83440D05C9B2486509D2DC9A51F10C4916FFAFFC1C6B7B6FABCE07188FAE76D5` |
+| live / 0 | proxy start and 19-label proof | 8378 | `75725F1BAD87DD1C1EF0A3BC8E5B34FF2B290F6F107F55440E69682B725E0E67` |
+| live / 1 | exact preparation, used only through scope / 1 | 4144 | `1BF3A613363B755BC15F35560FC1738D597CAFEFD41159DBC0B2CE1727F80C1C` |
 | live / 2 | owner | 22582 | `383E21D339AD67D704F1515F2091D1363809CC23DC61176EE65246012A5E476A` |
-| live / 3 | launch, used only through scope / 1 | 675 | `C4DDD2E84C14C125830DD422C613CE9DC4CFCDBCABB760F003B9187811B7D2FA` |
+| live / 3 | launch, used only through scope / 2 | 675 | `C4DDD2E84C14C125830DD422C613CE9DC4CFCDBCABB760F003B9187811B7D2FA` |
 | live / 4 | final owner cleanup | 2779 | `9316DE2F7C84A89947E57C8563E9381E97D7C52F0DFFE56CA7E4DE616DD8F637` |
-| scope / 0 | retained preparation | 2022 | `C34931235DB0BC7AD5CC441D9C6CD1BEF27DA436C902F21023FE2682881F3AA8` |
-| scope / 1 | guarded retained launch and cleanup functions | 14846 | `80DC8090F28FE6FB949616F8295C1CE14F637E049C69750B5ED8F83EAF83CFF5` |
-| scope / 2 | pre-accept failure disposition | 3308 | `B8087F2CB77A695C1B6DD145DDD3D39D48F8AABEBBA00863BEA0610C8BE6518E` |
+| scope / 0 | non-consuming preload and cleanup functions | 12727 | `A6B05C135B95DF685EA4518BAF5298BE6C528AA7C48F1143918B20D3220AAD61` |
+| scope / 1 | guarded retained preparation | 2975 | `3C2BF4B1B0BE81F8B58B2C7B583A819D8237FC70E519494EAD6018FC36F2C0A0` |
+| scope / 2 | guarded retained launch | 3178 | `AFA0E0389E8F0E0224849B772428B0CA95232C0150255577E5BC22526EC0BA7A` |
+| scope / 3 | pre-accept failure disposition | 3308 | `B8087F2CB77A695C1B6DD145DDD3D39D48F8AABEBBA00863BEA0610C8BE6518E` |
 
 R5 source container `task-2-rulesets-api-incident-sol-review.md`: 32520 bytes,
 SHA-256 `1950DC72285AA349E33CDFEDCE948C7A99CADF1F70528DF22F643FBA07FBB33A`.
@@ -130,7 +143,7 @@ a PASS. Any failed/ambiguous check closes V61 before later action, without retry
 
 1. Empty index; exact base ancestry with V61-only descendant changes; same 12
    dirty product paths and their recorded pre-review hashes. Verify every
-   source/fence/R5/runtime pin and parse all eight PowerShell fences with zero
+   source/fence/R5/runtime pin and parse all nine PowerShell fences with zero
    errors. No old runtime hash or old live/scope extraction path may remain in
    either new executable source container.
 2. Windows CIM `Microsoft Windows 11 Pro`, version/build `10.0.26200 / 26200`,
@@ -170,14 +183,18 @@ contains no token, header, or Zone ID. Before live actions its exact runtime
 path/hash/version and working directory must match the pins. Read-only shell
 commands run earlier for drafting are not this persistent parent.
 
-After every prerequisite passes, consume V61 once: clear the current Windows
+After every prerequisite and the non-consuming preload below pass, consume
+V61 once: clear the current Windows
 clipboard once with `Set-Clipboard -Value ''`, then read once shape-only with
 `Get-Clipboard -Raw`, discard the value, and require empty TRUE with both
 attempted/fulfilled counts `1/1`. Never emit clipboard bytes.
 
 In that same retained parent, extract and verify all source/fence pins before
-evaluating any. Then dot-source, in order, exactly once each: live / 0, scope /
-0, scope / 1. Never separately execute live / 1 or live / 3. Require exact
+evaluating any. Dot-source the non-consuming scope / 0 preload once before
+clipboard, proxy, preparation, or owner action; require exact
+`V61_NONCONSUMING_PRELOAD=PASS`. Then dot-source, in order, exactly once each:
+live / 0, scope / 1, scope / 2. Never separately execute live / 1 or live / 3.
+Require exact
 `PROXY_START_AND_PROOF=PASS`, `EXACT_RETAINED_SCOPE_PREPARATION=PASS`, and
 `EXACT_RETAINED_SCOPE_OWNER_LAUNCHED=PASS START=1/1 HANDLE=TRUE`.
 Retain the exact `$owner`, `$expectedOwnerPid`, `$ownerClock`, prepared paths,
@@ -205,9 +222,15 @@ start, remove only exact new, hash-proven direct-child preparations and the
 exact new proxy when the reviewed guard permits. After start, no file/root
 deletion before retained-handle exit proof; if start is uncertain without a
 handle, preserve all state and stop NOT PROVEN. Never enumerate/reacquire.
-Use only the one preloaded scope / 2 disposition; it invokes the unchanged
+Use only the one preloaded scope / 3 post-launch disposition; it invokes the unchanged
 remaining-budget final block and guarded proxy cleanup. No second wait/kill/
 drain/dispose/cleanup, retry, fallback, override, or verdict relaxation.
+The separate prelaunch preparation-failure dispatcher runs only in scope / 1:
+it reports root-create counters and file/root/proxy cleanup flags, then throws
+`V61_PREPARATION_FAILED_NO_RETRY`. Never run the launch or post-launch
+disposition after that terminal. A proxy-wrapper failure stops before any
+preparation; its own sole rollback/uncertainty path remains controlling and
+must not be followed by a second cleanup attempt.
 Long shell waits must yield tool control within 10 seconds so status updates
 remain possible; no tool wait above 60 seconds is required.
 

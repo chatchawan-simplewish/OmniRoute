@@ -2,26 +2,17 @@
 
 Non-executable source container. Use only under the independently reviewed V61 contract; no predecessor gate is reopened.
 
-## Exact retained preparation
+## Exact non-consuming preload
 
 ```powershell
-$briefRawForScope = [IO.File]::ReadAllText((Resolve-Path -LiteralPath '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-secure-console-transfer-v61-live-source.md'), [Text.UTF8Encoding]::new($false, $true))
-$prepTailForScope = $briefRawForScope.Substring($briefRawForScope.IndexOf('## Credential-free script preparation'))
-$prepMatchForScope = [regex]::Match($prepTailForScope, '(?ms)^```powershell\n(?<code>.*?)^```$')
-if (-not $prepMatchForScope.Success) { throw 'PREP_SCOPE_EXTRACTION_FAILED' }
-$prepBytesForScope = [Text.UTF8Encoding]::new($false).GetBytes($prepMatchForScope.Groups['code'].Value)
-$prepHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($prepBytesForScope))
-if ($prepBytesForScope.Length -ne 3988 -or $prepHashForScope -cne '83440D05C9B2486509D2DC9A51F10C4916FFAFFC1C6B7B6FABCE07188FAE76D5') { throw 'PREP_SCOPE_BYTE_PIN_FAILED' }
-. ([scriptblock]::Create($prepMatchForScope.Groups['code'].Value))
-if ([string]::IsNullOrWhiteSpace($transferRoot) -or [string]::IsNullOrWhiteSpace($ownerScriptPath) -or [string]::IsNullOrWhiteSpace($r5ScriptPath) -or [string]::IsNullOrWhiteSpace($safeLogPath)) { throw 'PREP_SCOPE_VARIABLES_MISSING' }
-if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ownerScriptPath)) -cne [IO.Path]::GetFullPath($transferRoot) -or [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($r5ScriptPath)) -cne [IO.Path]::GetFullPath($transferRoot) -or [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($safeLogPath)) -cne [IO.Path]::GetFullPath($transferRoot)) { throw 'PREP_SCOPE_CHILD_GUARD_FAILED' }
-if ((Get-FileHash -Algorithm SHA256 -LiteralPath $ownerScriptPath).Hash -cne '383E21D339AD67D704F1515F2091D1363809CC23DC61176EE65246012A5E476A' -or (Get-FileHash -Algorithm SHA256 -LiteralPath $r5ScriptPath).Hash -cne 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41' -or (Test-Path -LiteralPath $safeLogPath)) { throw 'PREP_SCOPE_WRITTEN_STATE_FAILED' }
-[Console]::Out.WriteLine('EXACT_RETAINED_SCOPE_PREPARATION=PASS')
-```
-
-## Exact retained launch
-
-```powershell
+$scopePreparationAttempted = 0
+$scopePreparationRootCreateAttempted = 0
+$scopePreparationRootCreateFulfilled = 0
+$transferRoot = $null
+$ownerScriptPath = $null
+$r5ScriptPath = $null
+$safeLogPath = $null
+$proxyId = $null
 $scopeOwnerStartAttempted = 0
 $scopeOwnerStartFulfilled = 0
 $scopeOwnerHandleRetained = $false
@@ -56,21 +47,24 @@ $expectedOwnerPid = $null
 $ownerClock = $null
 
 function Invoke-ExactScopeProxyCleanup {
+    if ($proxyId -notmatch '^[0-9a-f]{64}$') { throw 'SCOPE_PROXY_RETAINED_ID_MISSING' }
     $remote = @'
 set -eu
+expected='__PROXY_ID__'
 id="$(sudo docker inspect -f '{{.Id}}' team-api-proxy)"
 printf '%s' "$id" | grep -Eq '^[0-9a-f]{64}$'
+test "$id" = "$expected"
 test "$(sudo docker inspect -f '{{.State.Status}}' team-api-proxy)" = running
 test "$(sudo docker inspect -f '{{.Image}}' team-api-proxy)" = sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 test "$(sudo docker inspect -f '{{json .HostConfig.PortBindings}}' team-api-proxy)" = '{}'
 test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 3
 ! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
-sudo docker rm -f team-api-proxy >/dev/null
+sudo docker rm -f "$expected" >/dev/null
 test -z "$(sudo docker ps -aq -f name='^/team-api-proxy$')"
 test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 2
 ! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
 printf 'EXACT_PROXY_CLEANUP=PASS\n'
-'@
+'@.Replace('__PROXY_ID__',$proxyId)
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = 'C:\Windows\System32\OpenSSH\ssh.exe'
     $startInfo.UseShellExecute = $false
@@ -192,31 +186,32 @@ printf 'EXACT_PROXY_CLEANUP=PASS\n'
 }
 
 function Remove-ExactScopePreparedFiles {
+    if ($scopePreparationRootCreateAttempted -eq 0) { return }
+    if ($scopePreparationRootCreateFulfilled -ne 1) { throw 'V61_PREP_ROOT_CREATION_UNCERTAIN' }
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
     $root = [IO.Path]::GetFullPath($transferRoot)
-    if ([IO.Path]::GetDirectoryName($root).TrimEnd('\') -cne $tempRoot) { throw 'SCOPE_TEMP_ROOT_GUARD_FAILED' }
-    foreach ($path in @($ownerScriptPath,$r5ScriptPath,$safeLogPath)) {
-        if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($path)) -cne $root) { throw 'SCOPE_TEMP_CHILD_GUARD_FAILED' }
+    if ([IO.Path]::GetDirectoryName($root).TrimEnd('\') -cne $tempRoot -or
+        [IO.Path]::GetFileName($root) -notmatch '^omniroute-secure-console-[0-9a-f]{32}$') { throw 'SCOPE_TEMP_ROOT_GUARD_FAILED' }
+    if ((Get-Item -LiteralPath $root).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'V61_PREP_ROOT_REPARSE_POINT' }
+    $expectedFiles = @{
+        'omniroute-secure-console-owner.ps1' = '383E21D339AD67D704F1515F2091D1363809CC23DC61176EE65246012A5E476A'
+        'omniroute-r5-exact.ps1' = 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41'
     }
-    if (Test-Path -LiteralPath $safeLogPath) { throw 'SCOPE_SAFE_LOG_UNEXPECTED' }
-    if (@(Get-ChildItem -LiteralPath $root -Force).Count -ne 2) { throw 'SCOPE_PREPARED_FILE_COUNT_DRIFT' }
-    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $ownerScriptPath).Hash -cne '383E21D339AD67D704F1515F2091D1363809CC23DC61176EE65246012A5E476A' -or
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $r5ScriptPath).Hash -cne 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41') {
-        throw 'SCOPE_PREPARED_HASH_DRIFT'
+    $children = @(Get-ChildItem -LiteralPath $root -Force)
+    foreach ($child in $children) {
+        if ($child.PSIsContainer -or ($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            -not $expectedFiles.ContainsKey($child.Name) -or
+            [IO.Path]::GetDirectoryName($child.FullName) -cne $root -or
+            (Get-FileHash -Algorithm SHA256 -LiteralPath $child.FullName).Hash -cne $expectedFiles[$child.Name]) {
+            throw 'V61_PARTIAL_PREPARATION_CHILD_NOT_PROVEN'
+        }
     }
-    Remove-Item -LiteralPath $ownerScriptPath -Force
-    Remove-Item -LiteralPath $r5ScriptPath -Force
+    foreach ($child in $children) { Remove-Item -LiteralPath $child.FullName -Force }
     if (@(Get-ChildItem -LiteralPath $root -Force).Count -ne 0) { throw 'SCOPE_TEMP_NOT_EMPTY' }
     Remove-Item -LiteralPath $root -Force
 }
 
-try {
-    $launchPwshV61 = 'C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe'
-    if ((Get-Item -LiteralPath $launchPwshV61).Length -ne 301368 -or
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $launchPwshV61).Hash -cne '362A356CE7F0940EC74F73A8FC2C990A2CC24A38A11C90BBD8ECA947110AD139' -or
-        [Diagnostics.FileVersionInfo]::GetVersionInfo($launchPwshV61).FileVersion -cne '7.6.5.500') {
-        throw 'V61_PRELAUNCH_RUNTIME_PIN_DRIFT'
-    }
+$briefRawForScope = [IO.File]::ReadAllText((Resolve-Path -LiteralPath '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-secure-console-transfer-v61-live-source.md'), [Text.UTF8Encoding]::new($false, $true))
     $launchTailForScope = $briefRawForScope.Substring($briefRawForScope.IndexOf('## Launch and transfer sequence'))
     $launchMatchForScope = [regex]::Match($launchTailForScope, '(?ms)^```powershell\n(?<code>.*?)^```$')
     if (-not $launchMatchForScope.Success) { throw 'LAUNCH_SCOPE_EXTRACTION_FAILED' }
@@ -241,6 +236,56 @@ try {
     $dispositionHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($dispositionBytesForScope))
     if ($dispositionBytesForScope.Length -ne 3308 -or $dispositionHashForScope -cne 'B8087F2CB77A695C1B6DD145DDD3D39D48F8AABEBBA00863BEA0610C8BE6518E') { throw 'DISPOSITION_SCOPE_BYTE_PIN_FAILED' }
 
+[Console]::Out.WriteLine('V61_NONCONSUMING_PRELOAD=PASS')
+```
+
+## Exact retained preparation
+
+```powershell
+if ($scopePreparationAttempted -ne 0 -or $scopeOwnerStartAttempted -ne 0) { throw 'V61_PREPARATION_ALREADY_CONSUMED' }
+$scopePreparationAttempted++
+try {
+    $briefRawForScope = [IO.File]::ReadAllText((Resolve-Path -LiteralPath '.superpowers\sdd\2026-08-30-omniroute-standard-team-api\task-2-secure-console-transfer-v61-live-source.md'), [Text.UTF8Encoding]::new($false, $true))
+    $prepTailForScope = $briefRawForScope.Substring($briefRawForScope.IndexOf('## Credential-free script preparation'))
+    $prepMatchForScope = [regex]::Match($prepTailForScope, '(?ms)^```powershell\n(?<code>.*?)^```$')
+    if (-not $prepMatchForScope.Success) { throw 'PREP_SCOPE_EXTRACTION_FAILED' }
+    $prepBytesForScope = [Text.UTF8Encoding]::new($false).GetBytes($prepMatchForScope.Groups['code'].Value)
+    $prepHashForScope = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($prepBytesForScope))
+    if ($prepBytesForScope.Length -ne 4144 -or $prepHashForScope -cne '1BF3A613363B755BC15F35560FC1738D597CAFEFD41159DBC0B2CE1727F80C1C') { throw 'PREP_SCOPE_BYTE_PIN_FAILED' }
+    . ([scriptblock]::Create($prepMatchForScope.Groups['code'].Value))
+    if ([string]::IsNullOrWhiteSpace($transferRoot) -or [string]::IsNullOrWhiteSpace($ownerScriptPath) -or [string]::IsNullOrWhiteSpace($r5ScriptPath) -or [string]::IsNullOrWhiteSpace($safeLogPath)) { throw 'PREP_SCOPE_VARIABLES_MISSING' }
+    if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ownerScriptPath)) -cne [IO.Path]::GetFullPath($transferRoot) -or [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($r5ScriptPath)) -cne [IO.Path]::GetFullPath($transferRoot) -or [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($safeLogPath)) -cne [IO.Path]::GetFullPath($transferRoot)) { throw 'PREP_SCOPE_CHILD_GUARD_FAILED' }
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $ownerScriptPath).Hash -cne '383E21D339AD67D704F1515F2091D1363809CC23DC61176EE65246012A5E476A' -or (Get-FileHash -Algorithm SHA256 -LiteralPath $r5ScriptPath).Hash -cne 'DB75253CD851075C1D612A54EC4B02C8016C034C8BC192A3DB9D02DB9890AD41' -or (Test-Path -LiteralPath $safeLogPath)) { throw 'PREP_SCOPE_WRITTEN_STATE_FAILED' }
+    [Console]::Out.WriteLine('EXACT_RETAINED_SCOPE_PREPARATION=PASS')
+}
+catch {
+    $scopeOwnerResidual = 'PREPARATION_FAILED'
+    try {
+        Remove-ExactScopePreparedFiles
+        $scopeOwnerFileCleanup = 1
+        $scopeOwnerRootCleanup = 1
+    }
+    catch { $scopeOwnerResidual = 'PREPARATION_FILES_NOT_PROVEN' }
+    try {
+        Invoke-ExactScopeProxyCleanup
+        $scopeProxyCleanup = 1
+    }
+    catch { $scopeOwnerResidual = 'PREPARATION_CLEANUP_NOT_PROVEN' }
+    [Console]::Out.WriteLine(('V61_PREPARATION=FAIL ROOT_CREATE={0}/{1} FILE_CLEANUP={2} ROOT_CLEANUP={3} PROXY_CLEANUP={4} RESIDUAL={5}' -f $scopePreparationRootCreateAttempted,$scopePreparationRootCreateFulfilled,$scopeOwnerFileCleanup,$scopeOwnerRootCleanup,$scopeProxyCleanup,$scopeOwnerResidual))
+    throw 'V61_PREPARATION_FAILED_NO_RETRY'
+}
+```
+
+## Exact retained launch
+
+```powershell
+try {
+    $launchPwshV61 = 'C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe'
+    if ((Get-Item -LiteralPath $launchPwshV61).Length -ne 301368 -or
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $launchPwshV61).Hash -cne '362A356CE7F0940EC74F73A8FC2C990A2CC24A38A11C90BBD8ECA947110AD139' -or
+        [Diagnostics.FileVersionInfo]::GetVersionInfo($launchPwshV61).FileVersion -cne '7.6.5.500') {
+        throw 'V61_PRELAUNCH_RUNTIME_PIN_DRIFT'
+    }
     $scopeOwnerStartAttempted++
     . ([scriptblock]::Create($launchMatchForScope.Groups['code'].Value))
     if ($null -eq $owner -or $owner.Id -ne $expectedOwnerPid -or $null -eq $ownerClock) { throw 'LAUNCH_SCOPE_HANDLE_MISSING' }

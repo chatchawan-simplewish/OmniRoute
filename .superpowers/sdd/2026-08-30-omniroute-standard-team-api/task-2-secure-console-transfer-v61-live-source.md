@@ -119,11 +119,11 @@ foreach ($label in $expectedLabels) {
 if (@($proofLines | Where-Object { $_ -eq 'PROXY_PROOF=PASS ASSERTIONS=19' }).Count -ne 1) { $proofPass = $false }
 if (-not $proofPass) {
     $rollback = @'
-set -u
+set -eu
 expected='__PROXY_ID__'
 actual="$(sudo docker inspect -f '{{.Id}}' team-api-proxy 2>/dev/null || true)"
 test "$actual" = "$expected"
-sudo docker rm -f team-api-proxy >/dev/null
+sudo docker rm -f "$expected" >/dev/null
 test -z "$(sudo docker ps -aq -f name='^/team-api-proxy$')"
 test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 2
 ! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
@@ -195,7 +195,10 @@ $transferRoot = [IO.Path]::GetFullPath((Join-Path $resolvedTemp ("omniroute-secu
 if ([IO.Path]::GetDirectoryName($transferRoot) -cne $resolvedTemp.TrimEnd('\')) {
     throw 'TEMP_ROOT_GUARD_FAILED'
 }
+if (Test-Path -LiteralPath $transferRoot) { throw 'V61_PREP_ROOT_PREEXISTS' }
+$scopePreparationRootCreateAttempted++
 $null = [IO.Directory]::CreateDirectory($transferRoot)
+$scopePreparationRootCreateFulfilled++
 $ownerScriptPath = [IO.Path]::GetFullPath((Join-Path $transferRoot 'omniroute-secure-console-owner.ps1'))
 $r5ScriptPath = [IO.Path]::GetFullPath((Join-Path $transferRoot 'omniroute-r5-exact.ps1'))
 $safeLogPath = [IO.Path]::GetFullPath((Join-Path $transferRoot 'omniroute-secure-console-safe.log'))

@@ -16,11 +16,11 @@
 
 `C:\Users\chatc\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe --import file:///C:/ChatGPT%20Projects/SW-Selfhosted-Network/.worktrees/omniroute-routing-completion/node_modules/tsx/dist/loader.mjs --import ./tests/_setup/isolateDataDir.ts --test tests/unit/services/agent-route.test.ts tests/unit/db/agent-route-runs.test.ts tests/unit/api/agent-route-events.test.ts tests/unit/api/models-agent-route-aliases.test.ts`
 
-Result: 29 passed, 0 failed. Coverage includes slash alias catalog authorization,
-no-log lifecycle authorization and payload rejection, idempotent/latching run
-storage, objective checks, fresh 79/80 boundary validation, and native-controller
-dispatch ordering. `node node_modules/typescript/bin/tsc --noEmit --pretty false
---incremental false` also completed successfully.
+Historical result superseded: the prior 29-test run included twenty vacuous
+string-verdict tests and is not acceptance evidence. The current focused run has
+eight behavioral tests; it is partial evidence only. `node
+node_modules/typescript/bin/tsc --noEmit --pretty false --incremental false`
+completed successfully at the preceding checkpoint.
 
 ## Remaining live requirements
 

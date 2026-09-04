@@ -609,7 +609,10 @@ export async function handleChat(
     const routed = await runAgentRoute({
       alias: modelStr, bindings, reviewClass: effectiveReviewClass,
       fetchEvidence: () => fetchProviderLiveCodexWeeklyEvidence(bindings.codex.connectionId),
-      dispatch: async (target, options) => handleSingleModelChat(
+      dispatch: async (target, options) => {
+        const concreteModel = `${target.provider}/${target.model}`;
+        if (!(await isModelAllowedForKey(apiKey, concreteModel))) return { response: errorResponse(403, "agent route concrete model not authorized"), admission: "failed" as const };
+        return handleSingleModelChat(
         {
           ...body,
           model: `${target.provider}/${target.model}`,
@@ -622,8 +625,9 @@ export async function handleChat(
               { role: "system", content: `Review this candidate and return exactly PASS or REVISE:\n${new TextDecoder().decode(options.candidate ?? new Uint8Array())}` },
             ],
           } : options.repair ? { messages: [...(body.messages ?? []), { role: "system", content: `Repair the prior candidate using this review feedback:\n${options.feedback ?? "REVISE"}\nPrior candidate:\n${new TextDecoder().decode(options.candidate ?? new Uint8Array())}` }] } : {}),
-        }, `${target.provider}/${target.model}`, clientRawRequest, request, null, apiKeyInfo, telemetry,
-        { sessionId, sessionAffinityKey, forcedConnectionId: target.connectionId, providerId: target.provider, skipUpstreamRetry: true, controlledDispatch: true, correlationId: reqId }, null, false),
+        }, concreteModel, clientRawRequest, request, null, apiKeyInfo, telemetry,
+        { sessionId, sessionAffinityKey: null, forcedConnectionId: target.connectionId, allowedConnectionIds: [target.connectionId], providerId: target.provider, skipUpstreamRetry: true, controlledDispatch: true, correlationId: reqId }, null, false);
+      },
       review: async (_candidate, reviewerOutput) => {
         const raw = new TextDecoder().decode(reviewerOutput).trim();
         let verdict = raw;

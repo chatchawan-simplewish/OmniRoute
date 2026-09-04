@@ -41,8 +41,8 @@ in this file's directory.
 
 | New source container | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `task-2-secure-console-transfer-v61-live-source.md` | 39022 | `D401185DFD92D36AE3CC019ED3968657B41CAA54AE0C26BF3FD5924ECED6EB28` |
-| `task-2-secure-console-transfer-v61-scope-source.md` | 22572 | `D45A60CE4F96B6B9633E9A6BCF6FF1925831838C781B167E03105EF3855A98F6` |
+| `task-2-secure-console-transfer-v61-live-source.md` | 39231 | `75FE511EA9D150534B0969953AF74BA418A0035EAC06FBE5CF260C2083B42950` |
+| `task-2-secure-console-transfer-v61-scope-source.md` | 22820 | `EC675EB149AB5541CD6AE2F3F54448B2B131034CDA610EC91A6353E53A52E1FD` |
 
 Only these changes to original executable fences are allowed:
 
@@ -63,11 +63,19 @@ Only these changes to original executable fences are allowed:
    preparation failures through guarded partial-file cleanup and exact-ID proxy
    cleanup once. Unknown/partial-hash/reparse-point content is retained and
    classified NOT PROVEN, never deleted or reinterpreted as PASS.
+7. Fix the remaining listener-guard finding: every pre/post-cleanup listener
+   absence guard explicitly fails on enumeration error, matching listener, or
+   grep error. The 19-label proof likewise rejects a grep error. A negated
+   pipeline is never accepted as fail-fast proof. The fully mocked
+   `test-v61-listener-guards.ps1` covers 10 cases using the exact extracted
+   cleanup/rollback shell bodies with mock Docker/ss; no real Docker, SSH, or
+   deletion runs. Its pinned local test interpreter is the already installed
+   `C:\Program Files\Git\bin\bash.exe`, not a live-gate transport.
 
 The deterministic R5 script, final owner cleanup fence, and post-launch
 pre-accept disposition fence are byte-identical to their reviewed originals.
-The proxy wrapper changes only its rollback's fail-fast flag and immutable-ID
-deletion. The fixed temp direct-child guards, same-parent dot-source
+The proxy wrapper changes only rollback fail-fast/immutable-ID deletion and
+explicit listener error/absence handling. The fixed temp direct-child guards, same-parent dot-source
 semantics, no-reacquisition matrix, timeout budgets, counter tuples, credential
 redaction, revocation hold, and cleanup conditions are not relaxed.
 
@@ -79,12 +87,12 @@ allowed during review; evaluation is forbidden.
 
 | Container / index | Role | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
-| live / 0 | proxy start and 19-label proof | 8378 | `75725F1BAD87DD1C1EF0A3BC8E5B34FF2B290F6F107F55440E69682B725E0E67` |
+| live / 0 | proxy start and 19-label proof | 8587 | `04B1FBF7B4F975CC06EFE5B94615E5F3ED06BCB90622C46983087410D9608DE1` |
 | live / 1 | exact preparation, used only through scope / 1 | 4144 | `1BF3A613363B755BC15F35560FC1738D597CAFEFD41159DBC0B2CE1727F80C1C` |
 | live / 2 | owner | 22582 | `383E21D339AD67D704F1515F2091D1363809CC23DC61176EE65246012A5E476A` |
 | live / 3 | launch, used only through scope / 2 | 675 | `C4DDD2E84C14C125830DD422C613CE9DC4CFCDBCABB760F003B9187811B7D2FA` |
 | live / 4 | final owner cleanup | 2779 | `9316DE2F7C84A89947E57C8563E9381E97D7C52F0DFFE56CA7E4DE616DD8F637` |
-| scope / 0 | non-consuming preload and cleanup functions | 12727 | `A6B05C135B95DF685EA4518BAF5298BE6C528AA7C48F1143918B20D3220AAD61` |
+| scope / 0 | non-consuming preload and cleanup functions | 12975 | `B0E829102AF04FC63F03972A74C2BD36940F770C39C249784A713EB999421DED` |
 | scope / 1 | guarded retained preparation | 2975 | `3C2BF4B1B0BE81F8B58B2C7B583A819D8237FC70E519494EAD6018FC36F2C0A0` |
 | scope / 2 | guarded retained launch | 3178 | `AFA0E0389E8F0E0224849B772428B0CA95232C0150255577E5BC22526EC0BA7A` |
 | scope / 3 | pre-accept failure disposition | 3308 | `B8087F2CB77A695C1B6DD145DDD3D39D48F8AABEBBA00863BEA0610C8BE6518E` |

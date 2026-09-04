@@ -58,11 +58,13 @@ test "$(sudo docker inspect -f '{{.State.Status}}' team-api-proxy)" = running
 test "$(sudo docker inspect -f '{{.Image}}' team-api-proxy)" = sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 test "$(sudo docker inspect -f '{{json .HostConfig.PortBindings}}' team-api-proxy)" = '{}'
 test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 3
-! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
+listen_out="$(sudo ss -lntH)" || exit 90
+if printf '%s\n' "$listen_out" | grep -Eq '(^|:)20130([[:space:]]|$)'; then exit 90; else rc=$?; if [ "$rc" -ne 1 ]; then exit 90; fi; fi
 sudo docker rm -f "$expected" >/dev/null
 test -z "$(sudo docker ps -aq -f name='^/team-api-proxy$')"
 test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 2
-! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
+listen_out="$(sudo ss -lntH)" || exit 90
+if printf '%s\n' "$listen_out" | grep -Eq '(^|:)20130([[:space:]]|$)'; then exit 90; else rc=$?; if [ "$rc" -ne 1 ]; then exit 90; fi; fi
 printf 'EXACT_PROXY_CLEANUP=PASS\n'
 '@.Replace('__PROXY_ID__',$proxyId)
     $startInfo = [Diagnostics.ProcessStartInfo]::new()

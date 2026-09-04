@@ -98,7 +98,7 @@ pass caddy_sha
 check_eq network_members 3 sudo docker network inspect omniroute-internal --format '{{len .Containers}}'
 listen_out="$(sudo ss -lntH 2>&1)"; rc=$?
 if [ "$rc" -ne 0 ]; then fail listener_20130 "command_exit_$rc" absent; fi
-if printf '%s\n' "$listen_out" | grep -Eq '(^|:)20130([[:space:]]|$)'; then fail listener_20130 present absent; fi
+if printf '%s\n' "$listen_out" | grep -Eq '(^|:)20130([[:space:]]|$)'; then fail listener_20130 present absent; else rc=$?; if [ "$rc" -ne 1 ]; then fail listener_20130 "grep_exit_$rc" absent; fi; fi
 pass listener_20130
 ip="$(sudo docker inspect -f '{{with index .NetworkSettings.Networks "omniroute-internal"}}{{.IPAddress}}{{end}}' team-api-proxy 2>&1)"; rc=$?
 if [ "$rc" -ne 0 ] || [ -z "$ip" ]; then fail proxy_ip "command_exit_or_empty_$rc" nonempty; fi
@@ -126,7 +126,8 @@ test "$actual" = "$expected"
 sudo docker rm -f "$expected" >/dev/null
 test -z "$(sudo docker ps -aq -f name='^/team-api-proxy$')"
 test "$(sudo docker network inspect omniroute-internal --format '{{len .Containers}}')" = 2
-! sudo ss -lntH | grep -Eq '(^|:)20130([[:space:]]|$)'
+listen_out="$(sudo ss -lntH)" || exit 90
+if printf '%s\n' "$listen_out" | grep -Eq '(^|:)20130([[:space:]]|$)'; then exit 90; else rc=$?; if [ "$rc" -ne 1 ]; then exit 90; fi; fi
 printf 'EXACT_PROXY_ROLLBACK=PASS\n'
 '@.Replace('__PROXY_ID__',$proxyId)
     $rollbackResult = Invoke-ExactSsh 'ROLLBACK' $rollback

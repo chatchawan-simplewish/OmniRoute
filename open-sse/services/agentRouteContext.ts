@@ -11,7 +11,7 @@ export async function agentRouteBeforeFetch(url: string, headers: HeadersInit | 
   const context = agentRouteContext.getStore();
   if (!context?.options) return;
   const { options } = context;
-  options.signal.throwIfAborted();
+  options.checkAdmission();
   if (context.upstreamCalls) throw new Error("agent_route_hidden_retry_blocked");
   if (context.target?.provider === "codex" && (!subscriptionEligible(options.evidence ?? null) || options.evidence?.connectionId !== context.target.connectionId)) throw new Error("agent_route_evidence_expired");
   if (options.local) {
@@ -25,7 +25,7 @@ export async function agentRouteBeforeFetch(url: string, headers: HeadersInit | 
     if (slots.every(slot => slot.is_processing)) { context.admission = "full"; throw new Error("agent_route_local_full"); }
     context.admission = undefined;
   }
-  options.signal.throwIfAborted();
+  options.checkAdmission();
   context.upstreamCalls = 1;
   options.onSubmitted();
 }

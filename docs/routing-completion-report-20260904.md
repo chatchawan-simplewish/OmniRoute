@@ -1,9 +1,59 @@
 # OmniRoute routing completion candidate
 
-Updated 20260904 175159 Asia/Bangkok. Product owner: routing_completion_specialist
+Updated 20260904 180745 Asia/Bangkok. Product owner: routing_completion_specialist
 (fresh Sol High following the prior implementer's explicit release). Checkout:
 `C:/ChatGPT Projects/SW-Selfhosted-Network/.worktrees/omniroute-routing-completion`.
 Starting commit: `914b3e8d1ae6cc794e080e9ec90c782ea3f730db`.
+
+## Scoped residual-finding correction — F1-F3
+
+Following independent review of `90f439b30a7196d1d8dc1642b0694ef98a3e8ec4`,
+only the following residual fixes and directly affected regressions were added:
+
+- F1: the absolute monotonic deadline is checked after authorization and before
+  claiming/entering admission, around slot acquisition, at actual slot/generation
+  prefetch, at submission, and when accepting either a callback or a returned
+  response. An expired callback cannot clear a queued timer and gain acceptance.
+  The timer remains the asynchronous cancellation mechanism; synchronous budget
+  checks do not depend on timer scheduling. Cancellation and settlement precede
+  fallback, and unaccepted expiry costs zero attempts.
+- F2: supported Responses JSON and terminal SSE must explicitly report
+  `status=completed`, with no error or incomplete details. Missing, incomplete,
+  failed, queued, cancelled and in-progress states fail closed. Completed
+  Responses text/tool envelopes and legitimate Chat envelopes remain accepted.
+- F3: normal/high final Chinese stages scan the existing ordered cheap/strong
+  pools past pre-admission ineligible entries. The first admitted Chinese
+  candidate consumes the entire final-stage candidate allowance; HTTP failure
+  or reviewer REVISE does not cause another Chinese producer call. Reviewer
+  selection remains independent and ordered. No-eligible-candidate still blocks.
+
+Exactly three added regression tests were first run against the rejected bytes:
+**0 passed, 3 failed**, reproducing each finding. After the fixes, the bounded
+command below ran those three tests plus five directly related controller/native
+checks: **8 passed, 0 failed**, exit0, 12.678 seconds at 20260904 180723 Bangkok.
+The real native five-second case completed in5.428 seconds, with cancellation,
+zero Q6 charge and settled-before-Bell behavior preserved. Unrelated catalog,
+event, DB and logging suites were not rerun for this residual-fix round.
+
+```powershell
+& 'C:/Users/chatc/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe' --import file:///C:/ChatGPT%20Projects/SW-Selfhosted-Network/.worktrees/omniroute-routing-completion/node_modules/tsx/dist/loader.mjs --import ./tests/_setup/isolateDataDir.ts --test --test-name-pattern='review F[123]|admission cancellation|semantic Chat|real Chat and Responses|public streaming endpoints|native five-second' tests/unit/services/agent-route.test.ts tests/integration/agent-route-api.test.ts
+```
+
+The independent reviewer also checked the preceding candidate against pristine
+pre-feature base `6449695dd985045a0120e3246402296e62a967c6`:730 baseline,728 current,
+0 introduced diagnostics, exit0. This strengthens the historical attribution
+below but is not a clean build claim. Event wire, key permissions, role bindings,
+client ownership and all live/build/deployment gates remain unchanged. Return
+this descendant for **re-review of F1-F3 only** before B1; no broad re-review or
+live action is implied.
+
+Residual-round native-root type comparison against
+`90f439b30a7196d1d8dc1642b0694ef98a3e8ec4` also completed with exit0:
+**728 baseline,728 current,0 introduced diagnostics**. The exact command was:
+
+```powershell
+& 'C:/Users/chatc/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe' scripts/check-agent-route-type-delta.mjs 90f439b30a7196d1d8dc1642b0694ef98a3e8ec4
+```
 
 ## Status and authority
 

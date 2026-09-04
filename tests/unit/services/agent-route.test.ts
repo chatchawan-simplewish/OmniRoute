@@ -88,9 +88,10 @@ test("high has one xhigh local attempt, distinct fresh candidate/reviewer eviden
 test("admission cancellation settles before fallback and acceptance cancels admission timer", async () => {
   let monotonic = 0, settled = false;
   const result = await runAgentRoute({ alias: "agent/normal", bindings, now: () => monotonic,
-    authorize: async t => { if (t.model === "q6") monotonic = 5001; return true; },
     dispatch: async (t, o) => {
       if (t.model === "q6") {
+        monotonic = 5001;
+        o.onAdmitted();
         await new Promise<void>(resolve => { if (o.signal.aborted) resolve(); else o.signal.addEventListener("abort", () => resolve(), { once: true }); });
         settled = true; throw new Error("cancelled");
       }
@@ -111,7 +112,7 @@ test("latch after claim aborts in-flight I/O and suppresses every later call", a
 
 test("semantic Chat and Responses envelopes and strict reviewer verdicts", () => {
   assert.equal(new TextDecoder().decode(decodeAgentRouteEnvelope(content("answer")).output), "answer");
-  assert.equal(new TextDecoder().decode(decodeAgentRouteEnvelope(new TextEncoder().encode(JSON.stringify({ output: [{ type: "message", content: [{ type: "output_text", text: "answer" }] }] }))).output), "answer");
+  assert.equal(new TextDecoder().decode(decodeAgentRouteEnvelope(new TextEncoder().encode(JSON.stringify({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: "answer" }] }] }))).output), "answer");
   for (const value of ["PASS", "DO NOT PASS", '{"reasoning":"PASS","verdict":"REVISE"}', '{"verdict":"REVISE","findings":""}']) assert.equal(decodeAgentRouteReview(content(value)), null);
   assert.equal(decodeAgentRouteReview(content('{"verdict":"PASS","findings":""}'))?.verdict, "PASS");
   assert.throws(() => decodeAgentRouteEnvelope(new TextEncoder().encode("not-json")));
@@ -194,4 +195,61 @@ test("objective checks reject wrong property type and unexpected tools", async (
   const { evaluateAgentRouteObjectives } = await import("../../../open-sse/services/agentRouteObjectives.ts");
   assert.equal(evaluateAgentRouteObjectives([{ kind: "json_schema", schema: { type: "object", properties: { count: { type: "number" } } } }], new TextEncoder().encode('{"count":"bad"}')).verdict, "REVISE");
   assert.equal(evaluateAgentRouteObjectives([{ kind: "tool_call", required_names: ["allowed"], allow_unrequested: false }], new Uint8Array(), ["allowed", "extra"]).verdict, "REVISE");
+});
+
+test("review F1: expired absolute admission deadline cannot be cleared by immediate acceptance", async () => {
+  for (const phase of ["authorization", "submission", "acceptance", "return"] as const) {
+    let clock = 0, q6Dispatches = 0;
+    const result = await runAgentRoute({ alias: "agent/normal", bindings, now: () => clock,
+      authorize: async target => { if (target === bindings.vm1201 && phase === "authorization") clock = 5001; return true; },
+      dispatch: async (target, options) => {
+        if (target === bindings.vm1201) {
+          q6Dispatches++;
+          clock = 5001;
+          if (phase === "submission") options.onSubmitted();
+          if (phase !== "return") options.onAdmitted();
+        } else options.onAdmitted();
+        return new Response("answer");
+      }, review: async () => "PASS" });
+    assert.equal(result.target?.model, "q4", phase);
+    assert.equal(result.candidateAttempts, 1, phase + " must not charge expired Q6");
+    if (phase === "authorization") assert.equal(q6Dispatches, 0, "do not enter dispatch after expired authorization");
+  }
+});
+
+test("review F2: Responses completion status is authoritative for JSON and terminal SSE", () => {
+  const encode = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+  const output = [{ type: "message", status: "completed", content: [{ type: "output_text", text: "answer" }] }];
+  const complete = { object: "response", status: "completed", output };
+  assert.equal(new TextDecoder().decode(decodeAgentRouteEnvelope(encode(complete)).output), "answer");
+  for (const status of ["incomplete", "failed", "in_progress", "queued", "cancelled", undefined]) {
+    const response = { object: "response", status, incomplete_details: status === "incomplete" ? { reason: "max_output_tokens" } : null, output };
+    assert.throws(() => decodeAgentRouteEnvelope(encode(response)), String(status));
+    assert.throws(() => decodeAgentRouteEnvelope(new TextEncoder().encode("data: " + JSON.stringify({ type: "response.completed", response }) + "\n\n")), "SSE " + status);
+  }
+  assert.throws(() => decodeAgentRouteEnvelope(encode({ ...complete, error: { message: "failed" } })));
+  const tool = { type: "function_call", call_id: "call_fixture", name: "lookup", arguments: '{"id":1}' };
+  assert.deepEqual(decodeAgentRouteEnvelope(encode({ ...complete, output: [tool] })).toolNames, ["lookup"]);
+  assert.equal(new TextDecoder().decode(decodeAgentRouteEnvelope(content("chat answer")).output), "chat answer");
+});
+
+test("review F3: scan ranked Chinese eligibility but admit only one final-stage candidate", async () => {
+  for (const alias of ["agent/normal", "agent/high"] as const) {
+    const pool = [bind("rank1"), bind("rank2"), bind("rank3")];
+    const configured = { ...bindings, cheapChineseReviewers: pool, strongChineseReviewers: pool };
+    for (const mode of ["first-ineligible", "none-eligible", "revise", "technical-failure"] as const) {
+      const calls: string[] = [];
+      const result = await runAgentRoute({ alias, bindings: configured,
+        authorize: async target => pool.includes(target) && mode !== "none-eligible" && target !== pool[0],
+        dispatch: async (target, options) => { calls.push(target.model + (options.reviewer ? ":review" : ":candidate")); return new Response("answer", { status: mode === "technical-failure" && !options.reviewer ? 502 : 200 }); },
+        review: async () => mode === "revise" ? { verdict: "REVISE", findings: "fix answer" } : "PASS" });
+      if (mode === "none-eligible") { assert.equal(result.verdict, "BLOCKED"); assert.deepEqual(calls, []); }
+      else {
+        assert.equal(result.verdict, mode === "first-ineligible" ? "PASS" : "BLOCKED", alias + mode);
+        assert.deepEqual(calls.filter(call => call.endsWith(":candidate")), ["rank2:candidate"]);
+        assert.equal(result.candidateAttempts, 1);
+        if (mode !== "technical-failure") assert.deepEqual(calls, ["rank2:candidate", "rank3:review"]);
+      }
+    }
+  }
 });

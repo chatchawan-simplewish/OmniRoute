@@ -8,6 +8,9 @@ export function decodeAgentRouteEnvelope(bytes: Uint8Array) {
   let text = "", recognized = false, complete = !sse;
   let promptTokens: number | undefined, completionTokens: number | undefined;
   const tools = new Map<string, { name: string; args: string }>();
+  function completedResponse(response: any) {
+    if (!response || response.status !== "completed" || response.error || response.incomplete_details) throw new Error("incomplete_candidate_response");
+  }
   function responseItems(items: any[]) {
     for (const item of items) {
       if (item.type === "message") for (const content of item.content ?? []) if (content.type === "output_text" && typeof content.text === "string") text += content.text;
@@ -36,10 +39,10 @@ export function decodeAgentRouteEnvelope(bytes: Uint8Array) {
         const old = tools.get(key) ?? { name: "", args: "" };
         tools.set(key, { name: old.name + (tool.function?.name ?? ""), args: old.args + (tool.function?.arguments ?? "") });
       }
-    } else if (Array.isArray(frame.output)) { recognized = true; responseItems(frame.output); }
-    else if (frame.type === "response.completed") { recognized = true; complete = true; text = ""; tools.clear(); responseItems(frame.response?.output ?? []); }
+    } else if (Array.isArray(frame.output)) { completedResponse(frame); recognized = true; responseItems(frame.output); }
+    else if (frame.type === "response.completed") { completedResponse(frame.response); recognized = true; complete = true; text = ""; tools.clear(); responseItems(frame.response.output ?? []); }
     else if (frame.type === "response.output_text.delta") { recognized = true; text += frame.delta ?? ""; }
-    else if (typeof frame.output_text === "string") { recognized = true; text += frame.output_text; }
+    else if (typeof frame.output_text === "string") { completedResponse(frame); recognized = true; text += frame.output_text; }
   }
   if (!recognized || !complete) throw new Error("invalid_candidate_envelope");
   for (const tool of tools.values()) {

@@ -31,7 +31,7 @@ export function subscriptionEligible(e: CodexWeeklyEvidence | null) {
 }
 export type Admission = "admitted" | "full" | "offline" | "failed";
 export type DispatchResult = Response | { response: Response; admission: Admission };
-export type DispatchOptions = { reviewer: boolean; repair: boolean; local: boolean; reasoningEffort?: "low" | "medium" | "high" | "xhigh"; candidate?: Uint8Array; feedback?: string; signal: AbortSignal; evidence?: CodexWeeklyEvidence; onAdmitted: () => void; onSubmitted: () => void; onSlots: (busy: number) => void };
+export type DispatchOptions = { reviewer: boolean; repair: boolean; local: boolean; reasoningEffort?: "low" | "medium" | "high" | "xhigh"; candidate?: Uint8Array; feedback?: string; signal: AbortSignal; evidence?: CodexWeeklyEvidence; checkAdmission: () => void; onAdmitted: () => void; onSubmitted: () => void; onSlots: (busy: number) => void };
 export type ReviewResult = { verdict: RouteVerdict; findings: string };
 type Input = {
   alias: AgentRouteAlias; bindings: AgentRouteBindings; reviewClass?: ReviewClass;
@@ -75,35 +75,52 @@ export async function runAgentRoute(input: Input) {
   }
   async function call(target: AgentRouteBinding, reviewer: boolean, repair: boolean, candidate?: Uint8Array, feedback?: string) {
     const started = now();
+    const deadline = started + ADMISSION_MS;
+    const local = target === b.vm1201 || target === b.bellPc;
     if (!await eligible(target)) return null;
     const metadata = { provider: target.provider, model: target.model, connection_id: target.connectionId,
       candidate_attempt: candidateAttempts, repair_attempt: repairAttempts, reviewer_attempt: reviewerAttempts, fallback_reason: fallbackReason };
+    if (local && now() >= deadline) {
+      input.record?.("result", { ...metadata, admission_state: "full", latency_ms: Math.max(0, Math.round(now() - started)) });
+      return { admission: "full" as const, response: undefined, bytes: new Uint8Array() };
+    }
     if (!live() || input.beforeDispatch && !input.beforeDispatch(metadata)) { stopped = true; return null; }
-    const local = target === b.vm1201 || target === b.bellPc;
     const abort = new AbortController();
     const cancel = () => abort.abort();
     input.signal?.addEventListener("abort", cancel, { once: true });
     let admitted = false, submitted = false, expired = false;
-    const timer = local ? setTimeout(() => { expired = true; cancel(); }, Math.max(0, started + ADMISSION_MS - now())) : null;
+    const checkAdmission = () => {
+      if (local && !admitted && (expired || now() >= deadline)) { expired = true; cancel(); }
+      abort.signal.throwIfAborted();
+    };
+    const timer = local ? setTimeout(() => { expired = true; cancel(); }, Math.max(0, deadline - now())) : null;
+    const onAdmitted = () => {
+      // Recheck the absolute clock even if the event-loop timer has not fired.
+      // Abort the native body on expiry without stranding an already returned Response.
+      try { checkAdmission(); } catch { return; }
+      admitted = true;
+      if (timer) clearTimeout(timer);
+    };
     // Cross-worker latch commits are observed while I/O is pending. Never settle a
     // claim until the underlying dispatch AND body consumption have settled.
     const watcher = input.canContinue ? setInterval(() => { if (!live()) cancel(); }, 50) : null;
     let admission: Admission = "failed", response: Response | undefined, bytes = new Uint8Array();
     let release: (() => void) | undefined;
     try {
+      checkAdmission();
       if (local) {
-        try { release = await acquire("agent-local:" + target.connectionId, { maxConcurrency: 2, maxQueueSize: 0, timeoutMs: Math.max(0, started + ADMISSION_MS - now()) }); }
+        try { release = await acquire("agent-local:" + target.connectionId, { maxConcurrency: 2, maxQueueSize: 0, timeoutMs: Math.max(0, deadline - now()) }); }
         catch { admission = "full"; throw new Error("agent_route_local_full"); }
       }
-      abort.signal.throwIfAborted();
-      const result = await input.dispatch(target, { reviewer, repair, local, candidate, feedback, signal: abort.signal, evidence: dispatchEvidence,
+      checkAdmission();
+      const result = await input.dispatch(target, { reviewer, repair, local, candidate, feedback, signal: abort.signal, evidence: dispatchEvidence, checkAdmission,
         onSlots: busy => input.record?.("result", { ...metadata, busy_slots: busy, processing_requests: busy }),
-        onSubmitted: () => { submitted = true; }, onAdmitted: () => { admitted = true; if (timer) clearTimeout(timer); },
+        onSubmitted: () => { checkAdmission(); submitted = true; }, onAdmitted,
         ...(input.alias === "agent/high" && target === b.vm1201 ? { reasoningEffort: "xhigh" as const } : target.reasoningEffort ? { reasoningEffort: target.reasoningEffort } : {}),
       });
       response = result instanceof Response ? result : result.response;
+      if (result instanceof Response || result.admission === "admitted") onAdmitted();
       admission = expired && !admitted ? "full" : result instanceof Response ? "admitted" : result.admission;
-      if (admission === "admitted") { admitted = true; if (timer) clearTimeout(timer); }
       bytes = new Uint8Array(await response.arrayBuffer());
     } catch { admission = expired && !admitted ? "full" : admitted || submitted ? "admitted" : admission === "full" ? "full" : "offline"; }
     finally {
@@ -122,7 +139,8 @@ export async function runAgentRoute(input: Input) {
     if (!live()) { stopped = true; return null; }
     return { admission, response, bytes };
   }
-  const candidates = input.alias === "agent/high" ? [b.vm1201, b.codex, b.strongChineseReviewers[0]] : [b.vm1201, ...b.free, b.codexNormal, b.cheapChineseReviewers[0]];
+  const chineseCandidates = input.alias === "agent/high" ? b.strongChineseReviewers : b.cheapChineseReviewers;
+  const candidates = input.alias === "agent/high" ? [b.vm1201, b.codex, ...chineseCandidates] : [b.vm1201, ...b.free, b.codexNormal, ...chineseCandidates];
   for (let index = 0; index < candidates.length && live(); index++) {
     const target = candidates[index];
     if (!target) continue;
@@ -134,6 +152,9 @@ export async function runAgentRoute(input: Input) {
       if (!result) break;
       if (target === b.vm1201 && input.alias === "agent/normal" && ["full", "offline"].includes(result.admission)) candidates.splice(index + 1, 0, b.bellPc);
       if (result.admission !== "admitted") { fallbackReason = result.admission; break; }
+      // Eligibility scanning is not an additional Chinese candidate budget.
+      // Once one is admitted, technical/quality failure ends this final stage.
+      if (chineseCandidates.includes(target)) candidates.length = index + 1;
       prior = result.bytes;
       if (!result.response?.ok) { feedback = "The prior attempt failed technically. Produce a complete valid result for the original task."; fallbackReason = "technical_failure"; continue; }
       let semantic: { output: Uint8Array; toolNames: string[]; promptTokens?: number; completionTokens?: number };

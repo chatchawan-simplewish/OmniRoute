@@ -1,0 +1,50 @@
+[
+  {
+    "Path": "open-sse/services/agentRouteObjectives.ts",
+    "Hash": "9D8597673A2BD8AC3E06D710F54D544A5E52D141CF1619AE3E1793DAB4F294CB"
+  },
+  {
+    "Path": "open-sse/services/agentRoute.ts",
+    "Hash": "E95CE6AE5421B8206FC72A8E54BA84E2749BACE63EC0E03CC28259439E73E48A"
+  },
+  {
+    "Path": "open-sse/services/codexQuotaFetcher.ts",
+    "Hash": "C53380D96A8ACF46C1146E15BCCF049A6506D7604FDBCF90836FB2551E98B1A0"
+  },
+  {
+    "Path": "src/app/api/v1/agent-routes/events/route.ts",
+    "Hash": "8680BEDFA33DE0707BFFE4795E377FECF5F23077D35F1E5936FFC3A210B03396"
+  },
+  {
+    "Path": "src/app/api/v1/models/catalog.ts",
+    "Hash": "75870D0C1A24836CD9679C6E9275EDFB101B305409BEF0D4F122E4507C1C6553"
+  },
+  {
+    "Path": "src/lib/db/agentRouteRuns.ts",
+    "Hash": "C4F3C7F2B2879E9BA70CBC1FE43E2B6BB6250095192B4DCCDF8CDB2A4EEC4FCB"
+  },
+  {
+    "Path": "src/lib/db/migrations/134_agent_route_runs.sql",
+    "Hash": "99F0EBF7D83B068560229392853F678790801C7FF4C7BE52793EDBAEDB908A3B"
+  },
+  {
+    "Path": "src/lib/localDb.ts",
+    "Hash": "5A6AA5F7B58774CE2C092C948F0D9542F92D8BFD961AD030DE9C9689DAC3697F"
+  },
+  {
+    "Path": "tests/unit/api/agent-route-events.test.ts",
+    "Hash": "69EAD8B104FD7206DD7993A5EF1770B410D6327305A604904D3DC29375BA53CC"
+  },
+  {
+    "Path": "tests/unit/api/models-agent-route-aliases.test.ts",
+    "Hash": "82D3A1730D3794191ACA41071176662501E2A8899E805A1B1CB03A28E14EE7E7"
+  },
+  {
+    "Path": "tests/unit/db/agent-route-runs.test.ts",
+    "Hash": "B38898029AACD99F7E70CBB5D84C521E75C6EDC465D3D3C4A584350C51894E75"
+  },
+  {
+    "Path": "tests/unit/services/agent-route.test.ts",
+    "Hash": "1E3C60039DBE5817150BE026273CB4348A9B1F95B2492B9908F18D4FB4B58535"
+  }
+]

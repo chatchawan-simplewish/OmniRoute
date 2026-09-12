@@ -26,7 +26,7 @@ This new source worktree is exclusively owned by the current task. All prior sou
 
 - [x] Create isolated source worktree from accepted routing baseline.
 - [x] Reconcile latest server/client acceptance and spent-gate ownership records.
-- [ ] Independently review fresh discovery scope and pin live runtime/authentication metadata.
+- [x] Independently review fresh discovery scope and pin live runtime/authentication metadata.
 
 ## Phase 2 — complete candidate (three tasks)
 
@@ -48,9 +48,9 @@ This new source worktree is exclusively owned by the current task. All prior sou
 
 ## Current state
 
-Phase 1: 2/3. Phase 2: 0/3. Phase 3: 0/3. Phase 4: 0/3.
+Phase 1: 3/3. Phase 2: 0/3. Phase 3: 0/3. Phase 4: 0/3.
 Live switching is NOT PROVEN; no live mutation or inference probe has occurred in this implementation run.
-Next: independently re-review and execute narrowed read-only discovery; complete the manual source port and review it.
+Next: close the Codex app-server attempt-accounting finding, preserve Gemini behavior, and finish the scoped caller credential diagnosis. Live client deployment remains subject to the ownership boundary in `auto-switch-client-ownership-20260912.md`.
 
 ## Recovered evidence and current ownership
 
@@ -60,4 +60,9 @@ Next: independently re-review and execute narrowed read-only discovery; complete
 - Old D1-D4 and D6-D8 are spent; D5 is blocked. D9 is obsolete after the host move. Old rollout lane remains read-only under its previous owner.
 - Source port assigned to `/root/runtime_port` (Terra Medium) exclusively in `.worktrees/omniroute-auto-switch-runtime-20260912`, baseline `820ead300f0c03e17a87fbaa7e22e81d72faeeeb` (3.8.50 and accepted audit fix). This separate Git worktree is owned by the current task with the subagent as its sole source writer. The coordinator writes only this plan/discovery worktree while that implementation is active.
 - No generic cherry-pick: the accepted routing delta conflicts with newer auth, handler and DB architecture. Port behavior without replacing newer files wholesale.
-- Discovery review round 1 found excess API-key row metadata and incomplete SSH pins. Both were corrected; script `e53d0e0cd31af70fd6a9511cc8a7fe638ddfb2ffbaba4dc4d6c15ef5e54d8f03` passes the offline secret-exclusion/ambiguous-target check. Independent re-review pending.
+- Discovery review round 1 found excess API-key row metadata and incomplete SSH pins. Both were corrected; script `e53d0e0cd31af70fd6a9511cc8a7fe638ddfb2ffbaba4dc4d6c15ef5e54d8f03` passes the offline secret-exclusion/ambiguous-target check. Independent Sol High re-review PASS; exact pins checked and read executed successfully. See `auto-switch-live-discovery-result-20260912.md`.
+- Live r3 remains healthy; no agent_route tables and no static inference-key env fallback. This proves no active controller persistence, not invalid upstream credentials.
+- Public current catalog no longer lists GLM-5.2 Free. New candidate JSON proposes Nex N2.5 Pro Free as replacement, with independent review and live qualification pending. No live binding changed.
+- Runtime port `c70211160bae5237be4dfd7c8bb9e2894d757492`, report-only HEAD `61665339353191db4b1e8321a27a63ed76183bdd`, passed six unit/API/DB cases and eight integration cases. Type comparison introduced zero diagnostics against the pinned baseline. Independent Sol High review found one P1: Codex app-server bypasses submitted-attempt hooks and can cause a post-send error to be treated as no attempt. Original implementer owns the fail-closed fix; other requested gates passed review. Acceptance remains pending.
+- Reviewed direct metadata GET returned HTTP401; no forwarding defect is established. See `auto-switch-auth-result-20260912.md`. A separately reviewed hash-only metadata diagnosis is being prepared; no upstream credential rotation or authentication bypass is justified.
+- Exact model binding candidate passed independent review as an offline proposal only. Provider generation, per-connection eligibility, tool behavior and subscription quota remain unproven.

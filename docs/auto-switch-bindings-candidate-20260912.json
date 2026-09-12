@@ -1,0 +1,70 @@
+{
+  "vm1201": {
+    "provider": "llama-cpp",
+    "model": "qwen3.8-27b",
+    "connectionId": "eb57393b-f559-4acf-aac6-3eb4612e6d1f"
+  },
+  "bellPc": {
+    "provider": "lm-studio",
+    "model": "qwen3.8-27b-unsloth-ud-q4ks",
+    "connectionId": "da74225c-0fc0-45ce-ad22-ded85edb34b8"
+  },
+  "free": [
+    {
+      "provider": "openrouter",
+      "model": "cohere/north-mini-code:free",
+      "connectionId": "441b80a8-0dd8-4d6b-af31-f0e829f500d8"
+    },
+    {
+      "provider": "openrouter",
+      "model": "nex-agi/nex-n2.5-pro:free",
+      "connectionId": "441b80a8-0dd8-4d6b-af31-f0e829f500d8"
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "connectionId": "441b80a8-0dd8-4d6b-af31-f0e829f500d8"
+    }
+  ],
+  "codexNormal": {
+    "provider": "codex",
+    "model": "gpt-5.6-terra",
+    "reasoningEffort": "medium",
+    "connectionId": "8f92f200-d280-47b3-b380-2d94be0a4b75"
+  },
+  "codex": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "reasoningEffort": "high",
+    "connectionId": "8f92f200-d280-47b3-b380-2d94be0a4b75"
+  },
+  "cheapChineseReviewers": [
+    {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "connectionId": "c9cf9beb-d5bf-4d47-b65e-e219ea4206b9"
+    },
+    {
+      "provider": "openrouter",
+      "model": "z-ai/glm-5.3-flash",
+      "connectionId": "c9cf9beb-d5bf-4d47-b65e-e219ea4206b9"
+    }
+  ],
+  "strongChineseReviewers": [
+    {
+      "provider": "openrouter",
+      "model": "moonshotai/kimi-k3",
+      "connectionId": "c9cf9beb-d5bf-4d47-b65e-e219ea4206b9"
+    },
+    {
+      "provider": "openrouter",
+      "model": "z-ai/glm-5.3",
+      "connectionId": "c9cf9beb-d5bf-4d47-b65e-e219ea4206b9"
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3.8-2.4t-a95b",
+      "connectionId": "c9cf9beb-d5bf-4d47-b65e-e219ea4206b9"
+    }
+  ]
+}

@@ -13,6 +13,8 @@ SOURCE = "dc53bcfed67b3bbea7d2fbf82468342e573dadb3"
 IID = "sha256:a91994bf883698d4520ff048d16be999d4614331a528c76c0b95bc6dc8bec803"
 TAG = "omniroute-auto-switch-r2:" + SOURCE
 BUILDER_ARCHIVE = "/var/tmp/omniroute-auto-switch-image-transfer-20260912/image.tar"
+ARCHIVE_BYTES = 1117870592
+ARCHIVE_SHA256 = "ef45e7734e64280cbe9ca9bbbd8a950f350c028c50e9b02c55ab0e48801abb15"
 TARGET_ROOT = "/var/tmp/omniroute-auto-switch-image-transfer-r3-20260912"
 LOCAL = ROOT / "scripts/auto-switch-image-transfer-r3-20260912"
 CONTRACT = ROOT / "docs/auto-switch-image-transfer-contract-r3-20260912.md"
@@ -116,7 +118,8 @@ def image():
 if role=='builder':
  p=pathlib.Path(archive); assert p.is_file() and not p.is_symlink()
  size=p.stat().st_size; assert size>0
- print(json.dumps({'size':size,'sha256':file_hash(p)}))
+ sha=file_hash(p); assert size==int(expected_size) and sha==expected_sha
+ print(json.dumps({'size':size,'sha256':sha}))
 elif role=='target-preflight':
  require_private(target,False); absent(); live(); print(json.dumps({'containerd_path_proven':capacity(int(expected_size))}))
 elif role=='target-load':
@@ -136,7 +139,8 @@ def remote(stage, host, role, archive, size=0, digest="none"):
 
 def review_payload():
     return {"schema": "auto-switch-image-transfer-r3/v1", "source": SOURCE, "image": IID,
-            "tag": TAG, "builder_archive": BUILDER_ARCHIVE, "target_root": TARGET_ROOT,
+            "tag": TAG, "builder_archive": BUILDER_ARCHIVE, "archive_bytes": ARCHIVE_BYTES,
+            "archive_sha256": ARCHIVE_SHA256, "target_root": TARGET_ROOT,
             "launcher_sha256": sha256(pathlib.Path(__file__)), "contract_sha256": sha256(CONTRACT),
             "oci_helper_sha256": sha256(HELPER), "old_spent_launcher_sha256": OLD_SPENT_LAUNCHER_SHA256}
 
@@ -158,10 +162,12 @@ def execute(reviewed):
     verify_review(reviewed)
     if sha256(HELPER) != HELPER_SHA256:
         raise Stop("pins:oci_helper_drift")
-    info = remote("builder_archive_probe", "192.168.1.147", "builder", BUILDER_ARCHIVE)
+    info = remote("builder_archive_pin", "192.168.1.147", "builder", BUILDER_ARCHIVE,
+                  ARCHIVE_BYTES, ARCHIVE_SHA256)
     if set(info) != {"size", "sha256"} or type(info["size"]) is not int or info["size"] <= 0:
         raise Stop("builder_archive_metadata:invalid")
-    if not re.fullmatch(r"[0-9a-f]{64}", info["sha256"]): raise Stop("builder_archive_hash:invalid")
+    if info != {"size": ARCHIVE_BYTES, "sha256": ARCHIVE_SHA256}:
+        raise Stop("builder_archive_pin:mismatch")
     verify_archive_with_helper("192.168.1.147", BUILDER_ARCHIVE)
     if LOCAL.exists() or LOCAL.is_symlink(): raise Stop("local_path_absence:failed")
     if shutil.disk_usage(ROOT).free < info["size"] * 2 + 1073741824: raise Stop("local_capacity:failed")

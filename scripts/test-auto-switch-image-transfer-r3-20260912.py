@@ -37,6 +37,10 @@ with patch.object(namespace["subprocess"], "run", unexpected):
         pass
     else:
         raise AssertionError("unexpected Docker inspect error must stop")
-assert "print(json.dumps({'size':size,'sha256':file_hash(p)}))" in module.REMOTE
+assert "assert size==int(expected_size) and sha==expected_sha" in module.REMOTE
 assert "capacity(size)" not in module.REMOTE.split("if role=='builder':", 1)[1].split("elif role=='target-preflight':", 1)[0]
+assert module.ARCHIVE_BYTES == 1117870592
+assert module.ARCHIVE_SHA256 == "ef45e7734e64280cbe9ca9bbbd8a950f350c028c50e9b02c55ab0e48801abb15"
+assert 'assert size==int(expected_size) and sha==expected_sha' in module.REMOTE
+assert module.review_payload()["archive_sha256"] == module.ARCHIVE_SHA256
 print("IMAGE_TRANSFER_R3_LOCAL_CHECK_PASS")

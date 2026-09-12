@@ -2,12 +2,35 @@
 
 Current coordinator task: `01a09361-8143-73d3-adb7-15043355276b`. This records state; it does not transfer live authority or create another task.
 
-## Current checkpoint: R3 startup PASS; qualification-key review
+## Current checkpoint: R2 key readback validation stopped; R3 safely stopped
+
+- R2 setup is spent: `CANDIDATE_KEY_R2_STOP` at `readback`, validation category, HTTP status null. PATCH returned 200 with exact corrected echo; exhaustive effective restrictions remain unproved. New key ID `f3b390f7-98b5-4819-87b7-ad48ca4fdfb6`; prior orphan inactive readback passed. Candidate started and was confirmed stopped; no secret store/delivery stage was reached. Result `docs/auto-switch-candidate-key-r2-result-20260912.md`, SHA256 `7b37aace0d125f9e98196203734fab9fe09f5b7d96b5ba073401cbff0f43e5ee`.
+- Do not restart, retry or create another key from this spent gate. Original author now diagnoses the complete native create/PATCH/GET flow and must prove a real native database/API roundtrip before a replacement. runtime_port independently compares native defaults/serialization against readback expectations. Provider runner remains unbound; no egress or generation has occurred. Progress remains 7/12.
+
+- Disposable native POST/PATCH/GET roundtrip at dc53 passed HTTP 201/200/200 and found the sole expected-value mismatch: `ipAllowlist` is native `null`, not `[]`. Independent source review confirmed `getApiKeyById` leaves the nullable column unparsed; blocked models and quotas do normalize to empty arrays. This identifies the checker defect without changing the spent remote result. Original author prepares minimal R3 replacement with full native roundtrip expectations and mismatch-field-name-only diagnostics, preserving all spent bytes and restrictions.
+
+The earlier R1 failure and R2 preparation below are historical.
+
+- The sole key setup stopped at `patch`; spent, no retry. Result `docs/auto-switch-candidate-key-result-20260912.md`, SHA256 `e451e04ad350ee7d3e9b9042a84b9077449a206f7719113da778cc8c9da87f85`. Key ID `2620aa90-c44d-4317-b690-c4c8c8011ff3` was created after Codex inactive readback, but final restrictions are unproved. Store stage was never reached; no secret was delivered. Exact R3 candidate is confirmed stopped. No HTTP error category survived; only the fixed stage was retained.
+- Original author is tracing the request against native source to establish the cause before a separately reviewed replacement. Preserve spent launcher/contract/result bytes. No provider egress, generation or live client changes have occurred. Progress remains 7/12.
+
+- Source cause is now confirmed: native `updateKeyPermissionsSchema` strips `blockedModels` (24 input fields become 23), while the spent checker expected it in the PATCH echo. This proves the checker defect, not the remote PATCH outcome. hermes_final_review prepares a new R2 setup using exact retained candidate, one reviewed start, native deactivation/readback of the known unused key, unique replacement name/store, corrected PATCH and exhaustive GET readback. No replacement execution yet.
+
+- R2 replacement is prepared and under authority_audit independent review: launcher `fe0b44cf6348636811b8607c1df8fabcd1804d34836f56d8c15d6de38fdd6f51`, contract `f4baa5f8e4db1a43839ac7cc568f039c367a4dac726b1054e61d90c62864158f`. Three focused checks including actual native schema parse passed; spent artifacts remain unchanged. Root alone dispatches execution after review PASS.
+- Provider qualification plan now covers Q6/Q4 and all eight OpenRouter bindings. Read-only metadata proved Q6 `http://192.168.1.143:8000/v1`, Q4 `http://bell-cloudflare-proxy:20129/v1`. Q4 proxy has no host publication, so proposed companion uses existing `omniroute-internal` (`baf515e5b9c139e2233df62323a46b50ddc97b99f4c3d427b3ae9b460df9de1c`), zero published ports and native authentication, explicitly sharing trusted-container reachability. No proxy/live changes or guessed none-to-bridge transition. hermes_final_review prepares the new runner/contract only, pending key-R2 PASS and independent security review.
+- runtime_port owns only the new provider qualification plan; authority_audit is idle after reporting the spent setup. VM105 owner was asked for read-only clarification of a separate candidate-consumer boundary; no deployment or live authority was requested or transferred.
+
+- VM105 clarification returned at `2c66337bf8caebe5c8ec035dbae4f26c2578eec2`, `docs/handoffs/vm105-omniroute-client-boundary-20260912.md` in its authoritative worktree. A separate isolated consumer and synthetic endpoint can prove frozen protocol behavior without touching the blocked native bridge. Final composition/provider routing remains unproved and needs explicit narrow consumer/stage/receipt-correlation lane transfer; pilot/home, systemd, firewall, bridge, credentials, GPU and power remain excluded. No VM action occurred.
+
+The R3 startup and key review history below is superseded by this stopped state.
 
 - R3 startup passed once. Candidate `6b1089d2b14c175448ca48437e63a7ea0f880deb6374eee26ebf8bc96f498663`, name `omniroute-auto-switch-candidate-r3-20260912`, is healthy with network none and zero published ports. Result `docs/auto-switch-candidate-start-r3-result-20260912.md`, SHA256 `be622186c4f63a901d626f0ca7e7e5442ebc418e0babc3458874189d37c72aad`. Do not rerun startup. Progress remains 7/12; provider generation and live switching are not yet proved.
 - Key setup is bound to R3 and awaiting independent authority_audit review. Launcher SHA256 `7193f204ccd193ee214924eb27a057cf2304e1462506364b11aaae2caff189e1`; contract `b44281b5fba67d9ca4b7d8b536037c098f3727d583c22b49ed0da89b2d7499c6`. Candidate-only Codex disable/readback precedes native key creation; protected root-owned parent 0700 and exclusive file 0600. Four focused checks passed. No key setup execution or egress has occurred.
 - Source tracing confirms catalog warmup cannot refresh OAuth. Existing `OMNIROUTE_DISABLE_CREDENTIAL_HEALTH_CHECK=1` disables the separate credential scheduler: its native truth-value set includes `1`. No candidate restart or flag change is needed.
 - Next: independent key review, sole reviewed setup execution, then reviewed provider egress and forced Qwen/OpenRouter qualification. Defer Codex until an exclusive OAuth lifecycle boundary. Both-client rollout remains pending, including VM105's separate live ownership boundary.
+
+- Key review subsequently passed: review `623e007d3e97aaba3079970bd5da242808204026ff13388eb96f07f227d66b38`, pins `2d51a2ca9c8f62539618926274c3a31eddeba305470c38e48456c10182b4870f`. Root dispatched the sole execution to authority_audit; outcome pending. Do not duplicate dispatch.
+- Hermes rollout reuse check found no VM104-specific installer/rollback asset. `scripts/release.py` publishes GitHub releases and is unsuitable. The accepted runtime delta from 693641 to 9098efc has 13 source paths; future activation must preserve exact live preimages and revalidate that scope. Existing `tests/agent/test_omniroute_protocol.py` and `test_omniroute_steps.py` provide the already-passing offline protocol checks; they do not establish live rollout acceptance.
 
 The earlier checkpoint below is historical where superseded by the R3 PASS above.
 

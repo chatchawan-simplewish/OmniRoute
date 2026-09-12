@@ -5,6 +5,8 @@ Source worktree: `.worktrees/omniroute-auto-switch-20260912`.
 Baseline: `066a32e9fcb5aa47f73aade21d1a0fbba73cfe4e`.
 User instruction: "start implement Full automatic model switching unattended".
 
+Current checkpoint (2026-09-13 Bangkok): 7/12. Provider R1/R2 are spent before generation. Catalog-only diagnosis passed and identified 20 native synced-effort variants rejected by the checker; native --timeout fixes the shutdown-output assertion. Provider R3 is in preparation/review with fresh result identity and no key/image rebuild. The native DSH dummy credential-pipe fixture passed on pinned Node 24 in an isolated container. Live switching remains disabled; the active handoff records exact pins and remaining client rollout boundaries.
+
 ## Scope and authority
 
 Reuse the approved `docs/superpowers/specs/2026-08-29-omniroute-agent-routing-design.md` in the project root and subsequent reviewed routing/client corrections. Explicit `agent/normal` and `agent/high` remain the interface. Automatic difficulty classification is not included.
@@ -36,7 +38,7 @@ This new source worktree is exclusively owned by the current task. All prior sou
 
 ## Phase 3 — qualify and bind (three tasks)
 
-Current checkpoint: isolated R3 startup passed, but the R2 key setup stopped at final metadata validation after a successful PATCH. R3 is safely stopped; no key was delivered. Native CRUD roundtrip diagnosis is required before a replacement. No provider generation or live switching acceptance yet. See `auto-switch-handoff-20260912.md` for current evidence and remaining ownership boundaries.
+Current checkpoint: qualification key R3 passed complete native restrictions and protected storage. Earlier unused keys and candidate Codex are inactive; R3 is running network-none. Provider qualification runner preparation is active; no provider generation or live switching acceptance yet. See `auto-switch-handoff-20260912.md` for current evidence and remaining ownership boundaries.
 
 - [x] Prepare/review exact connection/model bindings and fail-closed quota evidence.
 - [ ] Qualify eligible providers through the intended inference path under a fresh reviewed contract.
@@ -52,7 +54,7 @@ Current checkpoint: isolated R3 startup passed, but the R2 key setup stopped at 
 
 Phase 1: 3/3. Phase 2: 3/3. Phase 3: 1/3. Phase 4: 0/3 (7/12).
 Live switching is NOT PROVEN; no live mutation or inference probe has occurred in this implementation run.
-Next: diagnose the retained stopped candidate, then review a replacement based on its actual startup failure. The first candidate-start gate failed at `server_health` and is spent; no provider qualification has occurred. R4 image transfer passed with exact IID/tag/archive pins and the live service unchanged. The storage key was located in `/app/data/server.env`; its value was not exposed. Gateway Codex/Gemini safety fixes remain accepted. The live-compatible Hermes port independently passes at `9098efc055a186c862f189022417d9f553b2bee7` on verified live source base `693641aa8b4359c602283bdbbc14041e03bc47bc`: 61 focused tests plus the new relay-cleanup regression passed. This closes source acceptance only. DeepSeek source/package assessment was transferred to this coordinator; live deployment and both-client acceptance remain Phase 4 work with the recorded ownership boundaries.
+Next: independently review the provider qualification replacement starting from the confirmed stopped R3 candidate. Startup R3 and restricted key R3 passed; provider qualification R1 then stopped before companion creation or inference and is spent. R4 image transfer passed with exact IID/tag/archive pins and the live service unchanged. Gateway Codex/Gemini safety fixes remain accepted. The live-compatible Hermes port independently passes at `9098efc055a186c862f189022417d9f553b2bee7` on verified live source base `693641aa8b4359c602283bdbbc14041e03bc47bc`: 61 focused tests plus the relay-cleanup regression passed. This closes source acceptance only. VM105's conditional transfer permits isolated synthetic staging from frozen installed bytes, not live provider-backed deployment. Live rollout and both-client acceptance remain Phase 4 work with those ownership boundaries.
 
 ## Recovered evidence and current ownership
 

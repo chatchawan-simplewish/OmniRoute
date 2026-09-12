@@ -36,6 +36,8 @@ This new source worktree is exclusively owned by the current task. All prior sou
 
 ## Phase 3 — qualify and bind (three tasks)
 
+Current checkpoint: isolated R3 startup PASS, network none and no published ports; qualification key is prepared and under independent review. No provider generation or live switching acceptance yet. See `auto-switch-handoff-20260912.md` for current evidence and remaining ownership boundaries.
+
 - [x] Prepare/review exact connection/model bindings and fail-closed quota evidence.
 - [ ] Qualify eligible providers through the intended inference path under a fresh reviewed contract.
 - [ ] Prove the routing matrix on an isolated candidate, including authorization and replay boundaries.

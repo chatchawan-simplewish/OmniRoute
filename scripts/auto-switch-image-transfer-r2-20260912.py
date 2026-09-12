@@ -17,7 +17,7 @@ TARGET_ROOT = "/var/tmp/omniroute-auto-switch-image-transfer-r2-20260912"
 LOCAL = ROOT / "scripts/auto-switch-image-transfer-r2-20260912"
 CONTRACT = ROOT / "docs/auto-switch-image-transfer-contract-r2-20260912.md"
 HELPER = ROOT / "scripts/auto-switch-oci-identity-20260912.py"
-HELPER_SHA256 = "6bf5248b2859b87bc422784342751aa7b91ae95ed530039e7da6f11b6c7eca01"
+HELPER_SHA256 = "7f822582a2ef5ce6c515ba002c7523b787cc3703e255ce5ec1cd0dca6bfc662a"
 OLD_SPENT_LAUNCHER_SHA256 = "7776a680ade8940ece3a47dc5feb154e0ef27209a07897674d309ea6f7822279"
 SSH = r"C:\WINDOWS\System32\OpenSSH\ssh.exe"
 SCP = r"C:\WINDOWS\System32\OpenSSH\scp.exe"
@@ -53,11 +53,13 @@ def run(stage, args, payload=None, timeout=1800):
 REMOTE = r'''
 import hashlib,json,os,pathlib,re,shutil,subprocess,sys
 role,archive,expected_size,expected_sha,iid,tag,target=sys.argv[1:]
+TARGET_ROLES=('target-preflight','target-load')
+assert role in ('builder',)+TARGET_ROLES
 def cmd(args, timeout=120):
  r=subprocess.run(args,capture_output=True,timeout=timeout)
  if r.returncode: raise AssertionError('command')
  return r.stdout.decode()
-def docker(args): return cmd((['sudo','-n'] if role=='target' else [])+['docker']+args)
+def docker(args): return cmd((['sudo','-n'] if role in TARGET_ROLES else [])+['docker']+args)
 def file_hash(p):
  h=hashlib.sha256()
  with open(p,'rb') as f:
@@ -78,11 +80,11 @@ def derived_containerd_root():
  ps=cmd(['sudo','-n','ps','-eo','args='],20).splitlines()
  matches=[x for x in ps if re.search(r'(^|/)containerd( |$)',x) and '--config ' in x]
  assert len(matches)==1
- config=re.search(r'--config\\s+([^\\s]+)',matches[0]).group(1)
+ config=re.search(r'--config\s+([^\s]+)',matches[0]).group(1)
  assert config.startswith('/') and pathlib.Path(config).is_file()
  root=None
  for line in pathlib.Path(config).read_text(encoding='utf-8').splitlines():
-  hit=re.fullmatch(r'\\s*root\\s*=\\s*"([^"]+)"\\s*',line)
+  hit=re.fullmatch(r'\s*root\s*=\s*"([^"]+)"\s*',line)
   if hit: root=hit.group(1); break
  assert root and root.startswith('/')
  return root
@@ -100,8 +102,9 @@ def absent():
  rows=docker(['image','ls','--all','--no-trunc','--format','{{.ID}} {{.Repository}}:{{.Tag}}']).splitlines()
  assert all(not r.startswith(iid+' ') and not r.endswith(' '+tag) for r in rows)
  for ref in [iid,tag]:
-  r=subprocess.run((['sudo','-n'] if role=='target' else [])+['docker','image','inspect',ref],capture_output=True,timeout=20)
-  assert r.returncode==1 and r.stdout==b'[]\\n'
+  r=subprocess.run((['sudo','-n'] if role in TARGET_ROLES else [])+['docker','image','inspect',ref],capture_output=True,timeout=20)
+  allowed=(b'Error response from daemon: No such image: '+ref.encode(),b'Error: No such image: '+ref.encode())
+  assert r.returncode==1 and r.stdout==b'[]\n' and r.stderr.strip() in allowed
 def live():
  row=json.loads(docker(['inspect','omniroute']))[0]
  assert row['Id']=='7b20ca195e3c9e875d0a1ce98832ca469c2a114886335b8466b1467b3ed139bc'

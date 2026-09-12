@@ -5,7 +5,7 @@ Source worktree: `.worktrees/omniroute-auto-switch-20260912`.
 Baseline: `066a32e9fcb5aa47f73aade21d1a0fbba73cfe4e`.
 User instruction: "start implement Full automatic model switching unattended".
 
-Current checkpoint (2026-09-13 Bangkok): 7/12. Provider R1/R2 are spent before generation. Catalog-only diagnosis passed and identified 20 native synced-effort variants rejected by the checker; native --timeout fixes the shutdown-output assertion. Provider R3 is in preparation/review with fresh result identity and no key/image rebuild. The native DSH dummy credential-pipe fixture passed on pinned Node 24 in an isolated container. Live switching remains disabled; the active handoff records exact pins and remaining client rollout boundaries.
+Current checkpoint (2026-09-13 Bangkok): 7/12. Provider R1/R2/R3 are spent before generation. Catalog-only diagnosis passed and identified 20 native synced-effort variants rejected by the checker; native --timeout fixes the shutdown-output assertion. Provider R3 passed catalog and denial checks, then stopped at connection_scope with zero model calls and confirmed companion shutdown. Current key restriction requires read-only diagnosis before any reviewed replacement. The native DSH dummy credential-pipe fixture passed on pinned Node 24 in an isolated container. Hermes security fixes await independent review and isolated Linux regressions. Live switching remains disabled; the active handoff records exact pins and remaining client rollout boundaries.
 
 ## Scope and authority
 
@@ -38,7 +38,7 @@ This new source worktree is exclusively owned by the current task. All prior sou
 
 ## Phase 3 — qualify and bind (three tasks)
 
-Current checkpoint: qualification key R3 passed complete native restrictions and protected storage. Earlier unused keys and candidate Codex are inactive; R3 is running network-none. Provider qualification runner preparation is active; no provider generation or live switching acceptance yet. See `auto-switch-handoff-20260912.md` for current evidence and remaining ownership boundaries.
+Current checkpoint: qualification key R3 passed complete native restrictions and protected storage at setup. Earlier unused keys and candidate Codex are inactive; candidate and latest companion are stopped. Provider R3 singleton restriction outcome is unknown after its spent STOP; read-only diagnosis is active. No provider generation or live switching acceptance yet. See `auto-switch-handoff-20260912.md` for current evidence and remaining ownership boundaries.
 
 - [x] Prepare/review exact connection/model bindings and fail-closed quota evidence.
 - [ ] Qualify eligible providers through the intended inference path under a fresh reviewed contract.

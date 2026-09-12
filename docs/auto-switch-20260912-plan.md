@@ -31,7 +31,7 @@ This new source worktree is exclusively owned by the current task. All prior sou
 ## Phase 2 — complete candidate (three tasks)
 
 - [x] Trace and repair the shared inference authentication path if current evidence confirms a defect.
-- [ ] Reconcile accepted controller/client code with the current provider/audit repair runtime; implement only proven gaps.
+- [x] Reconcile accepted controller/client code with the current provider/audit repair runtime; implement only proven gaps.
 - [x] Run focused acceptance checks and independent source/security review.
 
 ## Phase 3 — qualify and bind (three tasks)
@@ -48,9 +48,9 @@ This new source worktree is exclusively owned by the current task. All prior sou
 
 ## Current state
 
-Phase 1: 3/3. Phase 2: 2/3. Phase 3: 1/3. Phase 4: 0/3.
+Phase 1: 3/3. Phase 2: 3/3. Phase 3: 1/3. Phase 4: 0/3 (7/12).
 Live switching is NOT PROVEN; no live mutation or inference probe has occurred in this implementation run.
-Next: close the Codex app-server attempt-accounting finding, preserve Gemini behavior, and finish the scoped caller credential diagnosis. Live client deployment remains subject to the ownership boundary in `auto-switch-client-ownership-20260912.md`.
+Next: complete the reviewed replacement image transfer and recover the original storage encryption key before private candidate credential qualification. Offline source acceptance is complete: gateway Codex/Gemini safety fixes and Hermes `aa82b0fb468c4c16956051819d23d4f48d1ebc16` independently pass, with 61 focused Hermes tests. This closes source integration only; the accepted DeepSeek source contract remains unchanged. Live client deployment/parity is still gated by `auto-switch-client-ownership-20260912.md` and the tracked overlap in `auto-switch-hermes-live-overlap-20260912.md`, and remains part of Phase 4 acceptance.
 
 ## Recovered evidence and current ownership
 
@@ -70,3 +70,6 @@ Next: close the Codex app-server attempt-accounting finding, preserve Gemini beh
 - Caller authentication diagnosis is complete: the independently reviewed single hash-only diagnostic found exactly one valid admin CLI-token match and zero API-key matches with complete hash coverage. Stored requireLogin is true. Management-only authentication explains the 401; no server forwarding patch or upstream rotation is appropriate. Intended inference credentials still need a separate scoped reviewed contract before qualification. See `auto-switch-auth-metadata-result-20260912.md`.
 - Gemini preservation is committed at `dc53bcfed67b3bbea7d2fbf82468342e573dadb3` with 28 focused tests and scoped lint passing; independent review is pending. Candidate source is frozen for that review.
 - Independent Sol High Gemini review PASS closes candidate source review at `dc53bcfed67b3bbea7d2fbf82468342e573dadb3`; tests were not unnecessarily rerun. Candidate remains frozen. Exporter adaptation separately passed review and produced 5950 regular exact-Git-blob files, archive SHA256 `3cd078f0d025158248e710784c0499b51842d61f788f28e2a96fe589c4c9f440`, manifest SHA256 `c1179f5e5df5c42ec17f4c239e5ea077cd0416a608529b93e273ef0292782452`, with no credential-pattern matches. Image/runtime acceptance and current-client reconciliation remain open.
+- First isolated-build gate is FAILED/SPENT after successful local pin/artifact checks and an immediate launcher error; remote private-root state is unknown, and no build/image success is claimed. Offline regression proved Windows text-mode stdin converts the shell payload to CRLF. A separate byte-safe r2 launcher with a new private root/tag is being prepared; the first attempt is not retried. See `auto-switch-build-result-20260912.md` and `auto-switch-build-stdin-diagnosis-20260912.md`.
+- Current Hermes source baseline `04dd80a977f40b05e5b2054111747af07a61886a` was fetched from its verified public upstream into independent `.worktrees/hermes-auto-switch-20260912`, branch `codex/omniroute-auto-switch-20260912`. Sole source writer `/root/hermes_protocol_finish` replaced the stopped `/root/runtime_port` and is finishing accepted routing semantics on current turn/stream/compression mixins. Protocol tests pass 13/13; steps-suite acceptance and final review are pending. This does not include or overwrite VM104's uncommitted source and grants no live-client release.
+- Separate R2 build completed PASS with immutable IID `sha256:a91994bf883698d4520ff048d16be999d4614331a528c76c0b95bc6dc8bec803`; network-none Chromium/Playwright and SQLite checks passed. R1 remains spent. Image transfer and live candidate startup have not occurred. See `auto-switch-build-result-r2-20260912.md`.

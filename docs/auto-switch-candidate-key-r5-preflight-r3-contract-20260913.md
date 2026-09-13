@@ -1,0 +1,11 @@
+# Candidate key R5 preflight R3 contract — 20260913
+
+**SOURCE ONLY — NOT EXECUTABLE until an independent Sol High review freezes the exact launcher, test, contract, dependencies, and reviewed payload.**
+
+R3 is a fresh repeatable read-only preflight successor. It reuses the frozen R5 candidate/live/image/volume/environment/SQLite/store-absence preconditions and the same strict SSH, in-memory management token, Docker exec stdin, and bounded child-capture path. It performs exactly one ordered GET of `/api/keys`, `/api/combos`, and the exact Codex provider record. It performs no POST, PATCH, key or store creation, provider inference, container mutation, retry, fallback, cleanup, credential rotation, or secret output.
+
+The six native predicates accrue in order: key schema, key-name absence, combo schema, combo-sentinel absence, Codex schema, and Codex inactive. The native child stops after the first failed predicate and emits only fixed HTTP status/category, schema category, completed-step names, failure category, and booleans. The outer remote emitter copies every completed native predicate even on STOP. PASS requires all 17 inherited predicates and all three steps; STOP requires a strict true-prefix followed by at least one false. Timeout, connection loss, output overflow, invalid JSON, contradictory status, or malformed evidence fails closed as UNKNOWN locally.
+
+The launcher pins the accepted e53 source handler bytes for the three response envelopes, frozen R5 source, exact candidate ID, and bounded transport helper. Before SSH it requires normal `PROGRAMDATA`, absent `PYTHONOPTIMIZE`, an in-memory management token of the reviewed shape, exact reviewed-payload equality, and an absent fixed result. It reserves `docs/auto-switch-candidate-key-r5-preflight-result-r3-20260913.json` with `O_EXCL`, writes one bounded canonical PASS/STOP/UNKNOWN receipt, fsyncs, and closes it. The token, response bodies, key rows, provider row, and secret values never enter output or evidence.
+
+The previous R5 preflight receipts and one-GET diagnostic remain immutable and spent. An R3 PASS would establish only the named read-only preconditions at observation time; it would not create a qualification key or authorize hardware traffic.

@@ -1,0 +1,7 @@
+# Candidate key R5 preflight STOP diagnosis correction — 20260913
+
+The earlier local diagnosis correctly identified that the frozen R5 preflight collapses native evidence, but its statement that `/api/combos` and the Codex GET were not reached was unsupported. In `scripts/auto-switch-candidate-key-r5-20260913.py`, the Node program sets six local booleans as each ordered request succeeds, but the enclosing Python copies those booleans into the outer receipt only after the Node child reports complete success. Any first, second, or third native failure therefore leaves all six outer booleans false.
+
+The successful spent one-GET receipt proves that `/api/keys` returned HTTP 200 with the expected keys/total/allowKeyReveal envelope and no R5 key name at that observation time. It does not prove what happened during either frozen R5 preflight invocation, nor does it prove the combo or Codex predicates. Static comparison found no difference in the first GET's base64 token decoding, Authorization/Accept headers, Node stdin/EOF delivery, timeout, response-body completion, JSON parsing, or expected e53 schema.
+
+The earliest unresolved step is therefore the ordered native sequence itself, beginning with `/api/keys` for each historical invocation and then `/api/combos` and the Codex provider record. The minimum successor is one fresh, reviewed, read-only preflight that preserves the six native step results as they accrue and stops after the first failure. No authentication, transport, or mutation change is justified by the current evidence.

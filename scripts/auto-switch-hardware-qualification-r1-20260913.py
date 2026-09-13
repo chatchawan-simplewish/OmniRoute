@@ -612,7 +612,7 @@ IDS=__IDS__;INDEX=__INDEX__
 class Stop(Exception):pass
 class Unknown(Exception):pass
 def minimal(status):
- print(json.dumps({'status':status,'index':INDEX,'http_status':None,'content_valid':False,'selected_connection_id':None,'resolved_provider':None,'resolved_model':None,'candidate_attempt':None,'reviewer_verdict':None,'fallback_reason':None},sort_keys=True));raise SystemExit(2 if status=='REQUEST_UNKNOWN' else 1)
+  print(json.dumps({'status':status,'index':INDEX,'http_status':None,'content_valid':False,'request_id':None,'selected_connection_id':None,'resolved_provider':None,'resolved_model':None,'candidate_attempt':None,'reviewer_verdict':None,'fallback_reason':None},sort_keys=True));raise SystemExit(2 if status=='REQUEST_UNKNOWN' else 1)
 try:
  rc,out,err=bounded_capture(['docker','container','inspect',COMPANION],None,30)
  if rc or err:raise Stop()
@@ -628,7 +628,7 @@ try:
   if (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns)!=(opened.st_dev,opened.st_ino,opened.st_size,opened.st_mtime_ns):raise Stop()
  finally:os.close(fd)
  if not re.fullmatch(rb'sk-[0-9a-f]{16}-[0-9a-f]{6}-[0-9a-f]{8}',key):raise Stop()
- node=r"""const http=require('node:http');const key=Buffer.from('__KEY__','base64').toString();const ids=__NODE_IDS__;const body=Buffer.from(JSON.stringify({model:'agent/normal',stream:false,messages:[{role:'user',content:'Produce a detailed complete technical explanation of safe concurrent queue admission without tools.'}],omniroute_route:{checks:[{kind:'nonempty'}]}}));const headers={authorization:'Bearer '+key,'content-type':'application/json','content-length':String(body.length),'x-request-id':ids.request_id,'x-omniroute-task-id':ids.task_id,'x-omniroute-run-id':ids.run_id,'x-omniroute-turn-id':ids.turn_id,'x-omniroute-idempotency-key':ids.idempotency_key,'x-omniroute-review-class':'standard'};const req=http.request({host:'127.0.0.1',port:20128,path:'/v1/chat/completions',method:'POST',headers},res=>{let n=0,a=[];res.on('data',c=>{n+=c.length;if(n>1048576)req.destroy();else a.push(c)});res.on('end',()=>{let v=null;try{v=JSON.parse(Buffer.concat(a).toString('utf8'))}catch{};const valid=res.statusCode===200&&v&&Array.isArray(v.choices)&&v.choices.length>0&&v.choices.every(x=>x&&x.message&&typeof x.message.content==='string'&&x.message.content.length>0);process.stdout.write(JSON.stringify({status:res.statusCode,content_valid:!!valid,selected_connection_id:res.headers['x-omniroute-selected-connection-id']||null,resolved_provider:res.headers['x-omniroute-resolved-provider']||null,resolved_model:res.headers['x-omniroute-resolved-model']||null,candidate_attempt:Number(res.headers['x-omniroute-candidate-attempt']),reviewer_verdict:res.headers['x-omniroute-reviewer-verdict']||null,fallback_reason:res.headers['x-omniroute-fallback-reason']||''}))})});req.setTimeout(840000,()=>req.destroy());req.on('error',()=>process.exit(1));req.write(body);req.end();"""
+ node=r"""const http=require('node:http');const key=Buffer.from('__KEY__','base64').toString();const ids=__NODE_IDS__;const body=Buffer.from(JSON.stringify({model:'agent/normal',stream:false,messages:[{role:'user',content:'Produce a detailed complete technical explanation of safe concurrent queue admission without tools.'}],omniroute_route:{checks:[{kind:'nonempty'}]}}));const headers={authorization:'Bearer '+key,'content-type':'application/json','content-length':String(body.length),'x-correlation-id':ids.request_id,'x-omniroute-task-id':ids.task_id,'x-omniroute-run-id':ids.run_id,'x-omniroute-turn-id':ids.turn_id,'x-omniroute-idempotency-key':ids.idempotency_key,'x-omniroute-review-class':'standard'};const req=http.request({host:'127.0.0.1',port:20128,path:'/v1/chat/completions',method:'POST',headers},res=>{let n=0,a=[];res.on('data',c=>{n+=c.length;if(n>1048576)req.destroy();else a.push(c)});res.on('end',()=>{let v=null;try{v=JSON.parse(Buffer.concat(a).toString('utf8'))}catch{};const valid=res.statusCode===200&&v&&Array.isArray(v.choices)&&v.choices.length>0&&v.choices.every(x=>x&&x.message&&typeof x.message.content==='string'&&x.message.content.length>0);process.stdout.write(JSON.stringify({status:res.statusCode,content_valid:!!valid,request_id:res.headers['x-correlation-id']||null,selected_connection_id:res.headers['x-omniroute-selected-connection-id']||null,resolved_provider:res.headers['x-omniroute-resolved-provider']||null,resolved_model:res.headers['x-omniroute-resolved-model']||null,candidate_attempt:Number(res.headers['x-omniroute-candidate-attempt']),reviewer_verdict:res.headers['x-omniroute-reviewer-verdict']||null,fallback_reason:res.headers['x-omniroute-fallback-reason']||''}))})});req.setTimeout(840000,()=>req.destroy());req.on('error',()=>process.exit(1));req.write(body);req.end();"""
  node=node.replace('__KEY__',base64.b64encode(key).decode()).replace('__NODE_IDS__',json.dumps(IDS,separators=(',',':')))
  try:rc,out,err=bounded_capture(['docker','container','exec','-i','--user','node','--workdir','/app',COMPANION,'node','-'],node.encode(),900,1048576,65536)
  except RuntimeError as e:raise Unknown() from e
@@ -638,7 +638,7 @@ try:
  except Exception as e:raise Unknown() from e
  if not isinstance(value,dict):raise Unknown()
  valid=(value.get('status')==200 and value.get('content_valid') is True)
- safe={'status':'REQUEST_PASS' if valid else 'REQUEST_STOP','index':INDEX,'http_status':value.get('status'),'content_valid':value.get('content_valid') is True,'selected_connection_id':value.get('selected_connection_id'),'resolved_provider':value.get('resolved_provider'),'resolved_model':value.get('resolved_model'),'candidate_attempt':value.get('candidate_attempt'),'reviewer_verdict':value.get('reviewer_verdict'),'fallback_reason':value.get('fallback_reason')}
+ safe={'status':'REQUEST_PASS' if valid else 'REQUEST_STOP','index':INDEX,'http_status':value.get('status'),'content_valid':value.get('content_valid') is True,'request_id':value.get('request_id'),'selected_connection_id':value.get('selected_connection_id'),'resolved_provider':value.get('resolved_provider'),'resolved_model':value.get('resolved_model'),'candidate_attempt':value.get('candidate_attempt'),'reviewer_verdict':value.get('reviewer_verdict'),'fallback_reason':value.get('fallback_reason')}
  print(json.dumps(safe,sort_keys=True));raise SystemExit(0 if valid else 1)
 except SystemExit:raise
 except Unknown:minimal('REQUEST_UNKNOWN')
@@ -742,9 +742,9 @@ def new_ids():
     return {name: str(uuid.uuid4()) for name in ("task_id", "run_id", "turn_id", "idempotency_key", "request_id")}
 
 
-def validate_request(value, returncode, index):
+def validate_request(value, returncode, index, expected_request_id):
     fields = {"status", "index", "http_status", "content_valid", "selected_connection_id",
-              "resolved_provider", "resolved_model", "candidate_attempt", "reviewer_verdict", "fallback_reason"}
+              "resolved_provider", "resolved_model", "candidate_attempt", "reviewer_verdict", "fallback_reason", "request_id"}
     if not isinstance(value, dict) or set(value) != fields or value["index"] != index:
         raise Stop("request_validation")
     if returncode == 2 and value["status"] == "REQUEST_UNKNOWN":
@@ -752,6 +752,8 @@ def validate_request(value, returncode, index):
     if returncode != 0 or value["status"] != "REQUEST_PASS":
         raise Stop("request_validation")
     if value["http_status"] != 200 or value["content_valid"] is not True:
+        raise Stop("request_validation")
+    if value["request_id"] != expected_request_id or not isinstance(expected_request_id, str) or not re.fullmatch(r"[0-9a-f-]{36}", expected_request_id):
         raise Stop("request_validation")
     if value["candidate_attempt"] != 1 or value["reviewer_verdict"] != "PASS":
         raise Stop("request_validation")
@@ -829,7 +831,7 @@ def run_request(transport, index, ids, companion_id):
     started = time.monotonic_ns()
     value, returncode = invoke(transport, VM1205, render_request(index, ids, companion_id), REQUEST_TIMEOUT_SECONDS)
     finished = time.monotonic_ns()
-    value = validate_request(value, returncode, index)
+    value = validate_request(value, returncode, index, ids["request_id"])
     return {**value, "request_started_ns": started, "request_finished_ns": finished}
 
 
@@ -1129,6 +1131,7 @@ def execute(reviewed):
         request_rows = []
         for index, (ident, response, dbrow) in enumerate(zip(ids, responses, evidence["rows"]), 1):
             request_rows.append({"index": index, **ident,
+                                 "request_id": response["request_id"],
                                  "selected_connection_id": response["selected_connection_id"],
                                  "resolved_provider": response["resolved_provider"],
                                  "resolved_model": response["resolved_model"],

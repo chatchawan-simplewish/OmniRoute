@@ -68,21 +68,27 @@ rejected(lambda v: v["correlation"].update(q4_after_full=False))
 
 request_unknown = {name: None for name in ("http_status", "selected_connection_id", "resolved_provider",
                                              "resolved_model", "candidate_attempt", "reviewer_verdict",
-                                             "fallback_reason")}
+                                             "fallback_reason", "request_id")}
 request_unknown.update(status="REQUEST_UNKNOWN", index=1, content_valid=False)
-try: module["validate_request"](request_unknown, 2, 1)
+request_id = "11111111-1111-4111-8111-111111111111"
+try: module["validate_request"](request_unknown, 2, 1, request_id)
 except module["Stop"] as error: assert str(error) == "transport_unknown"
 else: raise AssertionError("request uncertainty accepted")
 
 request_pass = {"status": "REQUEST_PASS", "index": 1, "http_status": 200, "content_valid": True,
+                "request_id": request_id,
                 "selected_connection_id": module["Q6_CONNECTION"], "resolved_provider": "llama-cpp",
                 "resolved_model": module["Q6_MODEL"], "candidate_attempt": 1,
                 "reviewer_verdict": "PASS", "fallback_reason": "initial"}
-assert module["validate_request"](request_pass, 0, 1) == request_pass
+assert module["validate_request"](request_pass, 0, 1, request_id) == request_pass
 bad_request = copy.deepcopy(request_pass); bad_request["resolved_model"] = module["Q4_MODEL"]
-try: module["validate_request"](bad_request, 0, 1)
+try: module["validate_request"](bad_request, 0, 1, request_id)
 except module["Stop"]: pass
 else: raise AssertionError("wrong physical model accepted")
+wrong_request_id = copy.deepcopy(request_pass); wrong_request_id["request_id"] = "22222222-2222-4222-8222-222222222222"
+try: module["validate_request"](wrong_request_id, 0, 1, request_id)
+except module["Stop"]: pass
+else: raise AssertionError("unmatched runtime request ID accepted")
 
 try: module["validate_evidence"]({"status": "HARDWARE_EVIDENCE_UNKNOWN", "companion_stopped": None}, 2)
 except module["Stop"] as error: assert str(error) == "transport_unknown"
@@ -148,7 +154,7 @@ assert not safe_scope["safe_env"]({**expected_env, "UNEXPECTED": "1"}, baseline_
 credential_input = base64.b64encode(json.dumps({
     "storage_key": "fixture-storage-key",
     "api_key": "fixture-api-key",
-    "access_token": "fixture-access-token",
+    "access_token": None,
 }, separators=(",", ":")).encode()).decode()
 credential_program = module["Q4_CREDENTIAL_NODE"].replace("__INPUT_B64__", credential_input)
 credential_check = subprocess.run(
@@ -192,11 +198,15 @@ old_invoke, old_render = invoke_globals["invoke"], invoke_globals["render_reques
 invoke_globals["invoke"] = lambda *_: (request_pass, 0)
 invoke_globals["render_request"] = lambda *_: b"fixture"
 before_request = module["time"].monotonic_ns()
-timed_request = module["run_request"](object(), 1, {}, "e" * 64)
+timed_request = module["run_request"](object(), 1, {"request_id": request_id}, "e" * 64)
 after_request = module["time"].monotonic_ns()
 invoke_globals["invoke"], invoke_globals["render_request"] = old_invoke, old_render
 assert before_request <= timed_request["request_started_ns"] <= timed_request["request_finished_ns"] <= after_request
-assert b"monotonic_ns" not in module["render_request"](1, module["new_ids"](), "e" * 64)
+rendered_request = module["render_request"](1, module["new_ids"](), "e" * 64)
+assert b"monotonic_ns" not in rendered_request
+assert b"'x-correlation-id':ids.request_id" in rendered_request
+assert b"request_id:res.headers['x-correlation-id']||null" in rendered_request
+assert '"request_id": response["request_id"]' in LAUNCHER.read_text(encoding="utf-8")
 for payload in (prep_source, module["render_request"](1, module["new_ids"](), "e" * 64),
                 module["render_evidence"]([module["new_ids"]() for _ in range(3)], "e" * 64, 0),
                 module["render_stop"]("e" * 64)):

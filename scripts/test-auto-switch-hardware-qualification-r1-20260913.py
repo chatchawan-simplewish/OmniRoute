@@ -1,4 +1,5 @@
 """Focused offline boundaries for the R1 actual-hardware qualification source."""
+import ast
 import concurrent.futures
 import base64
 import copy
@@ -67,7 +68,7 @@ rejected(lambda v: v["correlation"].update(q4_after_full=False))
 
 request_unknown = {name: None for name in ("http_status", "selected_connection_id", "resolved_provider",
                                              "resolved_model", "candidate_attempt", "reviewer_verdict",
-                                             "fallback_reason", "request_started_ns", "request_finished_ns")}
+                                             "fallback_reason")}
 request_unknown.update(status="REQUEST_UNKNOWN", index=1, content_valid=False)
 try: module["validate_request"](request_unknown, 2, 1)
 except module["Stop"] as error: assert str(error) == "transport_unknown"
@@ -76,8 +77,7 @@ else: raise AssertionError("request uncertainty accepted")
 request_pass = {"status": "REQUEST_PASS", "index": 1, "http_status": 200, "content_valid": True,
                 "selected_connection_id": module["Q6_CONNECTION"], "resolved_provider": "llama-cpp",
                 "resolved_model": module["Q6_MODEL"], "candidate_attempt": 1,
-                "reviewer_verdict": "PASS", "fallback_reason": "initial",
-                "request_started_ns": 1, "request_finished_ns": 2}
+                "reviewer_verdict": "PASS", "fallback_reason": "initial"}
 assert module["validate_request"](request_pass, 0, 1) == request_pass
 bad_request = copy.deepcopy(request_pass); bad_request["resolved_model"] = module["Q4_MODEL"]
 try: module["validate_request"](bad_request, 0, 1)
@@ -112,6 +112,39 @@ assert b"q4url.hostname!=Q4_PROXY_HOST" in prep_source
 assert b"'Authorization':'Bearer '+token" in prep_source
 assert b"Q4_MODEL='qwen3.8-27b-unsloth-ud-q4ks'" in prep_source
 
+prep_tree = ast.parse(prep_source.decode())
+one_nodes = [node for node in prep_tree.body if isinstance(node, (ast.ClassDef, ast.FunctionDef))
+             and node.name in {"Stop", "Unknown", "one"}]
+one_scope = {"docker": lambda _: b"{}", "stage": "candidate_stop"}
+exec(compile(ast.Module(one_nodes, type_ignores=[]), "<hardware-prep-one>", "exec"), one_scope)
+try: one_scope["one"](["container", "inspect", "candidate"])
+except one_scope["Unknown"]: pass
+else: raise AssertionError("post-mutation malformed Docker JSON was not UNKNOWN")
+one_scope["stage"] = "identity"
+try: one_scope["one"](["container", "inspect", "candidate"])
+except one_scope["Stop"]: pass
+else: raise AssertionError("pre-mutation malformed Docker JSON was not STOP")
+
+safe_nodes = [node for node in prep_tree.body
+              if (isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "BINDINGS"
+                                                       for target in node.targets))
+              or (isinstance(node, ast.FunctionDef) and node.name == "safe_env")]
+safe_scope = {"json": json}
+exec(compile(ast.Module(safe_nodes, type_ignores=[]), "<hardware-prep-env>", "exec"), safe_scope)
+baseline_env = {"PATH": "/usr/local/bin:/usr/bin", "NODE_ENV": "production"}
+expected_env = dict(baseline_env)
+expected_env.update({
+    "DATA_DIR": "/app/data",
+    "OMNIROUTE_AGENT_ROUTE_BINDINGS_JSON": json.dumps(safe_scope["BINDINGS"], separators=(",", ":"), sort_keys=True),
+    "OMNIROUTE_DISABLE_BACKGROUND_SERVICES": "true",
+    "OMNIROUTE_DISABLE_CREDENTIAL_HEALTH_CHECK": "1",
+    "PROXY_HEALTH_ENABLED": "false", "FREE_PROXY_AUTO_SYNC_ENABLED": "false",
+    "OMNIROUTE_ENABLE_LIVE_WS": "0", "OMNIROUTE_DB_HEALTHCHECK_INTERVAL_MS": "0",
+    "OMNIROUTE_WAL_TRUNCATE_INTERVAL_MS": "0",
+})
+assert safe_scope["safe_env"](expected_env, baseline_env)
+assert not safe_scope["safe_env"]({**expected_env, "UNEXPECTED": "1"}, baseline_env)
+
 credential_input = base64.b64encode(json.dumps({
     "storage_key": "fixture-storage-key",
     "api_key": "fixture-api-key",
@@ -124,9 +157,46 @@ credential_check = subprocess.run(
 )
 assert credential_check.returncode == 0 and credential_check.stderr == b""
 assert json.loads(credential_check.stdout) == {
-    "status": "Q4_CREDENTIAL_PASS", "source": "apiKey",
+    "status": "Q4_CREDENTIAL_PASS",
     "credential_b64": base64.b64encode(b"fixture-api-key").decode(),
 }
+
+encrypt_check = subprocess.run(
+    ["node", "--input-type=module"],
+    input=b"""import crypto from 'node:crypto';
+const secret='fixture-storage-key',plain='fixture-api-key',iv=Buffer.alloc(16,7);
+const key=crypto.scryptSync(secret,'omniroute-field-encryption-v1',32);
+const cipher=crypto.createCipheriv('aes-256-gcm',key,iv);
+const body=cipher.update(plain,'utf8','hex')+cipher.final('hex');
+process.stdout.write('enc:v1:'+iv.toString('hex')+':'+body+':'+cipher.getAuthTag().toString('hex'));
+""",
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, check=False,
+)
+assert encrypt_check.returncode == 0 and encrypt_check.stderr == b""
+encrypted_input = base64.b64encode(json.dumps({
+    "storage_key": "fixture-storage-key", "api_key": encrypt_check.stdout.decode(),
+}, separators=(",", ":")).encode()).decode()
+encrypted_program = module["Q4_CREDENTIAL_NODE"].replace("__INPUT_B64__", encrypted_input)
+encrypted_check = subprocess.run(
+    ["node", "--input-type=module"], input=encrypted_program.encode(),
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, check=False,
+)
+assert encrypted_check.returncode == 0 and encrypted_check.stderr == b""
+assert json.loads(encrypted_check.stdout) == {
+    "status": "Q4_CREDENTIAL_PASS",
+    "credential_b64": base64.b64encode(b"fixture-api-key").decode(),
+}
+
+invoke_globals = module["run_request"].__globals__
+old_invoke, old_render = invoke_globals["invoke"], invoke_globals["render_request"]
+invoke_globals["invoke"] = lambda *_: (request_pass, 0)
+invoke_globals["render_request"] = lambda *_: b"fixture"
+before_request = module["time"].monotonic_ns()
+timed_request = module["run_request"](object(), 1, {}, "e" * 64)
+after_request = module["time"].monotonic_ns()
+invoke_globals["invoke"], invoke_globals["render_request"] = old_invoke, old_render
+assert before_request <= timed_request["request_started_ns"] <= timed_request["request_finished_ns"] <= after_request
+assert b"monotonic_ns" not in module["render_request"](1, module["new_ids"](), "e" * 64)
 for payload in (prep_source, module["render_request"](1, module["new_ids"](), "e" * 64),
                 module["render_evidence"]([module["new_ids"]() for _ in range(3)], "e" * 64, 0),
                 module["render_stop"]("e" * 64)):

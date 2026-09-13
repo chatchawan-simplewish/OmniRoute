@@ -170,7 +170,7 @@ def request_record(value, index):
         raise Stop("result_validation")
     if any(not isinstance(value[k], str) or not value[k] for k in ("resolved_provider", "resolved_model", "fallback_reason")):
         raise Stop("result_validation")
-    if type(value["request_started_ns"]) is not int or type(value["request_finished_ns"]) is not int or value["request_started_ns"] <= 0 or value["request_finished_ns"] < value["request_started_ns"]:
+    if type(value["request_started_ns"]) is not int or type(value["request_finished_ns"]) is not int or value["request_started_ns"] <= 0 or value["request_finished_ns"] < value["request_started_ns"] or value["request_finished_ns"] - value["request_started_ns"] > REQUEST_TIMEOUT_SECONDS * 1_000_000_000:
         raise Stop("result_validation")
     if not isinstance(value["turn_created_at"], str):
         raise Stop("result_validation")
@@ -307,7 +307,7 @@ Q4_CREDENTIAL_NODE = r'''
 import crypto from 'node:crypto';
 const input=JSON.parse(Buffer.from('__INPUT_B64__','base64').toString('utf8'));
 function decrypt(value){
- if(typeof value!=='string'||value.length===0)return '';
+ if(typeof value!=='string'||value.length===0)throw new Error('cipher');
  if(!value.startsWith('enc:v1:'))return value;
  const parts=value.slice(7).split(':');
  if(parts.length!==3||!/^[0-9a-f]{32}$/.test(parts[0])||!/^(?:[0-9a-f]{2})+$/.test(parts[1])||!/^[0-9a-f]{32}$/.test(parts[2]))throw new Error('cipher');
@@ -317,10 +317,10 @@ function decrypt(value){
  return decipher.update(parts[1],'hex','utf8')+decipher.final('utf8');
 }
 try{
- const apiKey=decrypt(input.api_key),accessToken=decrypt(input.access_token),credential=apiKey||accessToken;
+ const credential=decrypt(input.api_key);
  if(typeof credential!=='string'||credential.length<1||credential.length>4096||/[\r\n\0]/.test(credential))throw new Error('credential');
- process.stdout.write(JSON.stringify({status:'Q4_CREDENTIAL_PASS',source:apiKey?'apiKey':'accessToken',credential_b64:Buffer.from(credential,'utf8').toString('base64')}));
-}catch{process.stdout.write(JSON.stringify({status:'Q4_CREDENTIAL_STOP',source:null,credential_b64:null}));process.exitCode=1;}
+ process.stdout.write(JSON.stringify({status:'Q4_CREDENTIAL_PASS',credential_b64:Buffer.from(credential,'utf8').toString('base64')}));
+}catch{process.stdout.write(JSON.stringify({status:'Q4_CREDENTIAL_STOP',credential_b64:null}));process.exitCode=1;}
 '''
 
 
@@ -341,11 +341,18 @@ def observe(a,p=None,t=60):
 def docker(a,p=None,t=60):return observe(['docker',*a],p,t)
 def mutate(a,expected,t):
  rc,out,err=capture(['docker',*a],None,t)
- if rc or err or out.decode().strip()!=expected:raise Unknown()
+ try:matched=not rc and not err and out.decode().strip()==expected
+ except Exception as e:raise Unknown() from e
+ if not matched:raise Unknown()
  return out
 def one(a):
- v=json.loads(docker(a))
- if not isinstance(v,list) or len(v)!=1 or not isinstance(v[0],dict):raise Stop()
+ try:v=json.loads(docker(a))
+ except Exception as e:
+  if stage in {'candidate_stop','companion_create','companion_start'}:raise Unknown() from e
+  raise Stop() from e
+ if not isinstance(v,list) or len(v)!=1 or not isinstance(v[0],dict):
+  if stage in {'candidate_stop','companion_create','companion_start'}:raise Unknown()
+  raise Stop()
  return v[0]
 def envmap(v):
  out={}
@@ -355,11 +362,10 @@ def envmap(v):
   if not k or k in out:raise Stop()
   out[k]=x
  return out
-def safe_env(v):
+def safe_env(v,baseline):
  fixed={'DATA_DIR':'/app/data','OMNIROUTE_AGENT_ROUTE_BINDINGS_JSON':json.dumps(BINDINGS,separators=(',',':'),sort_keys=True),'OMNIROUTE_DISABLE_BACKGROUND_SERVICES':'true','OMNIROUTE_DISABLE_CREDENTIAL_HEALTH_CHECK':'1','PROXY_HEALTH_ENABLED':'false','FREE_PROXY_AUTO_SYNC_ENABLED':'false','OMNIROUTE_ENABLE_LIVE_WS':'0','OMNIROUTE_DB_HEALTHCHECK_INTERVAL_MS':'0','OMNIROUTE_WAL_TRUNCATE_INTERVAL_MS':'0'}
- denied={'STORAGE_ENCRYPTION_KEY','STORAGE_ENCRYPTION_KEY_VERSION','JWT_SECRET','API_KEY_SECRET','CLOUD_URL','NEXT_PUBLIC_CLOUD_URL','OMNIROUTE_CLOUD_SYNC_SECRETS','INITIAL_PASSWORD','HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy','OMNIROUTE_API_KEY','ROUTER_API_KEY','REDIS_URL'}
- prefixes=('OPENAI_','OPENROUTER_','ANTHROPIC_','CLAUDE_','CODEX_','GEMINI_','GOOGLE_','AZURE_','AWS_','QDRANT_','BIFROST_')
- return all(v.get(k)==x for k,x in fixed.items()) and not any(k in denied or k.startswith(prefixes) for k in v)
+ expected=dict(baseline);expected.update(fixed)
+ return v==expected
 def read_regular(path,limit,uid,gid,mode):
  before=os.lstat(path)
  if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode) or before.st_uid!=uid or before.st_gid!=gid or stat.S_IMODE(before.st_mode)!=mode or not 1<=before.st_size<=limit or pathlib.Path(os.path.realpath(path))!=path:raise Stop()
@@ -384,9 +390,9 @@ def parse_env(raw):
   if len(item)>=2 and item[0] in ('\"',"'") and item[-1]==item[0]:item=item[1:-1]
   result[key]=item
  return result
-def exact_container(row,network,expected_id):
+def exact_container(row,network,expected_id,image_env):
  host=row.get('HostConfig',{});ports=(row.get('NetworkSettings',{}).get('Ports') or {});tmpfs=host.get('Tmpfs') or {};tokens=(tmpfs.get('/tmp') or '').split(',');mounts=row.get('Mounts')
- return (row.get('Id')==expected_id and row.get('Image')==IMAGE and row.get('Config',{}).get('Image')==TAG and row.get('Config',{}).get('User')=='node' and row.get('Config',{}).get('WorkingDir')=='/app' and row.get('State',{}).get('Running') is True and row.get('State',{}).get('Health',{}).get('Status')=='healthy' and row.get('RestartCount')==0 and host.get('NetworkMode')==network and host.get('ReadonlyRootfs') is True and host.get('RestartPolicy',{}).get('Name')=='no' and host.get('CapDrop')==['ALL'] and host.get('SecurityOpt')==['no-new-privileges'] and host.get('PortBindings') in (None,{}) and all(x is None for x in ports.values()) and set(tmpfs)=={'/tmp'} and len(tokens)==6 and set(tokens)=={'rw','noexec','nosuid','nodev','size=67108864','mode=1777'} and isinstance(mounts,list) and len(mounts)==1 and mounts[0].get('Type')=='volume' and mounts[0].get('Name')==VOLUME and mounts[0].get('Destination')=='/app/data' and mounts[0].get('RW') is True and safe_env(envmap(row.get('Config',{}).get('Env',[]))))
+ return (row.get('Id')==expected_id and row.get('Image')==IMAGE and row.get('Config',{}).get('Image')==TAG and row.get('Config',{}).get('User')=='node' and row.get('Config',{}).get('WorkingDir')=='/app' and row.get('State',{}).get('Running') is True and row.get('State',{}).get('Health',{}).get('Status')=='healthy' and row.get('RestartCount')==0 and host.get('NetworkMode')==network and host.get('ReadonlyRootfs') is True and host.get('RestartPolicy',{}).get('Name')=='no' and host.get('CapDrop')==['ALL'] and host.get('SecurityOpt')==['no-new-privileges'] and host.get('PortBindings') in (None,{}) and all(x is None for x in ports.values()) and set(tmpfs)=={'/tmp'} and len(tokens)==6 and set(tokens)=={'rw','noexec','nosuid','nodev','size=67108864','mode=1777'} and isinstance(mounts,list) and len(mounts)==1 and mounts[0].get('Type')=='volume' and mounts[0].get('Name')==VOLUME and mounts[0].get('Destination')=='/app/data' and mounts[0].get('RW') is True and safe_env(envmap(row.get('Config',{}).get('Env',[])),image_env))
 def stop_companion():
  if not companion_id:return True
  row=one(['container','inspect',COMPANION])
@@ -399,11 +405,12 @@ try:
  stage='identity'
  live=one(['container','inspect','omniroute'])
  if live.get('Id')!=LIVE_ID or live.get('State',{}).get('Running') is not True:raise Stop()
- candidate=one(['container','inspect',CANDIDATE])
- if candidate!=one(['container','inspect',CANDIDATE_ID]) or not exact_container(candidate,'none',CANDIDATE_ID):raise Stop()
- candidate_stopped=False
  labels=one(['image','inspect',TAG])
  if labels.get('Id')!=IMAGE or labels.get('RepoTags')!=[TAG] or (labels.get('Config',{}).get('Labels') or {}).get('org.opencontainers.image.revision')!=SOURCE:raise Stop()
+ image_env=envmap(labels.get('Config',{}).get('Env',[]))
+ candidate=one(['container','inspect',CANDIDATE])
+ if candidate!=one(['container','inspect',CANDIDATE_ID]) or not exact_container(candidate,'none',CANDIDATE_ID,image_env):raise Stop()
+ candidate_stopped=False
  vol=one(['volume','inspect',VOLUME]);root=pathlib.Path(vol.get('Mountpoint',''))
  if vol.get('Name')!=VOLUME or vol.get('Driver')!='local' or vol.get('Scope')!='local' or not root.is_dir() or root.is_symlink() or pathlib.Path(os.path.realpath(root))!=root:raise Stop()
  stage='environment';envfile=root/'server.env';env=parse_env(read_regular(envfile,65536,1000,1000,0o600));required={'STORAGE_ENCRYPTION_KEY','JWT_SECRET','API_KEY_SECRET'}
@@ -425,7 +432,7 @@ try:
   if row[:5]!=(KEY_ID,KEY_NAME,1,1,'restricted') or json.loads(row[5])!=ALLOWED_MODELS or json.loads(row[6])!=['__omniroute_agent_route_no_combos__'] or json.loads(row[7])!=ALL_CONNECTIONS or json.loads(row[8])!=[] or json.loads(row[9])!=['agent:route'] or set(json.loads(row[10]))!={'chat','models'} or row[11:18]!=(0,None,None,None,0,None,0):raise Stop()
   if not isinstance(row[18],str) or not re.fullmatch(r'[0-9a-f]{64}',row[18]):raise Stop()
   q4row=q4rows[0]
-  if q4row[:4]!=(Q4_CONNECTION,'lm-studio','apikey',1) or not all(value is None or isinstance(value,str) for value in q4row[4:6]) or not isinstance(q4row[6],str):raise Stop()
+  if q4row[:4]!=(Q4_CONNECTION,'lm-studio','apikey',1) or not isinstance(q4row[4],str) or not 1<=len(q4row[4])<=16384 or q4row[5] is not None or not isinstance(q4row[6],str):raise Stop()
   q4psd=json.loads(q4row[6])
   if not isinstance(q4psd,dict):raise Stop()
   extras=q4psd.get('extraApiKeys')
@@ -456,13 +463,13 @@ try:
  except Exception as error:raise Stop() from error
  q4_address=str(q4_interface.ip)
  if q4_interface.version!=4 or str(q4_interface.network)!=NETWORK_SUBNET or q4_address==NETWORK_GATEWAY or peers[Q4][1].get('IPAddress')!=q4_address:raise Stop()
- stage='q4_credential';credential_input=json.dumps({'storage_key':storage_key,'api_key':q4row[4],'access_token':q4row[5]},separators=(',',':')).encode();storage_key='';q4row=None
+ stage='q4_credential';credential_input=json.dumps({'storage_key':storage_key,'api_key':q4row[4]},separators=(',',':')).encode();storage_key='';q4row=None
  credential_script=CREDENTIAL_NODE.replace('__INPUT_B64__',base64.b64encode(credential_input).decode());credential_input=b''
  rc,out,err=capture(['docker','container','exec','-i','--user','node','--workdir','/app',CANDIDATE,'node','--input-type=module'],credential_script.encode(),30);credential_script=''
  try:credential_result=json.loads(out) if not err and len(out)<=8192 else None
  except Exception:credential_result=None
  out=b'';err=b''
- if rc or not isinstance(credential_result,dict) or set(credential_result)!={'status','source','credential_b64'} or credential_result.get('status')!='Q4_CREDENTIAL_PASS' or credential_result.get('source') not in {'apiKey','accessToken'} or not isinstance(credential_result.get('credential_b64'),str):raise Stop()
+ if rc or not isinstance(credential_result,dict) or set(credential_result)!={'status','credential_b64'} or credential_result.get('status')!='Q4_CREDENTIAL_PASS' or not isinstance(credential_result.get('credential_b64'),str):raise Stop()
  try:credential=base64.b64decode(credential_result['credential_b64'],validate=True);token=credential.decode('utf8')
  except Exception as error:raise Stop() from error
  credential_result=None
@@ -484,7 +491,8 @@ try:
  for k in sorted(fixed):args.extend(['--env',k+'='+fixed[k]])
  rc,out,err=capture(['docker',*args,TAG],None,60)
  if rc or err:raise Unknown()
- companion_id=out.decode().strip()
+ try:companion_id=out.decode().strip()
+ except Exception as error:raise Unknown() from error
  if not re.fullmatch(r'[0-9a-f]{64}',companion_id):raise Unknown()
  stage='companion_start';mutate(['container','start',COMPANION],COMPANION,60)
  deadline=time.monotonic()+180
@@ -500,7 +508,7 @@ try:
   if health['timeouts']:raise Unknown()
   raise Stop()
  row=one(['container','inspect',COMPANION])
- if row.get('Id')!=companion_id or not exact_container(row,NETWORK,companion_id):raise Stop()
+ if row.get('Id')!=companion_id or not exact_container(row,NETWORK,companion_id,image_env):raise Stop()
  print(json.dumps({'status':'HARDWARE_PREP_PASS','stage':'complete','candidate_id':CANDIDATE_ID,'candidate_stopped':True,'companion_id':companion_id,'detail_baseline':detail,'network_private':True,'published_ports':0,'cloud_false':True,'codex_inactive':True,'migration_170':True,'migration_171':True,'key_policy':True,'environment_exact':True,'q4_reachable':True,'health_counters':health},sort_keys=True))
 except Unknown:
  print(json.dumps({'status':'HARDWARE_PREP_UNKNOWN','stage':stage,'candidate_id':CANDIDATE_ID,'candidate_stopped':None,'companion_id':None,'companion_stopped':None},sort_keys=True));raise SystemExit(2)
@@ -597,14 +605,14 @@ except Exception:emit('HARDWARE_EVIDENCE_STOP',stopped)
 
 
 REMOTE_REQUEST = r'''
-import base64,json,os,pathlib,re,stat,time
+import base64,json,os,pathlib,re,stat
 __BOUNDED_CAPTURE__
 COMPANION=__COMPANION__;COMPANION_ID=__COMPANION_ID__;IMAGE=__IMAGE__;STORE=pathlib.Path(__STORE__)
 IDS=__IDS__;INDEX=__INDEX__
 class Stop(Exception):pass
 class Unknown(Exception):pass
 def minimal(status):
- print(json.dumps({'status':status,'index':INDEX,'http_status':None,'content_valid':False,'selected_connection_id':None,'resolved_provider':None,'resolved_model':None,'candidate_attempt':None,'reviewer_verdict':None,'fallback_reason':None,'request_started_ns':None,'request_finished_ns':None},sort_keys=True));raise SystemExit(2 if status=='REQUEST_UNKNOWN' else 1)
+ print(json.dumps({'status':status,'index':INDEX,'http_status':None,'content_valid':False,'selected_connection_id':None,'resolved_provider':None,'resolved_model':None,'candidate_attempt':None,'reviewer_verdict':None,'fallback_reason':None},sort_keys=True));raise SystemExit(2 if status=='REQUEST_UNKNOWN' else 1)
 try:
  rc,out,err=bounded_capture(['docker','container','inspect',COMPANION],None,30)
  if rc or err:raise Stop()
@@ -622,16 +630,15 @@ try:
  if not re.fullmatch(rb'sk-[0-9a-f]{16}-[0-9a-f]{6}-[0-9a-f]{8}',key):raise Stop()
  node=r"""const http=require('node:http');const key=Buffer.from('__KEY__','base64').toString();const ids=__NODE_IDS__;const body=Buffer.from(JSON.stringify({model:'agent/normal',stream:false,messages:[{role:'user',content:'Produce a detailed complete technical explanation of safe concurrent queue admission without tools.'}],omniroute_route:{checks:[{kind:'nonempty'}]}}));const headers={authorization:'Bearer '+key,'content-type':'application/json','content-length':String(body.length),'x-request-id':ids.request_id,'x-omniroute-task-id':ids.task_id,'x-omniroute-run-id':ids.run_id,'x-omniroute-turn-id':ids.turn_id,'x-omniroute-idempotency-key':ids.idempotency_key,'x-omniroute-review-class':'standard'};const req=http.request({host:'127.0.0.1',port:20128,path:'/v1/chat/completions',method:'POST',headers},res=>{let n=0,a=[];res.on('data',c=>{n+=c.length;if(n>1048576)req.destroy();else a.push(c)});res.on('end',()=>{let v=null;try{v=JSON.parse(Buffer.concat(a).toString('utf8'))}catch{};const valid=res.statusCode===200&&v&&Array.isArray(v.choices)&&v.choices.length>0&&v.choices.every(x=>x&&x.message&&typeof x.message.content==='string'&&x.message.content.length>0);process.stdout.write(JSON.stringify({status:res.statusCode,content_valid:!!valid,selected_connection_id:res.headers['x-omniroute-selected-connection-id']||null,resolved_provider:res.headers['x-omniroute-resolved-provider']||null,resolved_model:res.headers['x-omniroute-resolved-model']||null,candidate_attempt:Number(res.headers['x-omniroute-candidate-attempt']),reviewer_verdict:res.headers['x-omniroute-reviewer-verdict']||null,fallback_reason:res.headers['x-omniroute-fallback-reason']||''}))})});req.setTimeout(840000,()=>req.destroy());req.on('error',()=>process.exit(1));req.write(body);req.end();"""
  node=node.replace('__KEY__',base64.b64encode(key).decode()).replace('__NODE_IDS__',json.dumps(IDS,separators=(',',':')))
- started=time.monotonic_ns()
  try:rc,out,err=bounded_capture(['docker','container','exec','-i','--user','node','--workdir','/app',COMPANION,'node','-'],node.encode(),900,1048576,65536)
  except RuntimeError as e:raise Unknown() from e
- finished=time.monotonic_ns();key=b'';node=''
+ key=b'';node=''
  if rc or err:raise Unknown()
  try:value=json.loads(out)
  except Exception as e:raise Unknown() from e
  if not isinstance(value,dict):raise Unknown()
  valid=(value.get('status')==200 and value.get('content_valid') is True)
- safe={'status':'REQUEST_PASS' if valid else 'REQUEST_STOP','index':INDEX,'http_status':value.get('status'),'content_valid':value.get('content_valid') is True,'selected_connection_id':value.get('selected_connection_id'),'resolved_provider':value.get('resolved_provider'),'resolved_model':value.get('resolved_model'),'candidate_attempt':value.get('candidate_attempt'),'reviewer_verdict':value.get('reviewer_verdict'),'fallback_reason':value.get('fallback_reason'),'request_started_ns':started,'request_finished_ns':finished}
+ safe={'status':'REQUEST_PASS' if valid else 'REQUEST_STOP','index':INDEX,'http_status':value.get('status'),'content_valid':value.get('content_valid') is True,'selected_connection_id':value.get('selected_connection_id'),'resolved_provider':value.get('resolved_provider'),'resolved_model':value.get('resolved_model'),'candidate_attempt':value.get('candidate_attempt'),'reviewer_verdict':value.get('reviewer_verdict'),'fallback_reason':value.get('fallback_reason')}
  print(json.dumps(safe,sort_keys=True));raise SystemExit(0 if valid else 1)
 except SystemExit:raise
 except Unknown:minimal('REQUEST_UNKNOWN')
@@ -737,8 +744,7 @@ def new_ids():
 
 def validate_request(value, returncode, index):
     fields = {"status", "index", "http_status", "content_valid", "selected_connection_id",
-              "resolved_provider", "resolved_model", "candidate_attempt", "reviewer_verdict", "fallback_reason",
-              "request_started_ns", "request_finished_ns"}
+              "resolved_provider", "resolved_model", "candidate_attempt", "reviewer_verdict", "fallback_reason"}
     if not isinstance(value, dict) or set(value) != fields or value["index"] != index:
         raise Stop("request_validation")
     if returncode == 2 and value["status"] == "REQUEST_UNKNOWN":
@@ -758,8 +764,6 @@ def validate_request(value, returncode, index):
         expected = (Q4_CONNECTION, "lm-studio", Q4_MODEL)
         fallback = {"capacity", "full"}
     if (value["selected_connection_id"], value["resolved_provider"], value["resolved_model"]) != expected or value["fallback_reason"] not in fallback:
-        raise Stop("request_validation")
-    if type(value["request_started_ns"]) is not int or type(value["request_finished_ns"]) is not int or value["request_started_ns"] <= 0 or value["request_finished_ns"] < value["request_started_ns"]:
         raise Stop("request_validation")
     return value
 
@@ -822,8 +826,11 @@ def metric_sample(transport, metrics_module):
 
 
 def run_request(transport, index, ids, companion_id):
+    started = time.monotonic_ns()
     value, returncode = invoke(transport, VM1205, render_request(index, ids, companion_id), REQUEST_TIMEOUT_SECONDS)
-    return validate_request(value, returncode, index)
+    finished = time.monotonic_ns()
+    value = validate_request(value, returncode, index)
+    return {**value, "request_started_ns": started, "request_finished_ns": finished}
 
 
 def resolve_future(future, timeout=None):

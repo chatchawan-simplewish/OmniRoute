@@ -4,6 +4,7 @@ import ast
 import base64
 import hashlib
 import importlib.util
+import inspect
 import json
 import os
 import pathlib
@@ -80,15 +81,17 @@ BRANCH = r''' if MODE=='preflight':
   stage='native_dispatch'
   try:rc,out,err=bounded_capture(['docker','container','exec','-i','--user','node','--workdir','/app',CANDIDATE,'node','-'],DEACTIVATE_NODE.encode(),60)
   except RuntimeError:
-   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':CODEX,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'child_timeout_or_output'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
+   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':None,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'child_timeout_or_output'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
   if err:
-   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':CODEX,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'child_stderr'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
+   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':None,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'child_stderr'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
   try:native=json.loads(out)
   except Exception:
-   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':CODEX,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'remote_envelope'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
-  if not isinstance(native,dict) or set(native)!={'status','stage','connection_id','before_active','patch_dispatched','patch_http_status','readback_http_status','inactive_readback','failure_category'}:
-   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':CODEX,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'remote_envelope'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
-  outer={'status':'CANDIDATE_CODEX_DEACTIVATE_R1_PASS' if rc==0 else 'CANDIDATE_CODEX_DEACTIVATE_R1_STOP' if rc==1 else 'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':native['stage'],'candidate_id':CANDIDATE_ID,'connection_id':CODEX,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':native['before_active'],'patch_dispatched':native['patch_dispatched'],'patch_http_status':native['patch_http_status'],'readback_http_status':native['readback_http_status'],'inactive_readback':native['inactive_readback'],'failure_category':native['failure_category']}
+   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':None,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'remote_envelope'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
+  try:native=validate_native_child(native,rc,CODEX)
+  except Exception:
+   print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN','stage':'native_dispatch','candidate_id':CANDIDATE_ID,'connection_id':None,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':None,'patch_http_status':None,'readback_http_status':None,'inactive_readback':None,'failure_category':'remote_envelope'},sort_keys=True,separators=(',',':')));raise SystemExit(2)
+  outer_status={'CODEX_DEACTIVATE_PASS':'CANDIDATE_CODEX_DEACTIVATE_R1_PASS','CODEX_DEACTIVATE_STOP':'CANDIDATE_CODEX_DEACTIVATE_R1_STOP','CODEX_DEACTIVATE_UNKNOWN':'CANDIDATE_CODEX_DEACTIVATE_R1_UNKNOWN'}[native['status']]
+  outer={'status':outer_status,'stage':native['stage'],'candidate_id':CANDIDATE_ID,'connection_id':native['connection_id'],'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':native['before_active'],'patch_dispatched':native['patch_dispatched'],'patch_http_status':native['patch_http_status'],'readback_http_status':native['readback_http_status'],'inactive_readback':native['inactive_readback'],'failure_category':native['failure_category']}
   print(json.dumps(outer,sort_keys=True,separators=(',',':')));raise SystemExit(rc if rc in (0,1,2) else 2)
 '''
 
@@ -99,6 +102,47 @@ def render_node(admin):
     value = NODE.replace("__ADMIN_B64__", base64.b64encode(admin.encode()).decode()).replace("__CODEX__", json.dumps(CODEX_CONNECTION))
     if admin in value:
         raise Stop("local_validation")
+    return value
+
+
+def validate_native_child(value, returncode, expected_connection):
+    fields = {"status", "stage", "connection_id", "before_active", "patch_dispatched",
+              "patch_http_status", "readback_http_status", "inactive_readback", "failure_category"}
+    if not isinstance(value, dict) or set(value) != fields or value["connection_id"] != expected_connection:
+        raise ValueError("native_envelope")
+    for field in ("patch_http_status", "readback_http_status"):
+        if value[field] is not None and (type(value[field]) is not int or not 100 <= value[field] <= 599):
+            raise ValueError("native_envelope")
+    failures = {"http_4xx", "http_5xx", "http_other", "parse_error", "schema_mismatch",
+                "predicate_failed", "timeout", "connection", "output_limit"}
+    if returncode == 0:
+        if (value["status"] != "CODEX_DEACTIVATE_PASS" or value["stage"] != "complete"
+                or type(value["before_active"]) is not bool
+                or value["patch_dispatched"] is not value["before_active"]
+                or value["patch_http_status"] != (200 if value["before_active"] else None)
+                or value["readback_http_status"] != 200 or value["inactive_readback"] is not True
+                or value["failure_category"] is not None):
+            raise ValueError("native_envelope")
+    elif returncode == 1:
+        if (value["status"] != "CODEX_DEACTIVATE_STOP" or value["stage"] not in {"get_before", "readback"}
+                or value["patch_dispatched"] is not False or value["patch_http_status"] is not None
+                or value["inactive_readback"] is not False or value["failure_category"] not in failures):
+            raise ValueError("native_envelope")
+        if value["stage"] == "get_before" and value["before_active"] is not None:
+            raise ValueError("native_envelope")
+        if value["stage"] == "readback" and value["before_active"] is not False:
+            raise ValueError("native_envelope")
+    elif returncode == 2:
+        if (value["status"] != "CODEX_DEACTIVATE_UNKNOWN" or value["stage"] not in {"patch", "readback"}
+                or value["before_active"] is not True or value["patch_dispatched"] is not True
+                or value["inactive_readback"] is not False or value["failure_category"] not in failures):
+            raise ValueError("native_envelope")
+        if value["stage"] == "patch" and value["readback_http_status"] != 200:
+            raise ValueError("native_envelope")
+        if value["stage"] == "readback" and value["patch_http_status"] != 200:
+            raise ValueError("native_envelope")
+    else:
+        raise ValueError("native_envelope")
     return value
 
 
@@ -117,13 +161,14 @@ def render_remote(admin):
     helpers = source.index("def rollback_key():"); body = source.index("try:\n candidate_format=", helpers)
     source = source[:helpers] + source[body:]
     start = source.index(" if MODE=='preflight':")
+    validator = "\n".join(" " + line if line else line for line in inspect.getsource(validate_native_child).splitlines())
     suffix = r'''except SystemExit:raise
 except Exception:
  print(json.dumps({'status':'CANDIDATE_CODEX_DEACTIVATE_R1_STOP','stage':stage if stage in PRECONDITIONS or stage=='store_preflight' else 'candidate_identity','candidate_id':CANDIDATE_ID,'connection_id':CODEX,'checks':{name:checks[name] for name in PRECONDITIONS},'before_active':None,'patch_dispatched':False,'patch_http_status':None,'readback_http_status':None,'inactive_readback':False,'failure_category':'precondition'},sort_keys=True,separators=(',',':')));raise SystemExit(1)
 finally:
  if store_parent_fd is not None:os.close(store_parent_fd)
 '''
-    source = source[:start] + BRANCH + suffix
+    source = source[:start] + validator + "\n" + BRANCH + suffix
     ast.parse(source)
     if any(token in source for token in ("request('POST'", "/v1/chat", "container','start", "container','stop")):
         raise Stop("local_validation")
@@ -147,8 +192,18 @@ def fixture_unknown(stage="patch"):
             "inactive_readback": False, "failure_category": "timeout"}
 
 
+def fixture_native(before_active=True, patched=True):
+    return {"status": "CODEX_DEACTIVATE_PASS", "stage": "complete",
+            "connection_id": CODEX_CONNECTION, "before_active": before_active,
+            "patch_dispatched": patched, "patch_http_status": 200 if patched else None,
+            "readback_http_status": 200, "inactive_readback": True, "failure_category": None}
+
+
 def validate_remote(value, returncode):
-    if not isinstance(value, dict) or set(value) != FIELDS or value["candidate_id"] != CANDIDATE_ID or value["connection_id"] != CODEX_CONNECTION:
+    if not isinstance(value, dict) or set(value) != FIELDS or value["candidate_id"] != CANDIDATE_ID:
+        raise Stop("remote_validation")
+    expected_connection = None if returncode == 2 and value["stage"] == "native_dispatch" else CODEX_CONNECTION
+    if value["connection_id"] != expected_connection:
         raise Stop("remote_validation")
     checks = value["checks"]
     if not isinstance(checks, dict) or tuple(checks) != tuple(PRECONDITIONS) or any(type(v) is not bool for v in checks.values()):
@@ -157,7 +212,7 @@ def validate_remote(value, returncode):
         if value[field] is not None and (type(value[field]) is not int or not 100 <= value[field] <= 599): raise Stop("remote_validation")
     if returncode == 0:
         expected = fixture_result(value["before_active"], value["patch_dispatched"])
-        if value["before_active"] not in (True, False) or value["patch_dispatched"] is not value["before_active"] or value != expected:
+        if type(value["before_active"]) is not bool or value["patch_dispatched"] is not value["before_active"] or value != expected:
             raise Stop("remote_validation")
     elif returncode == 1:
         if value["status"] != "CANDIDATE_CODEX_DEACTIVATE_R1_STOP" or value["stage"] not in set(PRECONDITIONS) | {"store_preflight", "get_before", "readback"} or value["patch_dispatched"] is not False or value["inactive_readback"] is not False or value["failure_category"] not in {"precondition", "http_4xx", "http_5xx", "http_other", "parse_error", "schema_mismatch", "predicate_failed", "timeout", "connection", "output_limit"}:

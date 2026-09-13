@@ -1,0 +1,11 @@
+# Candidate key R5 preflight capture contract — 20260913
+
+**SOURCE ONLY — NOT EXECUTABLE until an independent Sol High review freezes the exact launcher, test, contract, and reviewed payload.**
+
+This wrapper invokes the frozen candidate-key R5 launcher once in its existing `--preflight` mode. That mode performs only the already reviewed three management GETs (`/api/keys`, `/api/combos`, and the exact Codex provider record) after its existing candidate, live image, volume, environment, SQLite, and store-absence checks. The wrapper adds no remote behavior, POST, PATCH, key creation, store write, provider request, inference, container mutation, retry, fallback, or cleanup.
+
+Before starting the child, the wrapper requires exact SHA-256 pins for the frozen R5 launcher/test/contract, the bounded transport helper, the immutable first preflight receipt, the spent one-GET diagnostic receipt, and its accepted evidence review. It requires the exact candidate ID, a normal inherited environment with nonempty `PROGRAMDATA`, absent `PYTHONOPTIMIZE`, and the existing management token in process memory. It reserves `docs/auto-switch-candidate-key-r5-preflight-result-r2-20260913.json` with `O_EXCL` before the child; any invocation therefore spends this capture path.
+
+The child runs as `python -B scripts/auto-switch-candidate-key-r5-20260913.py --preflight` under a pinned concurrent bounded-output collector. Child stdout and stderr are held in memory and are never relayed. A valid receipt requires the exact frozen outer schema and the frozen validator's exact 17 named boolean checks. Exit zero is `PASS` only when all 17 are true. A structurally valid nonzero preflight response is `STOP` and retains its fixed stage and boolean map. Timeout, overflow, stderr, malformed JSON, schema contradiction, or any other uncertain child envelope is `UNKNOWN` with no remote payload. Envelope validity is therefore never presented as all-17 success.
+
+The wrapper writes one canonical, bounded JSON receipt, fsyncs it, and closes it on PASS, STOP, or UNKNOWN. Console output contains only wrapper status, fixed stage, and the all-17 boolean; it never contains the token, child output, response bodies, key identifiers, or secret values. The first preflight receipt and all frozen R5 and diagnostic bytes remain unchanged.

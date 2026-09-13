@@ -13,7 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 LAUNCHER = ROOT / "scripts/auto-switch-hardware-qualification-r1-20260913.py"
 module = runpy.run_path(str(LAUNCHER), run_name="hardware_qualification_r1_test")
 
-assert module["EXECUTION_READY"] is False
+assert module["EXECUTION_READY"] is True
 assert module["SOURCE"] == "e53d895e9a5e38a7f06ce59de254835f10e829c1"
 assert module["IMAGE"] == "sha256:8211e1071a3b68eac01673d76129150eb0c0fea329dd222bc8bf0394b13fc844"
 assert module["CANDIDATE_ID"] == "9468859edcdb483c53900edde14d301a162cccc791079154677e913f39bf26a3"

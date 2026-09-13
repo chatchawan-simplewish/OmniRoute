@@ -1,7 +1,6 @@
-"""Prepare the minimum actual-hardware OmniRoute concurrency qualification.
+"""Run the minimum actual-hardware OmniRoute concurrency qualification.
 
-The launcher is deliberately not executable until a reviewed R4 startup result,
-exact R4 container ID, and a fresh candidate-only qualification key are bound.
+Execution still requires exact reviewed pins and an explicit sole-owner dispatch.
 """
 import argparse
 import ast
@@ -58,7 +57,7 @@ KEY_ID = "a4ba1b25-64cf-4e1b-b694-a1b8bcb94f8a"
 CANDIDATE_KEY_RESULT_SHA256 = "7ea777eb23259d0b617cafe9fa262a17115863674ced7c344beaec4246db9044"
 CANDIDATE_KEY_STORE = "/root/.omniroute-qualification/auto-switch-candidate-qualification-r5-20260913.key"
 CANDIDATE_KEY_EVIDENCE_SHA256 = "5d5eda360f9bb1e73d27d27b003bff48b483e4b73276eeeaa4c143d8a8998aeb"
-EXECUTION_READY = False
+EXECUTION_READY = True
 
 Q6_CONNECTION = "eb57393b-f559-4acf-aac6-3eb4612e6d1f"
 Q4_CONNECTION = "da74225c-0fc0-45ce-ad22-ded85edb34b8"
@@ -1032,7 +1031,7 @@ def offline_check():
              (CANDIDATE_KEY_EVIDENCE, CANDIDATE_KEY_EVIDENCE_SHA256))
     if not all(regular(path) and digest(path) == expected for path, expected in fixed):
         raise Stop("local_validation")
-    if EXECUTION_READY or require_bound():
+    if not EXECUTION_READY or require_bound():
         raise Stop("local_validation")
     if RESULT.exists() or RESULT.is_symlink(): raise Stop("stale_result")
     if len(ALLOWED_MODELS) != 14 or ALL_CONNECTIONS != [Q6_CONNECTION, Q4_CONNECTION, OPENROUTER_FREE, CODEX_CONNECTION, OPENROUTER_PAID]:

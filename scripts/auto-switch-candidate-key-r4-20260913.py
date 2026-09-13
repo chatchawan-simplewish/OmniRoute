@@ -204,8 +204,9 @@ REMOTE_TEMPLATE = r'''
 import json,os,pathlib,re,sqlite3,stat,subprocess,threading,time,urllib.parse
 __BOUNDED_CAPTURE__
 LIVE_ID=__LIVE_ID__;LIVE_IMAGE=__LIVE_IMAGE__;LIVE_VOLUME=__LIVE_VOLUME__;CANDIDATE=__CANDIDATE__;CANDIDATE_ID=__CANDIDATE_ID__;VOLUME=__VOLUME__;IMAGE=__IMAGE__;TAG=__TAG__;SOURCE=__SOURCE__;KEY_NAME=__KEY_NAME__;STORE=pathlib.Path(__STORE__);NODE=__NODE__;ROLLBACK=__ROLLBACK__
-stage='identity';key_id=None;created=False;stored=False;store_identity=None;rollback_attempted=False;key_inactive_readback=None;failure_category='validation';http_status=None
+stage='identity';key_id=None;created=False;stored=False;store_identity=None;store_parent_fd=None;rollback_attempted=False;key_inactive_readback=None;failure_category='validation';http_status=None
 class Stop(Exception):pass
+class MutationUnknown(Exception):pass
 def run(a,p=None,t=60):
  try:rc,out,err=bounded_capture(a,p,t)
  except RuntimeError as e:raise Stop('child_timeout' if str(e)=='COMMAND_TIMEOUT' else 'child_output')
@@ -220,6 +221,31 @@ def formatted(kind,fmt,identity):
 def safe_dir(path,mode):
  item=os.lstat(path)
  if not stat.S_ISDIR(item.st_mode) or stat.S_ISLNK(item.st_mode) or item.st_uid!=0 or item.st_gid!=0 or stat.S_IMODE(item.st_mode)!=mode or pathlib.Path(os.path.realpath(path))!=path:raise Stop()
+ return item
+def read_regular(path,limit,uid,gid,mode):
+ item=os.lstat(path)
+ if not stat.S_ISREG(item.st_mode) or stat.S_ISLNK(item.st_mode) or item.st_uid!=uid or item.st_gid!=gid or stat.S_IMODE(item.st_mode)!=mode or item.st_size>limit:raise Stop()
+ fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+ try:
+  held=os.fstat(fd);raw=b''
+  while len(raw)<=limit:
+   block=os.read(fd,min(65536,limit+1-len(raw)))
+   if not block:break
+   raw+=block
+  after=os.fstat(fd)
+  if len(raw)>limit or len(raw)!=held.st_size or (held.st_dev,held.st_ino,held.st_size,held.st_mtime_ns)!=(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns):raise Stop()
+  return raw
+ finally:os.close(fd)
+def parse_env(raw):
+ result={}
+ for line in raw.decode('utf8').splitlines():
+  value=line.strip()
+  if not value or value.startswith('#') or '=' not in value:continue
+  key,item=value.split('=',1);key=key.strip();item=item.strip()
+  if key in result:raise Stop()
+  if len(item)>=2 and item[0] in ('\"',"'") and item[-1]==item[0]:item=item[1:-1]
+  result[key]=item
+ return result
 def cloud_false(path):
  db=sqlite3.connect('file:'+urllib.parse.quote(str(path),safe='/')+'?mode=ro',uri=True,timeout=10)
  try:
@@ -231,12 +257,28 @@ def schema_ready(path):
  db=sqlite3.connect('file:'+urllib.parse.quote(str(path),safe='/')+'?mode=ro',uri=True,timeout=10)
  try:
   db.execute('PRAGMA query_only=ON');db.execute('BEGIN')
+  if db.execute('PRAGMA quick_check').fetchall()!=[('ok',)]:raise Stop()
   migrations=set(db.execute("SELECT version,name FROM _omniroute_migrations WHERE version IN ('170','171')"))
   expected={'agent_route_runs':{'run_id','api_key_id','task_id','effective_review_class','created_at','updated_at'},'agent_route_turns':{'run_id','turn_id','idempotency_key','virtual_route','state','output_started','tool_started','dispatch_claimed','created_at','updated_at'},'agent_route_events':{'event_id','run_id','turn_id','idempotency_key','kind','provider','model','connection_id','candidate_attempt','repair_attempt','reviewer_attempt','admission_state','fallback_reason','latency_ms','busy_slots','processing_requests','prompt_tokens','completion_tokens','objective_outcome','reviewer_class','reviewer_model','reviewer_verdict','subscription_percent','subscription_evidence_id','subscription_evidence_at','subscription_decision','occurred_at','deferred_requests'}}
   if ('170','170_agent_route_runs') not in migrations or ('171','171_agent_route_deferred_metrics') not in migrations:raise Stop()
   for table,columns in expected.items():
    actual={row[1] for row in db.execute('PRAGMA table_info('+table+')')}
    if actual!=columns:raise Stop()
+  db.execute('ROLLBACK')
+ finally:db.close()
+def credential_shape(path):
+ db=sqlite3.connect('file:'+urllib.parse.quote(str(path),safe='/')+'?mode=ro',uri=True,timeout=10)
+ try:
+  db.execute('PRAGMA query_only=ON');db.execute('BEGIN')
+  columns={row[1] for row in db.execute('PRAGMA table_info(provider_connections)')};fields=['api_key','access_token','refresh_token','id_token']
+  if not set(fields).issubset(columns):raise Stop()
+  encrypted=plain=empty=0
+  for row in db.execute('SELECT '+','.join(fields)+' FROM provider_connections'):
+   for value in row:
+    if value is None or value=='':empty+=1
+    elif isinstance(value,str) and value.startswith('enc:v1:'):encrypted+=1
+    else:plain+=1
+  if (encrypted,plain,empty)!=(18,0,34):raise Stop()
   db.execute('ROLLBACK')
  finally:db.close()
 def rollback_key():
@@ -249,11 +291,13 @@ def rollback_key():
   key_inactive_readback=rc==0 and value=={'status':'ROLLBACK_PASS','key_inactive_readback':True}
  except:key_inactive_readback=False
 def remove_store():
- if not stored or store_identity is None:return None
+ if not stored or store_identity is None or store_parent_fd is None:return None
  try:
-  item=os.lstat(STORE)
+  item=os.stat(STORE.name,dir_fd=store_parent_fd,follow_symlinks=False)
   if (item.st_dev,item.st_ino)!=store_identity or not stat.S_ISREG(item.st_mode) or stat.S_ISLNK(item.st_mode):return False
-  os.unlink(STORE);return not os.path.lexists(STORE)
+  os.unlink(STORE.name,dir_fd=store_parent_fd);os.fsync(store_parent_fd)
+  try:os.stat(STORE.name,dir_fd=store_parent_fd,follow_symlinks=False);return False
+  except FileNotFoundError:return True
  except:return False
 try:
  candidate_format='{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"config_image":{{json .Config.Image}},"source":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"user":{{json .Config.User}},"running":{{json .State.Running}},"status":{{json .State.Status}},"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}"none"{{end}},"network":{{json .HostConfig.NetworkMode}},"readonly":{{json .HostConfig.ReadonlyRootfs}},"restart":{{json .HostConfig.RestartPolicy.Name}},"caps":{{json .HostConfig.CapDrop}},"security":{{json .HostConfig.SecurityOpt}},"ports":{{json .HostConfig.PortBindings}},"network_ports":{{json .NetworkSettings.Ports}},"tmpfs":{{json .HostConfig.Tmpfs}},"mounts":{{json .Mounts}}}'
@@ -274,21 +318,29 @@ try:
  if volume.get('name')!=VOLUME or volume.get('driver')!='local' or volume.get('scope')!='local' or not root.is_dir() or root.is_symlink() or pathlib.Path(os.path.realpath(root))!=root:raise Stop()
  db_path=root/'storage.sqlite';item=os.lstat(db_path)
  if not stat.S_ISREG(item.st_mode) or stat.S_ISLNK(item.st_mode) or pathlib.Path(os.path.realpath(db_path))!=db_path:raise Stop()
- cloud_false(db_path);schema_ready(db_path)
+ cloud_false(db_path);schema_ready(db_path);credential_shape(db_path)
+ env=parse_env(read_regular(root/'server.env',65536,1000,1000,0o600));required={'STORAGE_ENCRYPTION_KEY','JWT_SECRET','API_KEY_SECRET'}
+ if set(env) not in (required,required|{'STORAGE_ENCRYPTION_KEY_VERSION'}) or any(not env[name] or len(env[name])>4096 for name in env):raise Stop()
+ del env
  stage='store_preflight';parent=STORE.parent
  if STORE.name!='auto-switch-candidate-qualification-r4-20260913.key' or parent!=pathlib.Path('/root/.omniroute-qualification') or os.path.lexists(STORE):raise Stop()
- safe_dir(parent,0o700)
- stage='native';rc,out,err=docker(['container','exec','-i','--user','node','--workdir','/app',CANDIDATE,'node','-'],NODE.encode(),180)
- if err:raise Stop('child_output')
- native=json.loads(out)
+ parent_before=safe_dir(parent,0o700)
+ store_parent_fd=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW);parent_info=os.fstat(store_parent_fd)
+ if not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid!=0 or parent_info.st_gid!=0 or stat.S_IMODE(parent_info.st_mode)!=0o700 or (parent_info.st_dev,parent_info.st_ino)!=(parent_before.st_dev,parent_before.st_ino):raise Stop()
+ stage='native_dispatch'
+ try:rc,out,err=bounded_capture(['docker','container','exec','-i','--user','node','--workdir','/app',CANDIDATE,'node','-'],NODE.encode(),180)
+ except RuntimeError as error:raise MutationUnknown('child_timeout' if str(error)=='COMMAND_TIMEOUT' else 'child_output')
+ if err:raise MutationUnknown('child_output')
+ try:native=json.loads(out)
+ except Exception:raise MutationUnknown('remote_envelope')
  if rc:
   fields={'status','stage','key_id','failure_category','http_status','rollback_attempted','key_inactive_readback'}
-  if not isinstance(native,dict) or set(native)!=fields or native.get('status')!='KEY_NATIVE_R4_STOP':raise Stop('child_output')
+  if not isinstance(native,dict) or set(native)!=fields or native.get('status')!='KEY_NATIVE_R4_STOP':raise MutationUnknown('remote_envelope')
   key_id=native['key_id'];failure_category=native['failure_category'];http_status=native['http_status'];rollback_attempted=native['rollback_attempted'];key_inactive_readback=native['key_inactive_readback']
-  if native['stage'] not in {'native_preflight','provider_preflight','create','patch','readback'}:raise Stop('child_output')
+  if native['stage'] not in {'native_preflight','provider_preflight','create','patch','readback'}:raise MutationUnknown('remote_envelope')
   stage=native['stage']
   raise Stop(failure_category)
- if not isinstance(native,dict) or set(native)!={'status','key_id','secret','codex_inactive_readback'} or native.get('status')!='KEY_NATIVE_R4_PASS' or native.get('codex_inactive_readback') is not True:raise Stop()
+ if not isinstance(native,dict) or set(native)!={'status','key_id','secret','codex_inactive_readback'} or native.get('status')!='KEY_NATIVE_R4_PASS' or native.get('codex_inactive_readback') is not True:raise MutationUnknown('remote_envelope')
  key_id=native['key_id'];secret=native['secret'];created=True
  if not re.fullmatch(r'[0-9a-f-]{36}',key_id) or not re.fullmatch(r'sk-[0-9a-f]{16}-[0-9a-f]{6}-[0-9a-f]{8}',secret):raise Stop()
  stage='db_readback';db=sqlite3.connect('file:'+urllib.parse.quote(str(db_path),safe='/')+'?mode=ro',uri=True,timeout=10)
@@ -299,7 +351,7 @@ try:
  finally:db.close()
  stage='store';old=os.umask(0o077)
  try:
-  fd=os.open(STORE,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);stored=True;opened=os.fstat(fd);store_identity=(opened.st_dev,opened.st_ino)
+  fd=os.open(STORE.name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=store_parent_fd);stored=True;opened=os.fstat(fd);store_identity=(opened.st_dev,opened.st_ino)
   try:
    raw=secret.encode('ascii');offset=0
    while offset<len(raw):
@@ -310,15 +362,19 @@ try:
    if not stat.S_ISREG(item.st_mode) or item.st_uid!=0 or item.st_gid!=0 or stat.S_IMODE(item.st_mode)!=0o600 or item.st_size!=len(raw):raise Stop()
   finally:os.close(fd)
  finally:os.umask(old)
- item=os.lstat(STORE)
- if not stat.S_ISREG(item.st_mode) or stat.S_ISLNK(item.st_mode) or (item.st_dev,item.st_ino)!=store_identity or pathlib.Path(os.path.realpath(STORE))!=STORE:raise Stop()
+ os.fsync(store_parent_fd);item=os.stat(STORE.name,dir_fd=store_parent_fd,follow_symlinks=False)
+ if not stat.S_ISREG(item.st_mode) or stat.S_ISLNK(item.st_mode) or (item.st_dev,item.st_ino)!=store_identity:raise Stop()
  stage='result';row=formatted('container',candidate_format,CANDIDATE_ID)
  if row.get('id')!=CANDIDATE_ID or row.get('running') is not True or row.get('health')!='healthy' or row.get('network')!='none':raise Stop()
  print(json.dumps({'status':'CANDIDATE_KEY_R4_PASS','candidate_id':CANDIDATE_ID,'candidate_running':True,'key_id':key_id,'key_name':KEY_NAME,'created':True,'patched':True,'readback':True,'stored':True,'allowed_models':14,'allowed_connections':5,'allowed_quotas':0,'scopes':1,'endpoints':2,'no_log':True,'auto_resolve':False,'codex_inactive_readback':True,'db_ip_allowlist_is_null':True,'migration_170':True,'migration_171':True,'rollback_attempted':False,'key_inactive_readback':False},sort_keys=True,separators=(',',':')))
+except MutationUnknown as error:
+ print(json.dumps({'status':'CANDIDATE_KEY_R4_UNKNOWN','stage':'native_dispatch','candidate_id':None,'candidate_running':None,'key_id':None,'created':None,'stored':None,'store_removed':None,'failure_category':str(error) if str(error) in {'child_timeout','child_output','remote_envelope'} else 'remote_envelope','http_status':None,'rollback_attempted':None,'key_inactive_readback':None},sort_keys=True,separators=(',',':')));raise SystemExit(2)
 except Exception as error:
  if str(error) in {'validation','http_4xx','http_5xx','http_other','timeout','connection','output_limit','child_timeout','child_output'}:failure_category=str(error)
  rollback_key();removed=remove_store()
  print(json.dumps({'status':'CANDIDATE_KEY_R4_STOP','stage':stage if stage in {'identity','store_preflight','native','native_preflight','provider_preflight','create','patch','readback','db_readback','store','result'} else 'identity','candidate_id':CANDIDATE_ID,'candidate_running':True if stage!='identity' else None,'key_id':key_id,'created':created,'stored':stored,'store_removed':removed,'failure_category':failure_category,'http_status':http_status,'rollback_attempted':rollback_attempted,'key_inactive_readback':key_inactive_readback},sort_keys=True,separators=(',',':')));raise SystemExit(1)
+finally:
+ if store_parent_fd is not None:os.close(store_parent_fd)
 '''
 
 
@@ -360,6 +416,12 @@ def validate_result(value, returncode, expected_candidate_id=None):
     stop_fields = {"status", "stage", "candidate_id", "candidate_running", "key_id", "created",
                    "stored", "store_removed", "failure_category", "http_status",
                    "rollback_attempted", "key_inactive_readback"}
+    if isinstance(value, dict) and value.get("status") == "CANDIDATE_KEY_R4_UNKNOWN":
+        if (returncode == 0 or set(value) != stop_fields or value["stage"] != "native_dispatch"
+                or value["failure_category"] not in {"child_timeout", "child_output", "remote_envelope"}
+                or any(value[name] is not None for name in stop_fields - {"status", "stage", "failure_category"})):
+            raise Stop("remote_validation")
+        return value
     if not isinstance(value, dict) or set(value) != stop_fields or value["status"] != "CANDIDATE_KEY_R4_STOP":
         raise Stop("remote_validation")
     if value["stage"] not in {"identity", "store_preflight", "native", "native_preflight", "provider_preflight", "create", "patch", "readback", "db_readback", "store", "result"}:
@@ -516,7 +578,8 @@ def execute(reviewed):
         if err:raise Stop("remote_validation")
         try:value=validate_result(json.loads(out),rc)
         except Exception as error:raise Stop("remote_validation") from error
-        receipt={"schema":RESULT_SCHEMA,"status":"PASS" if rc==0 else "STOP","stage":"complete" if rc==0 else value["stage"],"remote":value}
+        status="PASS" if rc==0 else ("UNKNOWN" if value["status"]=="CANDIDATE_KEY_R4_UNKNOWN" else "STOP")
+        receipt={"schema":RESULT_SCHEMA,"status":status,"stage":"complete" if rc==0 else value["stage"],"remote":value}
         print(json.dumps(value,sort_keys=True));return 0 if rc==0 else 1
     except Stop as error:
         if str(error) not in {"transport","remote_validation"}:

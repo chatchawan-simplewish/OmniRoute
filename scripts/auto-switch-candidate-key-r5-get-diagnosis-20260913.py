@@ -126,9 +126,36 @@ def validate_remote(value, returncode):
             raise Stop("remote_validation")
         if value["keys_is_array"] not in (None, True, False) or value["key_name_present"] not in (None, True, False):
             raise Stop("remote_validation")
-        if value["child_outcome"] not in {"complete", "parse_error", "timeout", "connection", "output_limit"}:
+        outcome = value["child_outcome"]
+        if outcome not in {"complete", "parse_error", "timeout", "connection", "output_limit"}:
             raise Stop("remote_validation")
-        if value["child_outcome"] != "complete" and any(value[k] is not None for k in ("http_status", "keys_is_array", "key_name_present")):
+        expected_category = ("ok" if value["http_status"] == 200 else "auth_401" if value["http_status"] == 401
+                             else "auth_403" if value["http_status"] == 403 else "server_5xx"
+                             if isinstance(value["http_status"], int) and 500 <= value["http_status"] <= 599
+                             else "other_http" if isinstance(value["http_status"], int) else "none")
+        if value["http_category"] != expected_category:
+            raise Stop("remote_validation")
+        if outcome == "parse_error":
+            if (value["http_status"] is None or value["json_parsed"] is not False
+                    or value["schema_category"] != "unparsed"
+                    or value["keys_is_array"] is not None or value["key_name_present"] is not None):
+                raise Stop("remote_validation")
+        elif outcome in {"timeout", "connection", "output_limit"}:
+            if (value["http_status"] is not None or value["http_category"] != "none"
+                    or value["json_parsed"] is not False or value["schema_category"] != "unparsed"
+                    or value["keys_is_array"] is not None or value["key_name_present"] is not None):
+                raise Stop("remote_validation")
+        elif (value["http_status"] is None or value["json_parsed"] is not True
+              or value["schema_category"] == "unparsed"):
+            raise Stop("remote_validation")
+        elif value["schema_category"] == "not_object":
+            if value["keys_is_array"] is not None or value["key_name_present"] is not None:
+                raise Stop("remote_validation")
+        elif type(value["keys_is_array"]) is not bool:
+            raise Stop("remote_validation")
+        elif value["keys_is_array"] is True and type(value["key_name_present"]) is not bool:
+            raise Stop("remote_validation")
+        elif value["keys_is_array"] is False and value["key_name_present"] is not None:
             raise Stop("remote_validation")
         return value
     r5 = load(R5, R5_SHA256, "candidate_key_r5_diag_validator")

@@ -19,12 +19,30 @@ good = {"status": "CANDIDATE_KEY_R5_GET_DIAG_PASS", "candidate_id": module["CAND
         "key_name_present": False, "child_outcome": "complete"}
 assert module["validate_remote"](good, 0) == good
 
+parse_error = copy.deepcopy(good)
+parse_error.update(http_status=503, http_category="server_5xx", json_parsed=False,
+                   schema_category="unparsed", keys_is_array=None, key_name_present=None,
+                   child_outcome="parse_error")
+assert module["validate_remote"](parse_error, 0) == parse_error
+
+transport_error = copy.deepcopy(good)
+transport_error.update(http_status=None, http_category="none", json_parsed=False,
+                       schema_category="unparsed", keys_is_array=None, key_name_present=None,
+                       child_outcome="timeout")
+assert module["validate_remote"](transport_error, 0) == transport_error
+
 for change in (
     lambda v: v.update(raw_body="secret-like-value"),
     lambda v: v.update(http_category="arbitrary"),
     lambda v: v.update(schema_category="keys,keyHash"),
     lambda v: v.update(child_outcome="raw error"),
     lambda v: v.update(http_status=999),
+    lambda v: v.update(child_outcome="parse_error", http_status=None, json_parsed=False,
+                       schema_category="unparsed", keys_is_array=None, key_name_present=None),
+    lambda v: v.update(child_outcome="timeout", http_status=None, json_parsed=False,
+                       schema_category="unparsed", keys_is_array=None, key_name_present=None),
+    lambda v: v.update(schema_category="not_object", keys_is_array=True, key_name_present=False),
+    lambda v: v.update(keys_is_array=False, key_name_present=False),
 ):
     bad = copy.deepcopy(good); change(bad)
     try:

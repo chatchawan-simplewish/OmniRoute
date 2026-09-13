@@ -29,6 +29,7 @@ assert value["status"] == "STOP" and value["all_17_pass"] is False and value["ch
 
 for bad in (
     (envelope("CANDIDATE_KEY_R5_PREFLIGHT_PASS", "complete", failed), b"", 0),
+    (envelope("CANDIDATE_KEY_R5_PREFLIGHT_STOP", "native_preflight", checks), b"", 1),
     (envelope("CANDIDATE_KEY_R5_PREFLIGHT_STOP", "native_preflight", failed), b"warning", 1),
     (b"{}", b"", 1),
 ):

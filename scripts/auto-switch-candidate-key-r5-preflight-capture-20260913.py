@@ -100,7 +100,7 @@ def classify_child(stdout, stderr, returncode, r5):
     except Exception as error:
         raise Stop("child_envelope") from error
     all_pass = all(remote["checks"].values())
-    if returncode == 0 and not all_pass:
+    if (returncode == 0) != all_pass:
         raise Stop("child_envelope")
     status = "PASS" if returncode == 0 else "STOP"
     stage = "complete" if status == "PASS" else remote["stage"]

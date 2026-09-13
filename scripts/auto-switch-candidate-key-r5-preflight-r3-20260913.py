@@ -139,16 +139,33 @@ def validate_native(value, returncode):
     if any(not isinstance(evidence[name], dict) or set(evidence[name]) != set(labels) for name in ("http_status", "http_category", "schema")): raise Stop("remote_validation")
     expected_steps = (["keys"] if true_count >= 2 else []) + (["combos"] if true_count >= 4 else []) + (["codex"] if true_count == 6 else [])
     if evidence["completed_steps"] != expected_steps: raise Stop("remote_validation")
+    status_map = evidence["http_status"]; category_map = evidence["http_category"]; schema_map = evidence["schema"]
     for label in labels:
-        status = evidence["http_status"][label]; category = evidence["http_category"][label]; schema = evidence["schema"][label]
+        status = status_map[label]; category = category_map[label]; schema = schema_map[label]
         if status is not None and (type(status) is not int or not 100 <= status <= 599): raise Stop("remote_validation")
         expected_category = "ok" if status == 200 else "auth_401" if status == 401 else "auth_403" if status == 403 else "server_5xx" if isinstance(status, int) and status >= 500 else "other_http" if isinstance(status, int) else None
         if category != expected_category or schema not in (None, "expected", "mismatch", "not_object"): raise Stop("remote_validation")
     if returncode == 0:
         if value["status"] != "KEY_NATIVE_R5_PREFLIGHT_R3_PASS" or value["stage"] != "complete" or true_count != 6 or evidence["failure_category"] is not None or evidence["child_outcome"] != "complete": raise Stop("remote_validation")
+        if any((status_map[label], category_map[label], schema_map[label]) != (200, "ok", "expected") for label in labels): raise Stop("remote_validation")
     else:
-        allowed = {"auth_401", "auth_403", "server_5xx", "other_http", "parse_error", "schema_mismatch", "predicate_failed", "timeout", "connection", "output_limit"}
-        if returncode != 1 or value["status"] != "KEY_NATIVE_R5_PREFLIGHT_R3_STOP" or value["stage"] not in NATIVE_CHECKS or true_count == 6 or evidence["failure_category"] not in allowed or evidence["child_outcome"] not in {"http_error", "parse_error", "schema_error", "predicate_error", "timeout", "connection", "output_limit"}: raise Stop("remote_validation")
+        if returncode != 1 or value["status"] != "KEY_NATIVE_R5_PREFLIGHT_R3_STOP" or true_count == 6 or value["stage"] != NATIVE_CHECKS[true_count]: raise Stop("remote_validation")
+        current = labels[true_count // 2]
+        earlier = labels[:true_count // 2]; later = labels[true_count // 2 + 1:]
+        if any((status_map[label], category_map[label], schema_map[label]) != (200, "ok", "expected") for label in earlier): raise Stop("remote_validation")
+        if any((status_map[label], category_map[label], schema_map[label]) != (None, None, None) for label in later): raise Stop("remote_validation")
+        current_value = (status_map[current], category_map[current], schema_map[current], evidence["failure_category"], evidence["child_outcome"])
+        transport = {(None, None, None, name, name) for name in ("timeout", "connection", "output_limit")}
+        http = {(code, category, None, category, "http_error") for code, category in ((401, "auth_401"), (403, "auth_403"))}
+        if isinstance(status_map[current], int) and status_map[current] != 200:
+            http.add((status_map[current], category_map[current], None, category_map[current], "http_error"))
+        schema = {(200, "ok", None, "parse_error", "parse_error"),
+                  (200, "ok", "mismatch", "schema_mismatch", "schema_error"),
+                  (200, "ok", "not_object", "schema_mismatch", "schema_error"),
+                  (200, "ok", "expected", "schema_mismatch", "schema_error")}
+        predicate = {(200, "ok", "expected", "predicate_failed", "predicate_error")}
+        allowed = transport | http | (predicate if true_count % 2 else schema)
+        if current_value not in allowed: raise Stop("remote_validation")
     return value
 
 

@@ -56,6 +56,17 @@ broken = {**stopped, "evidence": {**stopped["evidence"], "completed_steps": []}}
 rejected(broken, 1)
 wrong_stage = json.loads(json.dumps(stopped)); wrong_stage["stage"] = "codex_schema"; rejected(wrong_stage, 1)
 later = json.loads(json.dumps(stopped)); later["evidence"]["http_status"]["codex"] = 200; later["evidence"]["http_category"]["codex"] = "ok"; later["evidence"]["schema"]["codex"] = "expected"; rejected(later, 1)
+odd = {name: name == "key_api_schema" for name in module.NATIVE_CHECKS}
+odd_timeout = native(odd, {"keys": None, "combos": None, "codex": None},
+                     {"keys": None, "combos": None, "codex": None},
+                     {"keys": None, "combos": None, "codex": None}, [],
+                     "KEY_NATIVE_R5_PREFLIGHT_R3_STOP", "key_name_absent", "timeout", "timeout")
+rejected(odd_timeout, 1)
+odd_http = native(odd, {"keys": 500, "combos": None, "codex": None},
+                  {"keys": "server_5xx", "combos": None, "codex": None},
+                  {"keys": None, "combos": None, "codex": None}, [],
+                  "KEY_NATIVE_R5_PREFLIGHT_R3_STOP", "key_name_absent", "server_5xx", "http_error")
+rejected(odd_http, 1)
 
 outer_checks = {name: (passed["checks"][name] if name in module.NATIVE_CHECKS else True)
                 for name in sorted(r5.PREFLIGHT_CHECKS)}

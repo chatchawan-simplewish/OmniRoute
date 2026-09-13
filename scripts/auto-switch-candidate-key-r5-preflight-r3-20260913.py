@@ -164,7 +164,7 @@ def validate_native(value, returncode):
                   (200, "ok", "not_object", "schema_mismatch", "schema_error"),
                   (200, "ok", "expected", "schema_mismatch", "schema_error")}
         predicate = {(200, "ok", "expected", "predicate_failed", "predicate_error")}
-        allowed = transport | http | (predicate if true_count % 2 else schema)
+        allowed = predicate if true_count % 2 else transport | http | schema
         if current_value not in allowed: raise Stop("remote_validation")
     return value
 

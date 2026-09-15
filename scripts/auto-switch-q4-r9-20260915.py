@@ -10,6 +10,9 @@ HELPER = ROOT / "scripts" / "auto-switch-q4-r9-20260915-helper.py"
 CONTRACT = ROOT / "docs" / "auto-switch-q4-r9-20260915-contract.md"
 TEST = ROOT / "scripts" / "auto-switch-q4-r9-20260915-test.py"
 APPROVAL_HASH_FIELDS = ("launcher_sha256", "helper_sha256", "contract_sha256", "test_sha256")
+MANIFEST_KEYS = {"schema", *APPROVAL_HASH_FIELDS}
+ACTION_KEYS = {"schema", "source_manifest", "runtime", "state_leaf", "terminal_leaf"}
+APPROVAL_KEYS = {"schema", "verdict", "model", "effort", "reviewed_payload_sha256", *APPROVAL_HASH_FIELDS}
 
 
 def canonical(value):
@@ -32,6 +35,10 @@ def source_manifest(sources=None):
 def approved_request_bytes(payload_raw, approval_raw, sources):
     action, approval = json.loads(payload_raw), json.loads(approval_raw)
     manifest = source_manifest(sources)
+    if not isinstance(action, dict) or not isinstance(approval, dict) or payload_raw != canonical(action) or approval_raw != canonical(approval):
+        raise ValueError("noncanonical input")
+    if set(manifest) != MANIFEST_KEYS or set(action) != ACTION_KEYS or set(approval) != APPROVAL_KEYS:
+        raise ValueError("schema drift")
     if action.get("schema") != "auto-switch-q4-r9-action/v1" or action.get("source_manifest") != manifest:
         raise ValueError("unbound action")
     if approval.get("schema") != "auto-switch-q4-r9-approval/v1" or approval.get("verdict") != "PASS":
@@ -43,7 +50,9 @@ def approved_request_bytes(payload_raw, approval_raw, sources):
     if any(approval.get(field) != manifest[field] for field in APPROVAL_HASH_FIELDS):
         raise ValueError("source drift")
     return {"schema": "auto-switch-q4-r9-request/v1", "action": action, "approval": approval,
-            "source_manifest": manifest}
+            "source_manifest": manifest, "source_bundle": {"launcher": sources[SELF], "helper": sources[HELPER],
+            "contract": sources[CONTRACT], "test": sources[TEST]}, "action_bytes": payload_raw,
+            "approval_bytes": approval_raw}
 
 
 def approved_request(payload_path, approval_path, sources=None):

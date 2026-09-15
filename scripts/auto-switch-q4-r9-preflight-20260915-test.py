@@ -100,6 +100,10 @@ class Q4R9PreflightTest(unittest.TestCase):
             self.assertEqual(action_raw, module.canonical(action))
             self.assertEqual(action["credential"], json.loads(receipt_raw)["credential"])
             self.assertEqual(action["runtime"]["endpoint"], "http://172.18.0.9:20129/v1")
+            rendered_request = json.loads((root / "action" / "request.json").read_bytes())
+            self.assertEqual(rendered_request["headers"], {
+                "x-omniroute-session-id": request_id, "x-request-id": request_id,
+            })
 
             runtime_spec = importlib.util.spec_from_file_location("q4_r9_runtime", RUNTIME)
             runtime_module = importlib.util.module_from_spec(runtime_spec)
@@ -121,18 +125,21 @@ class Q4R9PreflightTest(unittest.TestCase):
             collector_module = importlib.util.module_from_spec(collector_spec)
             collector_spec.loader.exec_module(collector_module)
             selection_db = root / "selection.sqlite"
-            observed_log_id = "1789445000000-abc123"
+            pending_request_id = "1789445000000-abc123"
+            skill_request_id = "33333333-3333-4333-8333-333333333333"
+            self.assertNotEqual(pending_request_id, skill_request_id)
             connection = sqlite3.connect(selection_db)
-            connection.execute("CREATE TABLE call_logs(id TEXT,status INTEGER,model TEXT,provider TEXT,connection_id TEXT)")
-            connection.execute("INSERT INTO call_logs VALUES(?,?,?,?,?)", (
-                observed_log_id, 200, action["runtime"]["model"], "lm-studio", action["runtime"]["connection_id"]))
+            connection.execute("CREATE TABLE call_logs(id TEXT,status INTEGER,method TEXT,path TEXT,model TEXT,provider TEXT,connection_id TEXT,session_tag TEXT)")
+            connection.execute("INSERT INTO call_logs VALUES(?,?,?,?,?,?,?,?)", (
+                pending_request_id, 200, "POST", "/v1/chat/completions", action["runtime"]["model"],
+                "lm-studio", action["runtime"]["connection_id"], request_id))
             connection.commit(); connection.close()
-            self.assertEqual(collector_module.observed_connection(selection_db, observed_log_id, action["runtime"]),
+            self.assertEqual(collector_module.observed_connection(selection_db, request_id, action["runtime"]),
                              action["runtime"]["connection_id"])
             mismatched_runtime = dict(action["runtime"])
             mismatched_runtime["connection_id"] = "22222222-2222-4222-8222-222222222222"
             with self.assertRaises(ValueError):
-                collector_module.observed_connection(selection_db, observed_log_id, mismatched_runtime)
+                collector_module.observed_connection(selection_db, request_id, mismatched_runtime)
             review_package_path = root / "action" / "review-package.json"
             self.assertTrue(review_package_path.is_file(), "exact-action review package is missing")
             review_package = json.loads(review_package_path.read_bytes())

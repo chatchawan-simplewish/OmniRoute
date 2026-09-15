@@ -50,13 +50,15 @@ def observed_connection(db_path, request_id, runtime):
         database.execute("PRAGMA query_only=ON")
         database.execute("BEGIN")
         rows = database.execute(
-            "SELECT status,model,provider,connection_id FROM call_logs WHERE id=?", (request_id,)).fetchall()
+            "SELECT status,method,path,model,provider,connection_id FROM call_logs WHERE session_tag=?",
+            (request_id,)).fetchall()
     finally:
         database.close()
-    expected = (200, runtime.get("model"), "lm-studio", runtime.get("connection_id"))
+    expected = (200, "POST", "/v1/chat/completions", runtime.get("model"),
+                "lm-studio", runtime.get("connection_id"))
     if len(rows) != 1 or tuple(rows[0]) != expected:
         raise ValueError("selected connection")
-    return rows[0][3]
+    return rows[0][5]
 
 
 def main():
@@ -67,10 +69,10 @@ def main():
             or set(spec) != {"schema", "headers", "body"}
             or spec.get("schema") != "auto-switch-q4-r9-q4-request/v1"
             or spec.get("body", {}).get("model") != runtime.get("model")
-            or set(spec.get("headers", {})) != {"x-request-id"}):
+            or set(spec.get("headers", {})) != {"x-omniroute-session-id", "x-request-id"}):
         return 1
     request_id = spec["headers"]["x-request-id"]
-    if uuid.UUID(request_id).version != 4:
+    if spec["headers"]["x-omniroute-session-id"] != request_id or uuid.UUID(request_id).version != 4:
         return 1
     origin = urllib.parse.urlsplit(runtime.get("endpoint", ""))
     if (origin.scheme != "http" or origin.port != 20129 or origin.path.rstrip("/") != "/v1"
@@ -87,18 +89,16 @@ def main():
     body_raw = canonical(spec["body"])
     completion_status, meta, completion_raw = request(
         origin, "POST", "/v1/chat/completions",
-        {**headers, "Content-Type": "application/json", "X-Request-Id": request_id}, body_raw)
+        {**headers, "Content-Type": "application/json", "X-OmniRoute-Session-Id": request_id,
+         "X-Request-Id": request_id}, body_raw)
     completion = json.loads(completion_raw)
     choices = completion.get("choices") if isinstance(completion, dict) else None
     content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and len(choices) == 1 and isinstance(choices[0], dict) else None
-    observed_log_id = meta.get("x-omniroute-request-id")
     if (completion_status != 200 or not isinstance(content, str) or not content
             or meta.get("x-omniroute-model") != runtime["model"]
-            or not isinstance(observed_log_id, str) or not 1 <= len(observed_log_id) <= 128
-            or any(ord(char) < 0x21 or ord(char) > 0x7e for char in observed_log_id)
             or meta.get("x-omniroute-provider") != "lm-studio"):
         return 1
-    selected_connection = observed_connection(CALL_LOG_DB, observed_log_id, runtime)
+    selected_connection = observed_connection(CALL_LOG_DB, request_id, runtime)
     evidence = {
         "schema": "auto-switch-q4-r9-evidence/v1", "runtime": runtime,
         "health": {"status": health_status, "candidate_id": runtime["candidate_id"]},

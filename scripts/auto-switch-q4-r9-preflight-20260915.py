@@ -340,9 +340,10 @@ def _operation_bytes(candidate_ipv4, request_id):
     if address.version != 4 or not address.is_private or address.is_loopback or address.is_multicast:
         raise ValueError("unsafe candidate address")
     request = parse(read_once(REQUEST).rstrip(b"\r\n"))
-    if request.get("headers", {}).get("x-request-id") != "__REQUEST_ID__" or uuid.UUID(request_id).version != 4:
+    if (request.get("headers") != {"x-omniroute-session-id": "__REQUEST_ID__", "x-request-id": "__REQUEST_ID__"}
+            or uuid.UUID(request_id).version != 4):
         raise ValueError("request id")
-    request["headers"]["x-request-id"] = str(uuid.UUID(request_id))
+    request["headers"] = {name: str(uuid.UUID(request_id)) for name in request["headers"]}
     command = parse(read_once(COMMAND).rstrip(b"\r\n"))
     if command.get("candidate_id") != CANDIDATE_ID or command.get("image_sha256") != IMAGE_SHA256:
         raise ValueError("command template")

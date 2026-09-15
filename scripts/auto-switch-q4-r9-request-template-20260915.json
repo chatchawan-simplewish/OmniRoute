@@ -1,1 +1,1 @@
-{"body":{"max_tokens":16,"messages":[{"content":"Reply with exactly Q4_R9_OK","role":"user"}],"model":"lm-studio/qwen3.8-27b-unsloth-ud-q4ks","stream":false,"temperature":0},"headers":{"x-request-id":"__REQUEST_ID__"},"schema":"auto-switch-q4-r9-q4-request/v1"}
+{"body":{"max_tokens":16,"messages":[{"content":"Reply with exactly Q4_R9_OK","role":"user"}],"model":"lm-studio/qwen3.8-27b-unsloth-ud-q4ks","stream":false,"temperature":0},"headers":{"x-omniroute-session-id":"__REQUEST_ID__","x-request-id":"__REQUEST_ID__"},"schema":"auto-switch-q4-r9-q4-request/v1"}

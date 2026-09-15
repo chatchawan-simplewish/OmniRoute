@@ -1,0 +1,1 @@
+{"candidate_id":"9468859edcdb483c53900edde14d301a162cccc791079154677e913f39bf26a3","candidate_name":"omniroute-auto-switch-candidate-r4-20260913","docker_path":"/usr/bin/docker","health_attempts":30,"health_interval_ms":1000,"image_sha256":"8211e1071a3b68eac01673d76129150eb0c0fea329dd222bc8bf0394b13fc844","schema":"auto-switch-q4-r9-runtime-command/v1"}

@@ -1,7 +1,7 @@
-import copy
 import hashlib
 import importlib.util
 import json
+import os
 import pathlib
 import tempfile
 import unittest
@@ -19,117 +19,164 @@ def load(path, name):
     return module
 
 
-class Runtime:
-    def __init__(self):
-        self.started = self.stopped = False
-
-    def snapshot(self):
-        return RUNTIME
-
-    def source_bytes(self):
-        return b"fixture-reviewed-runtime-v1"
-
-    def start(self, expected):
-        assert expected == RUNTIME
-        self.started = True
-
-    def authenticate(self, secret, action):
-        assert secret == b"fixture-secret"
-        return json.dumps({"schema": "auto-switch-q4-r9-evidence/v1", "runtime": RUNTIME,
-                "collector_sha256": RUNTIME["collector_sha256"],
-                "health": {"status": 200, "candidate_id": RUNTIME["candidate_id"]},
-                "models": {"status": 200, "candidate_id": RUNTIME["candidate_id"], "model": RUNTIME["model"]},
-                "completion": {"status": 200, "candidate_id": RUNTIME["candidate_id"], "model": RUNTIME["model"],
-                               "connection_id": RUNTIME["connection_id"], "request_count": 1,
-                               "request_id": "11111111-1111-4111-8111-111111111111", "content_bytes": 1}}, sort_keys=True, separators=(",", ":")).encode()
-
-    def stop(self):
-        self.stopped = True
-        return True
+PROGRAM = r'''import json,sys
+def frames(raw):
+ out=[]
+ while raw:
+  size=int.from_bytes(raw[:8],"big");raw=raw[8:]
+  out.append(raw[:size]);raw=raw[size:]
+ return out
+action_raw,command_raw=frames(sys.stdin.buffer.read())
+command=json.loads(command_raw)
+with open(command["marker"],"a",encoding="ascii") as handle:handle.write(sys.argv[1]+"\n")
+if sys.argv[1]=="start" and command["fail_start"]:raise SystemExit(7)
+'''.encode()
 
 
-RUNTIME = {"schema": "auto-switch-q4-r9-runtime/v1", "host": "192.0.2.9", "candidate_id": "a" * 64,
-           "image_sha256": "b" * 64, "command_sha256": "c" * 64, "collector_sha256": "d" * 64,
-           "endpoint": "http://127.0.0.1:20129/v1", "model": "lm-studio/qwen3.8-27b-unsloth-ud-q4ks",
-           "connection_id": "da74225c-0fc0-45ce-ad22-ded85edb34b8", "request_sha256": "e" * 64,
-           "runtime_sha256": hashlib.sha256(b"fixture-reviewed-runtime-v1").hexdigest()}
+COLLECTOR = r'''import json,sys
+def frames(raw):
+ out=[]
+ while raw:
+  size=int.from_bytes(raw[:8],"big");raw=raw[8:]
+  out.append(raw[:size]);raw=raw[size:]
+ return out
+action_raw,request_raw,secret=frames(sys.stdin.buffer.read())
+action=json.loads(action_raw);request=json.loads(request_raw)
+assert secret==b"fixture-secret" and request=={"schema":"q4-request/v1","prompt":"reply one byte"}
+r=action["runtime"]
+value={"schema":"auto-switch-q4-r9-evidence/v1","runtime":r,
+ "health":{"status":200,"candidate_id":r["candidate_id"]},
+ "models":{"status":200,"candidate_id":r["candidate_id"],"model":r["model"]},
+ "completion":{"status":200,"candidate_id":r["candidate_id"],"model":r["model"],
+ "connection_id":r["connection_id"],"request_count":1,
+ "request_id":"11111111-1111-4111-8111-111111111111","content_bytes":1}}
+sys.stdout.buffer.write(json.dumps(value,sort_keys=True,separators=(",",":")).encode())
+'''.encode()
 
 
 class Q4R9Test(unittest.TestCase):
-    def test_manifest_approval_and_single_spent_execution_are_bound_to_fresh_files(self):
-        launcher = load(LAUNCHER, "q4_r9_launcher")
-        helper = load(HELPER, "q4_r9_helper")
-        sources = launcher.source_bytes()
-        manifest = launcher.source_manifest(sources)
-        self.assertEqual(manifest["schema"], "auto-switch-q4-r9-source/v1")
-        self.assertEqual(manifest["helper_sha256"], hashlib.sha256(sources[launcher.HELPER]).hexdigest())
-        action = {"schema": "auto-switch-q4-r9-action/v1", "source_manifest": manifest, "runtime": RUNTIME,
-                  "leaf_root": ".", "secret_path": "key", "state_leaf": "q4-r9-state.json", "terminal_leaf": "q4-r9-terminal.json"}
-        raw = launcher.canonical(action)
-        approval = {"schema": "auto-switch-q4-r9-approval/v1", "verdict": "PASS",
-                    "model": "gpt-5.6-sol", "effort": "high",
-                    "reviewed_payload_sha256": hashlib.sha256(raw).hexdigest(),
-                    **{key: manifest[key] for key in launcher.APPROVAL_HASH_FIELDS}}
+    def setUp(self):
+        self.launcher = load(LAUNCHER, "q4_r9_launcher")
+        self.helper = load(HELPER, "q4_r9_helper")
+
+    def build(self, root, fail_start=False):
+        marker = root / "marker"
+        operations = {
+            "runtime": PROGRAM,
+            "command": self.launcher.canonical({"schema": "q4-command/v1", "marker": str(marker), "fail_start": fail_start}),
+            "collector": COLLECTOR,
+            "request": self.launcher.canonical({"schema": "q4-request/v1", "prompt": "reply one byte"}),
+        }
+        sources = self.launcher.source_bytes()
+        manifest = self.launcher.source_manifest(sources, operations)
+        runtime = {
+            "schema": "auto-switch-q4-r9-runtime/v2", "host": "192.0.2.9", "candidate_id": "a" * 64,
+            "image_sha256": "b" * 64, "endpoint": "http://127.0.0.1:20129/v1",
+            "model": "lm-studio/qwen3.8-27b-unsloth-ud-q4ks",
+            "connection_id": "da74225c-0fc0-45ce-ad22-ded85edb34b8",
+            **{name + "_sha256": hashlib.sha256(value).hexdigest() for name, value in operations.items()},
+            "start_timeout_ms": 5000, "collect_timeout_ms": 5000, "stop_timeout_ms": 5000,
+        }
+        credential = {"schema": "auto-switch-q4-r9-credential/v1", "parent_device": 1, "parent_inode": 2,
+                      "parent_uid": 0, "parent_gid": 0, "parent_mode": 0o700,
+                      "secret_device": 3, "secret_inode": 4, "secret_uid": 0, "secret_gid": 0,
+                      "secret_mode": 0o600, "secret_size": 14, "secret_mtime_ns": 5, "secret_leaf": "key"}
+        action = {"schema": "auto-switch-q4-r9-action/v2", "source_manifest": manifest, "runtime": runtime,
+                  "credential": credential, "state_leaf": "q4-r9-state.json", "terminal_leaf": "q4-r9-terminal.json"}
+        action_raw = self.launcher.canonical(action)
+        approval = {"schema": "auto-switch-q4-r9-approval/v2", "verdict": "PASS", "model": "gpt-5.6-sol",
+                    "effort": "high", "reviewed_payload_sha256": hashlib.sha256(action_raw).hexdigest(),
+                    **{field: manifest[field] for field in self.launcher.APPROVAL_HASH_FIELDS}}
+        request = self.launcher.approved_request_bytes(action_raw, self.launcher.canonical(approval), sources, operations)
+        return action, request, sources, operations, marker
+
+    def test_retained_programs_and_direct_evidence_are_pinned_and_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            payload, review, key = root / "payload.json", root / "approval.json", root / "key"
-            payload.write_bytes(raw)
-            review.write_bytes(launcher.canonical(approval))
-            key.write_bytes(b"fixture-secret\n")
-            request = launcher.approved_request(payload, review, sources)
-            self.assertEqual(request["action"], action)
-            self.assertEqual(request["action_bytes"], raw)
-            self.assertEqual(request["approval_bytes"], launcher.canonical(approval))
-            self.assertEqual(request["source_bundle"]["launcher"], sources[launcher.SELF])
-            runtime = Runtime()
-            self.assertEqual(helper.execute(request, runtime, key), 0)
-            state = json.loads((root / action["state_leaf"]).read_text())
-            terminal = json.loads((root / action["terminal_leaf"]).read_text())
-            self.assertEqual(state, {"schema": "auto-switch-q4-r9-state/v1", "status": "Q4_R9_UNKNOWN", "gate_spent": True})
-            self.assertEqual(terminal["status"], "Q4_R9_PASS")
-            self.assertEqual(terminal["evidence_sha256"], hashlib.sha256(runtime.authenticate(b"fixture-secret", action)).hexdigest())
-            self.assertTrue(runtime.started and runtime.stopped)
+            action, request, sources, operations, marker = self.build(root)
+
+            self.assertEqual(request["operation_bundle"], operations)
+            self.assertEqual(self.helper._validate(request), action)
+            start = self.helper._run_retained(operations["runtime"], "start",
+                                              self.helper._pack(request["action_bytes"], operations["command"]), 5000, 0)
+            self.assertEqual((start.returncode, start.stdout, start.stderr), (0, b"", b""))
+            observed = self.helper._run_retained(operations["collector"], "collect",
+                                                 self.helper._pack(request["action_bytes"], operations["request"], b"fixture-secret"), 5000, 65536)
+            evidence = self.helper._validate_evidence(observed, action)
+            self.assertEqual(evidence["completion"]["request_count"], 1)
+            self.assertEqual(marker.read_text(encoding="ascii"), "start\n")
+
+            runtime_path = root / "runtime.py"
+            runtime_path.write_bytes(operations["runtime"])
+            retained = self.launcher.retain_files({"runtime": runtime_path})
+            runtime_path.write_text("raise SystemExit(99)\n", encoding="ascii")
+            kept = self.helper._run_retained(retained["runtime"], "stop",
+                                             self.helper._pack(request["action_bytes"], operations["command"]), 5000, 0)
+            self.assertEqual(kept.returncode, 0)
+            self.assertEqual(marker.read_text(encoding="ascii"), "start\nstop\n")
+
+            noncanonical = observed.stdout + b"\n"
+            with self.assertRaises(ValueError):
+                self.helper._validate_evidence(type("Result", (), {"returncode": 0, "stdout": noncanonical, "stderr": b""})(), action)
+            boolean_evidence = json.loads(observed.stdout)
+            boolean_evidence["completion"]["request_count"] = True
+            with self.assertRaises(ValueError):
+                self.helper._validate_evidence(type("Result", (), {"returncode": 0,
+                    "stdout": self.launcher.canonical(boolean_evidence), "stderr": b""})(), action)
+
+            changed = dict(operations)
+            changed["collector"] += b"\n"
+            with self.assertRaises(ValueError):
+                self.launcher.approved_request_bytes(request["action_bytes"], request["approval_bytes"], sources, changed)
+
+            _, bad_request, _, bad_operations, bad_marker = self.build(root, fail_start=True)
+            start = self.helper._run_retained(bad_operations["runtime"], "start",
+                                              self.helper._pack(bad_request["action_bytes"], bad_operations["command"]), 5000, 0)
+            stop = self.helper._run_retained(bad_operations["runtime"], "stop",
+                                             self.helper._pack(bad_request["action_bytes"], bad_operations["command"]), 5000, 0)
+            self.assertEqual(start.returncode, 7)
+            self.assertEqual(stop.returncode, 0)
+            self.assertTrue(bad_marker.read_text(encoding="ascii").endswith("start\nstop\n"))
+
+    def test_secret_and_leaf_parent_pins_come_from_opened_objects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            key = root / "key"
+            key.write_bytes(b"fixture-secret")
+            if os.name == "posix":
+                os.chmod(root, 0o700); os.chmod(key, 0o600)
+                parent_fd, secret_fd, identity = self.helper._open_credential(root, "key")
+                try:
+                    self.assertEqual(identity["parent_device"], os.fstat(parent_fd).st_dev)
+                    self.assertEqual(identity["secret_inode"], os.fstat(secret_fd).st_ino)
+                finally:
+                    os.close(secret_fd); os.close(parent_fd)
+            else:
+                with self.assertRaises(OSError):
+                    self.helper._open_credential(root, "key")
+
+    @unittest.skipUnless(os.name == "posix" and getattr(os, "geteuid", lambda: 1)() == 0,
+                         "live gate requires the reviewed root-owned POSIX store")
+    def test_posix_gate_reserves_unknown_stops_once_and_publishes_only_direct_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            os.chmod(root, 0o700)
+            key = root / "key"
+            key.write_bytes(b"fixture-secret")
+            os.chmod(key, 0o600)
+            action, request, sources, operations, marker = self.build(root)
+            parent_fd, secret_fd, action["credential"] = self.helper._open_credential(root, "key")
+            os.close(secret_fd); os.close(parent_fd)
+            action_raw = self.launcher.canonical(action)
+            approval = {**request["approval"], "reviewed_payload_sha256": hashlib.sha256(action_raw).hexdigest()}
+            request = self.launcher.approved_request_bytes(action_raw, self.launcher.canonical(approval), sources, operations)
+            self.assertEqual(self.helper.execute(request, root), 0)
+            self.assertEqual(json.loads((root / action["state_leaf"]).read_text()),
+                             {"schema": "auto-switch-q4-r9-state/v1", "status": "Q4_R9_UNKNOWN", "gate_spent": True})
+            self.assertEqual(json.loads((root / action["terminal_leaf"]).read_text())["status"], "Q4_R9_PASS")
+            self.assertEqual(marker.read_text(encoding="ascii"), "start\nstop\n")
             with self.assertRaises(FileExistsError):
-                helper.execute(request, Runtime(), key)
-            altered = copy.deepcopy(request)
-            altered["action"]["state_leaf"] = "q4-r9-altered-state.json"
-            altered["action"]["terminal_leaf"] = "q4-r9-altered-terminal.json"
-            with self.assertRaises(ValueError):
-                helper.execute(altered, Runtime(), key)
-            noncanonical = raw + b"\n"
-            bad_approval = {**approval, "reviewed_payload_sha256": hashlib.sha256(noncanonical).hexdigest()}
-            with self.assertRaises(ValueError):
-                launcher.approved_request_bytes(noncanonical, launcher.canonical(bad_approval), sources)
-            uncertain_action = {**action, "state_leaf": "q4-r9-uncertain-state.json", "terminal_leaf": "q4-r9-uncertain-terminal.json"}
-            uncertain_raw = launcher.canonical(uncertain_action)
-            uncertain_approval = {**approval, "reviewed_payload_sha256": hashlib.sha256(uncertain_raw).hexdigest()}
-            class UncertainRuntime(Runtime):
-                def start(self, expected): raise OSError("lost start response")
-            uncertain = UncertainRuntime()
-            self.assertEqual(helper.execute(launcher.approved_request_bytes(uncertain_raw, launcher.canonical(uncertain_approval), sources), uncertain, key), 1)
-            self.assertTrue(uncertain.stopped)
-            self.assertTrue((root / uncertain_action["state_leaf"]).exists())
-            self.assertFalse((root / uncertain_action["terminal_leaf"]).exists())
-            bad_action = {**action, "state_leaf": "q4-r9-bad-state.json", "terminal_leaf": "q4-r9-bad-terminal.json"}
-            bad_raw = launcher.canonical(bad_action)
-            bad_approval = {**approval, "reviewed_payload_sha256": hashlib.sha256(bad_raw).hexdigest()}
-            class BooleanProof(Runtime):
-                def authenticate(self, secret, action): return {"health_http_status": 200, "selected_q4": True, "content_valid": True}
-            self.assertEqual(helper.execute(launcher.approved_request_bytes(bad_raw, launcher.canonical(bad_approval), sources), BooleanProof(), key), 1)
-            self.assertTrue((root / bad_action["state_leaf"]).exists())
-            self.assertFalse((root / bad_action["terminal_leaf"]).exists())
-            boolean_action = {**action, "state_leaf": "q4-r9-boolean-state.json", "terminal_leaf": "q4-r9-boolean-terminal.json"}
-            boolean_raw = launcher.canonical(boolean_action)
-            boolean_approval = {**approval, "reviewed_payload_sha256": hashlib.sha256(boolean_raw).hexdigest()}
-            class BooleanInteger(Runtime):
-                def authenticate(self, secret, action):
-                    value = json.loads(super().authenticate(secret, action)); value["completion"]["request_count"] = True; value["completion"]["content_bytes"] = True
-                    return launcher.canonical(value)
-            self.assertEqual(helper.execute(launcher.approved_request_bytes(boolean_raw, launcher.canonical(boolean_approval), sources), BooleanInteger(), key), 1)
-        changed = dict(sources)
-        changed[launcher.HELPER] += b"# changed\n"
-        with self.assertRaises(ValueError):
-            launcher.approved_request_bytes(raw, launcher.canonical(approval), changed)
+                self.helper.execute(request, root)
 
 
 if __name__ == "__main__":

@@ -1,17 +1,22 @@
-"""Direct-byte approval binding for the fresh Q4 R9 qualification gate."""
+"""Retained-byte approval and dispatch for the fresh Q4 R9 gate."""
 import hashlib
 import json
+import os
 import pathlib
+import stat
+import sys
 
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-SELF = pathlib.Path(__file__).resolve()
-HELPER = ROOT / "scripts" / "auto-switch-q4-r9-20260915-helper.py"
-CONTRACT = ROOT / "docs" / "auto-switch-q4-r9-20260915-contract.md"
-TEST = ROOT / "scripts" / "auto-switch-q4-r9-20260915-test.py"
-APPROVAL_HASH_FIELDS = ("launcher_sha256", "helper_sha256", "contract_sha256", "test_sha256")
+ROOT = pathlib.Path(__file__).resolve().parents[1] if not str(__file__).startswith("<retained-") else None
+SELF = ROOT / "scripts" / "auto-switch-q4-r9-20260915.py" if ROOT else None
+HELPER = ROOT / "scripts" / "auto-switch-q4-r9-20260915-helper.py" if ROOT else None
+CONTRACT = ROOT / "docs" / "auto-switch-q4-r9-20260915-contract.md" if ROOT else None
+TEST = ROOT / "scripts" / "auto-switch-q4-r9-20260915-test.py" if ROOT else None
+SOURCE_NAMES = ("launcher", "helper", "contract", "test")
+OPERATION_NAMES = ("runtime", "command", "collector", "request")
+APPROVAL_HASH_FIELDS = tuple(name + "_sha256" for name in SOURCE_NAMES + OPERATION_NAMES)
 MANIFEST_KEYS = {"schema", *APPROVAL_HASH_FIELDS}
-ACTION_KEYS = {"schema", "source_manifest", "runtime", "leaf_root", "secret_path", "state_leaf", "terminal_leaf"}
+ACTION_KEYS = {"schema", "source_manifest", "runtime", "credential", "state_leaf", "terminal_leaf"}
 APPROVAL_KEYS = {"schema", "verdict", "model", "effort", "reviewed_payload_sha256", *APPROVAL_HASH_FIELDS}
 
 
@@ -19,42 +24,104 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
-def source_bytes():
-    return {SELF: SELF.read_bytes(), HELPER: HELPER.read_bytes(), CONTRACT: CONTRACT.read_bytes(), TEST: TEST.read_bytes()}
+def _object(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate key")
+        value[key] = item
+    return value
 
 
-def source_manifest(sources=None):
-    sources = source_bytes() if sources is None else sources
-    return {"schema": "auto-switch-q4-r9-source/v1",
-            "launcher_sha256": hashlib.sha256(sources[SELF]).hexdigest(),
-            "helper_sha256": hashlib.sha256(sources[HELPER]).hexdigest(),
-            "contract_sha256": hashlib.sha256(sources[CONTRACT]).hexdigest(),
-            "test_sha256": hashlib.sha256(sources[TEST]).hexdigest()}
-
-
-def approved_request_bytes(payload_raw, approval_raw, sources):
-    action, approval = json.loads(payload_raw), json.loads(approval_raw)
-    manifest = source_manifest(sources)
-    if not isinstance(action, dict) or not isinstance(approval, dict) or payload_raw != canonical(action) or approval_raw != canonical(approval):
+def _parse(raw):
+    try:
+        value = json.loads(raw, object_pairs_hook=_object)
+    except Exception as error:
+        raise ValueError("invalid json") from error
+    if not isinstance(value, dict) or raw != canonical(value):
         raise ValueError("noncanonical input")
-    if set(manifest) != MANIFEST_KEYS or set(action) != ACTION_KEYS or set(approval) != APPROVAL_KEYS:
+    return value
+
+
+def _read_once(path, limit=1024 * 1024):
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > limit:
+            raise ValueError("unsafe retained file")
+        chunks, total = [], 0
+        while True:
+            chunk = os.read(fd, min(65536, limit + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk); total += len(chunk)
+            if total > limit:
+                raise ValueError("retained file too large")
+        after = os.fstat(fd)
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+            raise ValueError("retained file changed")
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+def retain_files(paths):
+    return {name: _read_once(path) for name, path in paths.items()}
+
+
+def source_bytes():
+    if ROOT is None:
+        raise ValueError("retained launcher needs supplied source bundle")
+    return retain_files({"launcher": SELF, "helper": HELPER, "contract": CONTRACT, "test": TEST})
+
+
+def source_manifest(sources, operations):
+    if set(sources) != set(SOURCE_NAMES) or set(operations) != set(OPERATION_NAMES):
+        raise ValueError("bundle schema")
+    bundle = {**sources, **operations}
+    if not all(isinstance(value, bytes) and value for value in bundle.values()):
+        raise ValueError("empty bundle member")
+    return {"schema": "auto-switch-q4-r9-source/v2",
+            **{name + "_sha256": hashlib.sha256(bundle[name]).hexdigest() for name in SOURCE_NAMES + OPERATION_NAMES}}
+
+
+def approved_request_bytes(action_raw, approval_raw, sources, operations):
+    action, approval = _parse(action_raw), _parse(approval_raw)
+    manifest = source_manifest(sources, operations)
+    if set(action) != ACTION_KEYS or set(approval) != APPROVAL_KEYS:
         raise ValueError("schema drift")
-    if action.get("schema") != "auto-switch-q4-r9-action/v1" or action.get("source_manifest") != manifest:
+    if action["schema"] != "auto-switch-q4-r9-action/v2" or action["source_manifest"] != manifest:
         raise ValueError("unbound action")
-    if approval.get("schema") != "auto-switch-q4-r9-approval/v1" or approval.get("verdict") != "PASS":
+    if (approval["schema"], approval["verdict"], approval["model"], approval["effort"]) != ("auto-switch-q4-r9-approval/v2", "PASS", "gpt-5.6-sol", "high"):
         raise ValueError("unapproved action")
-    if approval.get("model") != "gpt-5.6-sol" or approval.get("effort") != "high":
-        raise ValueError("wrong reviewer")
-    if approval.get("reviewed_payload_sha256") != hashlib.sha256(payload_raw).hexdigest():
+    if approval["reviewed_payload_sha256"] != hashlib.sha256(action_raw).hexdigest():
         raise ValueError("payload drift")
-    if any(approval.get(field) != manifest[field] for field in APPROVAL_HASH_FIELDS):
-        raise ValueError("source drift")
-    return {"schema": "auto-switch-q4-r9-request/v1", "action": action, "approval": approval,
-            "source_manifest": manifest, "source_bundle": {"launcher": sources[SELF], "helper": sources[HELPER],
-            "contract": sources[CONTRACT], "test": sources[TEST]}, "action_bytes": payload_raw,
-            "approval_bytes": approval_raw}
+    if any(approval[field] != manifest[field] for field in APPROVAL_HASH_FIELDS):
+        raise ValueError("source or operation drift")
+    return {"schema": "auto-switch-q4-r9-request/v2", "action": action, "approval": approval,
+            "source_manifest": manifest, "source_bundle": sources, "operation_bundle": operations,
+            "action_bytes": action_raw, "approval_bytes": approval_raw}
 
 
-def approved_request(payload_path, approval_path, sources=None):
-    sources = source_bytes() if sources is None else sources
-    return approved_request_bytes(pathlib.Path(payload_path).read_bytes(), pathlib.Path(approval_path).read_bytes(), sources)
+def execute_retained_bytes(action_raw, approval_raw, sources, operations, secret_parent):
+    request = approved_request_bytes(action_raw, approval_raw, sources, operations)
+    namespace = {"__name__": "q4_r9_retained_helper", "__file__": "<retained-q4-r9-helper>"}
+    exec(compile(sources["helper"], namespace["__file__"], "exec"), namespace)
+    return namespace["execute"](request, secret_parent)
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if "__retained_launcher_bytes__" not in globals() or len(argv) != 10:
+        return 2
+    action_path, approval_path, runtime_path, command_path, collector_path, request_path, secret_parent, helper_path, contract_path, test_path = argv
+    sources = retain_files({"helper": helper_path, "contract": contract_path, "test": test_path})
+    sources["launcher"] = __retained_launcher_bytes__
+    operations = retain_files({"runtime": runtime_path, "command": command_path, "collector": collector_path, "request": request_path})
+    inputs = retain_files({"action": action_path, "approval": approval_path})
+    return execute_retained_bytes(inputs["action"], inputs["approval"], sources, operations, secret_parent)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -11,7 +11,7 @@ CONTRACT = ROOT / "docs" / "auto-switch-q4-r9-20260915-contract.md"
 TEST = ROOT / "scripts" / "auto-switch-q4-r9-20260915-test.py"
 APPROVAL_HASH_FIELDS = ("launcher_sha256", "helper_sha256", "contract_sha256", "test_sha256")
 MANIFEST_KEYS = {"schema", *APPROVAL_HASH_FIELDS}
-ACTION_KEYS = {"schema", "source_manifest", "runtime", "state_leaf", "terminal_leaf"}
+ACTION_KEYS = {"schema", "source_manifest", "runtime", "leaf_root", "secret_path", "state_leaf", "terminal_leaf"}
 APPROVAL_KEYS = {"schema", "verdict", "model", "effort", "reviewed_payload_sha256", *APPROVAL_HASH_FIELDS}
 
 

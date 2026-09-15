@@ -29,18 +29,19 @@ class Runtime:
     def source_bytes(self):
         return b"fixture-reviewed-runtime-v1"
 
-    def start(self):
+    def start(self, expected):
+        assert expected == RUNTIME
         self.started = True
 
     def authenticate(self, secret, action):
         assert secret == b"fixture-secret"
-        return {"schema": "auto-switch-q4-r9-evidence/v1", "runtime": RUNTIME,
+        return json.dumps({"schema": "auto-switch-q4-r9-evidence/v1", "runtime": RUNTIME,
                 "collector_sha256": RUNTIME["collector_sha256"],
                 "health": {"status": 200, "candidate_id": RUNTIME["candidate_id"]},
                 "models": {"status": 200, "candidate_id": RUNTIME["candidate_id"], "model": RUNTIME["model"]},
                 "completion": {"status": 200, "candidate_id": RUNTIME["candidate_id"], "model": RUNTIME["model"],
                                "connection_id": RUNTIME["connection_id"], "request_count": 1,
-                               "request_id": "11111111-1111-4111-8111-111111111111", "content_bytes": 1}}
+                               "request_id": "11111111-1111-4111-8111-111111111111", "content_bytes": 1}}, sort_keys=True, separators=(",", ":")).encode()
 
     def stop(self):
         self.stopped = True
@@ -63,7 +64,7 @@ class Q4R9Test(unittest.TestCase):
         self.assertEqual(manifest["schema"], "auto-switch-q4-r9-source/v1")
         self.assertEqual(manifest["helper_sha256"], hashlib.sha256(sources[launcher.HELPER]).hexdigest())
         action = {"schema": "auto-switch-q4-r9-action/v1", "source_manifest": manifest, "runtime": RUNTIME,
-                  "state_leaf": "q4-r9-state.json", "terminal_leaf": "q4-r9-terminal.json"}
+                  "leaf_root": ".", "secret_path": "key", "state_leaf": "q4-r9-state.json", "terminal_leaf": "q4-r9-terminal.json"}
         raw = launcher.canonical(action)
         approval = {"schema": "auto-switch-q4-r9-approval/v1", "verdict": "PASS",
                     "model": "gpt-5.6-sol", "effort": "high",
@@ -102,7 +103,7 @@ class Q4R9Test(unittest.TestCase):
             uncertain_raw = launcher.canonical(uncertain_action)
             uncertain_approval = {**approval, "reviewed_payload_sha256": hashlib.sha256(uncertain_raw).hexdigest()}
             class UncertainRuntime(Runtime):
-                def start(self): raise OSError("lost start response")
+                def start(self, expected): raise OSError("lost start response")
             uncertain = UncertainRuntime()
             self.assertEqual(helper.execute(launcher.approved_request_bytes(uncertain_raw, launcher.canonical(uncertain_approval), sources), uncertain, key), 1)
             self.assertTrue(uncertain.stopped)
@@ -116,6 +117,14 @@ class Q4R9Test(unittest.TestCase):
             self.assertEqual(helper.execute(launcher.approved_request_bytes(bad_raw, launcher.canonical(bad_approval), sources), BooleanProof(), key), 1)
             self.assertTrue((root / bad_action["state_leaf"]).exists())
             self.assertFalse((root / bad_action["terminal_leaf"]).exists())
+            boolean_action = {**action, "state_leaf": "q4-r9-boolean-state.json", "terminal_leaf": "q4-r9-boolean-terminal.json"}
+            boolean_raw = launcher.canonical(boolean_action)
+            boolean_approval = {**approval, "reviewed_payload_sha256": hashlib.sha256(boolean_raw).hexdigest()}
+            class BooleanInteger(Runtime):
+                def authenticate(self, secret, action):
+                    value = json.loads(super().authenticate(secret, action)); value["completion"]["request_count"] = True; value["completion"]["content_bytes"] = True
+                    return launcher.canonical(value)
+            self.assertEqual(helper.execute(launcher.approved_request_bytes(boolean_raw, launcher.canonical(boolean_approval), sources), BooleanInteger(), key), 1)
         changed = dict(sources)
         changed[launcher.HELPER] += b"# changed\n"
         with self.assertRaises(ValueError):

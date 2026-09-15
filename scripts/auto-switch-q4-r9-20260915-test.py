@@ -5,6 +5,7 @@ import os
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -154,6 +155,39 @@ class Q4R9Test(unittest.TestCase):
             else:
                 with self.assertRaises(OSError):
                     self.helper._open_credential(root, "key")
+
+    def test_short_retained_secret_read_is_rejected_before_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = pathlib.Path(tmp) / "key"
+            key.write_bytes(b"fixture-secret")
+            fd = os.open(key, os.O_RDONLY)
+            try:
+                opened = os.fstat(fd)
+                expected = {"secret_device": opened.st_dev, "secret_inode": opened.st_ino,
+                            "secret_uid": opened.st_uid, "secret_gid": opened.st_gid,
+                            "secret_mode": opened.st_mode & 0o777, "secret_size": opened.st_size,
+                            "secret_mtime_ns": opened.st_mtime_ns}
+                with mock.patch.object(self.helper.os, "pread", return_value=b"fixture-secre", create=True):
+                    with self.assertRaises(ValueError):
+                        self.helper._read_secret(fd, {"expected": expected})
+            finally:
+                os.close(fd)
+
+    def test_execute_fail_start_stops_once_retains_unknown_and_withholds_terminal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            action, request, _, _, marker = self.build(root, fail_start=True)
+            parent = os.open(root / "parent-handle", os.O_WRONLY | os.O_CREAT)
+            secret = os.open(root / "secret-handle", os.O_WRONLY | os.O_CREAT)
+            writes = []
+            with mock.patch.object(self.helper, "_open_credential", return_value=(parent, secret, action["credential"])), \
+                    mock.patch.object(self.helper, "_exists", return_value=False), \
+                    mock.patch.object(self.helper, "_read_secret", return_value=b"fixture-secret"), \
+                    mock.patch.object(self.helper, "_write_new", side_effect=lambda fd, leaf, value: writes.append((leaf, value))):
+                self.assertEqual(self.helper.execute(request, root), 1)
+            self.assertEqual(marker.read_text(encoding="ascii"), "start\nstop\n")
+            self.assertEqual(writes, [(action["state_leaf"],
+                {"schema": "auto-switch-q4-r9-state/v1", "status": "Q4_R9_UNKNOWN", "gate_spent": True})])
 
     @unittest.skipUnless(os.name == "posix" and getattr(os, "geteuid", lambda: 1)() == 0,
                          "live gate requires the reviewed root-owned POSIX store")

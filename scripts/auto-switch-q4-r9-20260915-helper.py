@@ -180,7 +180,7 @@ def _read_secret(secret_fd, credential):
         raise ValueError("credential drift")
     secret = os.pread(secret_fd, 4097, 0)
     after = os.fstat(secret_fd)
-    if len(secret) > 4096 or not secret or any(char in secret for char in (b"\0", b"\r", b"\n")) or (
+    if len(secret) != expected["secret_size"] or any(char in secret for char in (b"\0", b"\r", b"\n")) or (
             before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
         raise ValueError("unsafe credential")

@@ -1,5 +1,7 @@
 """One-contact descriptor preflight and offline exact-action renderer."""
 import argparse
+import contextlib
+import ctypes
 import hashlib
 import ipaddress
 import json
@@ -10,6 +12,7 @@ import secrets
 import stat
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -47,6 +50,7 @@ CANDIDATE_ID = "9468859edcdb483c53900edde14d301a162cccc791079154677e913f39bf26a3
 IMAGE_SHA256 = "8211e1071a3b68eac01673d76129150eb0c0fea329dd222bc8bf0394b13fc844"
 MODEL = "lm-studio/qwen3.8-27b-unsloth-ud-q4ks"
 CONNECTION_ID = "da74225c-0fc0-45ce-ad22-ded85edb34b8"
+PREFLIGHT_SPENT = False
 RECEIPT_KEYS = {"schema", "status", "host", "nonce", "observed_unix_ns", "secret_parent",
                 "credential", "state_leaf", "terminal_leaf", "state_absent", "terminal_absent",
                 "bootstrap_sha256"}
@@ -105,10 +109,10 @@ def digest(path):
     return hashlib.sha256(read_once(path)).hexdigest()
 
 
-def ssh_command():
+def ssh_command(known_hosts_path):
     return [str(SSH), "-T", "-F", "none", "-i", str(IDENTITY),
             "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
-            "-o", "UserKnownHostsFile=" + KNOWN_HOSTS.as_posix(), "-o", "GlobalKnownHostsFile=none",
+            "-o", "UserKnownHostsFile=" + pathlib.Path(known_hosts_path).as_posix(), "-o", "GlobalKnownHostsFile=none",
             "-o", "HostKeyAlias=" + HOST, "-o", "ConnectTimeout=10", "-o", "ConnectionAttempts=1",
             "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2", SSH_USER + "@" + HOST,
             "sudo -n /usr/bin/python3 -I -c '" + REMOTE_SHIM + "'"]
@@ -118,8 +122,9 @@ def retain_package():
     return {name: read_once(path) for name, path in PACKAGE.items()}
 
 
-def review_payload(package=None):
+def review_payload(package=None, known_hosts=None):
     package = retain_package() if package is None else package
+    known_hosts = read_once(KNOWN_HOSTS) if known_hosts is None else known_hosts
     if set(package) != set(PACKAGE) or not all(isinstance(raw, bytes) and raw for raw in package.values()):
         raise ValueError("package")
     return {
@@ -127,7 +132,7 @@ def review_payload(package=None):
         "base_source_commit": "e129b8dd7c3d2831198b6d675d459c6ba223f2ff",
         "source_review_commit": "b500e65e2386769ed38241ebb5cd9ee742a23eb0",
         "host": HOST, "ssh_user": SSH_USER, "ssh_path": str(SSH), "identity_path": str(IDENTITY),
-        "known_hosts_path": str(KNOWN_HOSTS), "known_hosts_sha256": digest(KNOWN_HOSTS),
+        "known_hosts_path": str(KNOWN_HOSTS), "known_hosts_sha256": hashlib.sha256(known_hosts).hexdigest(),
         "secret_parent": SECRET_PARENT, "secret_leaf": SECRET_LEAF,
         "state_leaf": STATE_LEAF, "terminal_leaf": TERMINAL_LEAF, "receipt_path": str(RECEIPT),
         "package_sha256": {name: hashlib.sha256(package[name]).hexdigest() for name in PACKAGE},
@@ -136,15 +141,16 @@ def review_payload(package=None):
 
 def validate_approval(raw):
     package = retain_package()
+    known_hosts = read_once(KNOWN_HOSTS)
     approval = parse(raw)
     if set(approval) != {"schema", "verdict", "model", "effort", "reviewed_payload_sha256"}:
         raise ValueError("approval schema")
     if (approval["schema"], approval["verdict"], approval["model"], approval["effort"]) != (
             "auto-switch-q4-r9-descriptor-preflight-approval/v1", "PASS", "gpt-5.6-sol", "high"):
         raise ValueError("approval")
-    if approval["reviewed_payload_sha256"] != hashlib.sha256(canonical(review_payload(package))).hexdigest():
+    if approval["reviewed_payload_sha256"] != hashlib.sha256(canonical(review_payload(package, known_hosts))).hexdigest():
         raise ValueError("review drift")
-    return package["bootstrap"]
+    return package["bootstrap"], known_hosts
 
 
 def _bounded_capture(command, payload, timeout):
@@ -229,18 +235,80 @@ def _write_reserved(path, raw):
         os.close(fd)
 
 
-def run_preflight(receipt_path=RECEIPT, transport=_bounded_capture, now_ns=None, bootstrap=None):
+def _locked_read_fd(path):
+    if os.name != "nt":
+        raise OSError("Windows SSH boundary required")
+    import msvcrt
+    create_file = ctypes.windll.kernel32.CreateFileW
+    create_file.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
+                            ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+    create_file.restype = ctypes.c_void_p
+    handle = create_file(str(path), 0x80000000, 0x00000001, None, 3, 0x80, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise OSError(ctypes.get_last_error(), "known_hosts lock")
+    try:
+        return msvcrt.open_osfhandle(handle, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+    except Exception:
+        ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(handle))
+        raise
+
+
+@contextlib.contextmanager
+def retained_known_hosts(raw):
+    if not isinstance(raw, bytes) or not raw or len(raw) > 1048576:
+        raise ValueError("known_hosts bytes")
+    parent = pathlib.Path(tempfile.mkdtemp(prefix="q4-r9-known-hosts-"))
+    path = parent / "known_hosts"
+    fd = None
+    try:
+        _write_reserved(path, raw)
+        os.chmod(path, stat.S_IREAD)
+        fd = _locked_read_fd(path)
+        before = os.fstat(fd)
+        os.lseek(fd, 0, os.SEEK_SET)
+        if os.read(fd, len(raw) + 1) != raw:
+            raise ValueError("known_hosts materialization")
+        yield path
+        after = os.fstat(fd)
+        current = os.stat(path, follow_symlinks=False)
+        os.lseek(fd, 0, os.SEEK_SET)
+        if ((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) !=
+                (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) !=
+                (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns)
+                or os.read(fd, len(raw) + 1) != raw):
+            raise RuntimeError("known_hosts uncertainty")
+    finally:
+        if fd is not None:
+            os.close(fd)
+        cleanup_error = None
+        try:
+            if path.exists():
+                os.chmod(path, stat.S_IWRITE); path.unlink()
+            parent.rmdir()
+        except Exception as error:
+            cleanup_error = error
+        if cleanup_error is not None:
+            raise RuntimeError("known_hosts cleanup uncertainty") from cleanup_error
+
+
+def run_preflight(receipt_path=RECEIPT, transport=_bounded_capture, now_ns=None, bootstrap=None,
+                  known_hosts=None):
+    global PREFLIGHT_SPENT
     receipt_path = pathlib.Path(receipt_path)
     fd = os.open(receipt_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
+    PREFLIGHT_SPENT = True
     raw = canonical({"schema": "auto-switch-q4-r9-descriptor-preflight-local/v1", "status": "UNKNOWN",
                      "host": HOST, "reason": "uncertain"})
     try:
         bootstrap = read_once(BOOTSTRAP) if bootstrap is None else bootstrap
+        known_hosts = read_once(KNOWN_HOSTS) if known_hosts is None else known_hosts
         if not isinstance(bootstrap, bytes) or not bootstrap:
             raise ValueError("bootstrap")
         nonce = secrets.token_hex(32)
         payload = len(bootstrap).to_bytes(8, "big") + bootstrap + canonical(_config(bootstrap, nonce))
-        code, output, errors = transport(ssh_command(), payload, 30)
+        with retained_known_hosts(known_hosts) as retained_path:
+            code, output, errors = transport(ssh_command(retained_path), payload, 30)
         if code or errors or not output:
             raise RuntimeError("preflight transport")
         raw = canonical(validate_receipt(output, nonce, now_ns, hashlib.sha256(bootstrap).hexdigest()))
@@ -256,6 +324,15 @@ def run_preflight(receipt_path=RECEIPT, transport=_bounded_capture, now_ns=None,
             os.fsync(fd)
         finally:
             os.close(fd)
+
+
+def failure_envelope(receipt_path=RECEIPT):
+    path = pathlib.Path(receipt_path)
+    if PREFLIGHT_SPENT or (path.is_file() and not path.is_symlink()):
+        return {"schema": "auto-switch-q4-r9-preflight-error/v1", "status": "UNKNOWN",
+                "preflight_spent": True}
+    return {"schema": "auto-switch-q4-r9-preflight-error/v1", "status": "NOT_EXECUTED",
+            "preflight_spent": False}
 
 
 def _operation_bytes(candidate_ipv4, request_id):
@@ -322,8 +399,8 @@ def main():
     if args.review_payload:
         sys.stdout.buffer.write(canonical(review_payload())); return 0
     if args.execute_approved:
-        bootstrap = validate_approval(read_once(args.execute_approved))
-        run_preflight(bootstrap=bootstrap); return 0
+        bootstrap, known_hosts = validate_approval(read_once(args.execute_approved))
+        run_preflight(bootstrap=bootstrap, known_hosts=known_hosts); return 0
     if not args.candidate_ipv4 or not args.request_id or not args.output_dir:
         return 2
     raw = render_action(read_once(args.render_action), args.candidate_ipv4, args.request_id, args.output_dir)
@@ -335,5 +412,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception:
-        sys.stdout.buffer.write(canonical({"schema": "auto-switch-q4-r9-preflight-error/v1", "status": "NOT_EXECUTED"}))
+        sys.stdout.buffer.write(canonical(failure_envelope()))
         raise SystemExit(1)

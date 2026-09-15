@@ -1,9 +1,14 @@
 """Direct authenticated Q4 collector for the later reviewed Q4 R9 action."""
 import http.client
 import json
+import pathlib
+import sqlite3
 import sys
 import urllib.parse
 import uuid
+
+
+CALL_LOG_DB = pathlib.Path("/var/lib/docker/volumes/omniroute-auto-switch-candidate-data-r4-20260913/_data/storage.sqlite")
 
 
 def canonical(value):
@@ -35,6 +40,23 @@ def request(origin, method, path, headers, body=None):
         return response.status, {name.lower(): value for name, value in response.getheaders()}, raw
     finally:
         connection.close()
+
+
+def observed_connection(db_path, request_id, runtime):
+    absolute = pathlib.Path(db_path).resolve(strict=True)
+    uri = "file:" + urllib.parse.quote(str(absolute).replace("\\", "/"), safe="/:?") + "?mode=ro"
+    database = sqlite3.connect(uri, uri=True, timeout=5)
+    try:
+        database.execute("PRAGMA query_only=ON")
+        database.execute("BEGIN")
+        rows = database.execute(
+            "SELECT status,model,provider,connection_id FROM call_logs WHERE id=?", (request_id,)).fetchall()
+    finally:
+        database.close()
+    expected = (200, runtime.get("model"), "lm-studio", runtime.get("connection_id"))
+    if len(rows) != 1 or tuple(rows[0]) != expected:
+        raise ValueError("selected connection")
+    return rows[0][3]
 
 
 def main():
@@ -69,17 +91,20 @@ def main():
     completion = json.loads(completion_raw)
     choices = completion.get("choices") if isinstance(completion, dict) else None
     content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and len(choices) == 1 and isinstance(choices[0], dict) else None
+    observed_log_id = meta.get("x-omniroute-request-id")
     if (completion_status != 200 or not isinstance(content, str) or not content
             or meta.get("x-omniroute-model") != runtime["model"]
-            or meta.get("x-omniroute-request-id") != request_id
+            or not isinstance(observed_log_id, str) or not 1 <= len(observed_log_id) <= 128
+            or any(ord(char) < 0x21 or ord(char) > 0x7e for char in observed_log_id)
             or meta.get("x-omniroute-provider") != "lm-studio"):
         return 1
+    selected_connection = observed_connection(CALL_LOG_DB, observed_log_id, runtime)
     evidence = {
         "schema": "auto-switch-q4-r9-evidence/v1", "runtime": runtime,
         "health": {"status": health_status, "candidate_id": runtime["candidate_id"]},
         "models": {"status": models_status, "candidate_id": runtime["candidate_id"], "model": runtime["model"]},
         "completion": {"status": completion_status, "candidate_id": runtime["candidate_id"],
-            "model": runtime["model"], "connection_id": runtime["connection_id"], "request_count": 1,
+            "model": runtime["model"], "connection_id": selected_connection, "request_count": 1,
             "request_id": request_id, "content_bytes": len(content.encode("utf-8"))},
     }
     secret = b""; token = ""

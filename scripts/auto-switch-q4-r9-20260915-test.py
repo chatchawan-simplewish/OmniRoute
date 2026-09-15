@@ -87,6 +87,7 @@ class Q4R9Test(unittest.TestCase):
             terminal = json.loads((root / action["terminal_leaf"]).read_text())
             self.assertEqual(state, {"schema": "auto-switch-q4-r9-state/v1", "status": "Q4_R9_UNKNOWN", "gate_spent": True})
             self.assertEqual(terminal["status"], "Q4_R9_PASS")
+            self.assertEqual(terminal["evidence_sha256"], hashlib.sha256(runtime.authenticate(b"fixture-secret", action)).hexdigest())
             self.assertTrue(runtime.started and runtime.stopped)
             with self.assertRaises(FileExistsError):
                 helper.execute(request, Runtime(), key)

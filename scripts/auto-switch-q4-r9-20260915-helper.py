@@ -69,6 +69,7 @@ def execute(request, runtime, secret_path):
         evidence_bytes = runtime.authenticate(secret, action)
         if not isinstance(evidence_bytes, bytes): return 1
         evidence = json.loads(evidence_bytes)
+        if evidence_bytes != json.dumps(evidence, sort_keys=True, separators=(",", ":")).encode(): return 1
         completion = evidence["completion"]
         passed = set(evidence) == {"schema", "runtime", "collector_sha256", "health", "models", "completion"}
         passed = passed and evidence["schema"] == "auto-switch-q4-r9-evidence/v1" and evidence["runtime"] == action["runtime"] and evidence["collector_sha256"] == action["runtime"]["collector_sha256"]
@@ -83,5 +84,5 @@ def execute(request, runtime, secret_path):
     passed = passed and stopped is True
     if not passed: return 1
     _write_new(terminal, {"schema": "auto-switch-q4-r9-terminal/v1", "status": "Q4_R9_PASS", "gate_spent": True,
-                          "request_id": evidence["completion"]["request_id"], "candidate_stopped_retained": True})
+                          "request_id": evidence["completion"]["request_id"], "evidence_sha256": hashlib.sha256(evidence_bytes).hexdigest(), "candidate_stopped_retained": True})
     return 0

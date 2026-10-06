@@ -370,7 +370,7 @@ jobs:
   bank-ratchet-shrinks:
     name: Bank ratchet shrinks
     if: ${{ github.event_name != 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     permissions:
       contents: write
       pull-requests: write

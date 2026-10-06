@@ -14,7 +14,7 @@ jobs:
   analysis:
     if: ${{ github.event_name != 'push' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     name: Scorecard analysis
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     permissions:
       # security-events: write removed — Scorecard findings are advisory and no longer
       # uploaded to the code-scanning Security tab (they are supply-chain/posture scores,

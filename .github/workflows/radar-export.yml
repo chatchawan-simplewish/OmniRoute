@@ -33,7 +33,7 @@ env:
 
 jobs:
   publish-export:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     permissions:
       contents: write # gh release upload — clobra o asset estável do export
     steps:

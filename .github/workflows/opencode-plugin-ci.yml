@@ -28,7 +28,7 @@ defaults:
 jobs:
   test:
     name: Test (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +48,7 @@ jobs:
 
   test-v2:
     name: Test v2 (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     strategy:
       fail-fast: false
       matrix:
@@ -71,7 +71,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     needs: [test, test-v2]
     steps:
       - uses: actions/checkout@v7

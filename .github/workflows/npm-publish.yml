@@ -388,7 +388,7 @@ jobs:
   stage-npm:
     needs: publish
     if: needs.publish.outputs.skip != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     permissions:
       contents: read
       id-token: write # npm provenance — the whole reason this job is separate
@@ -486,7 +486,7 @@ jobs:
           echo "✅ Published omniroute@$VERSION (dist-tag=$TAG) [DIRECT mode]"
 
   publish-opencode-plugin:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     permissions:
       contents: read
       id-token: write # npm provenance
@@ -575,7 +575,7 @@ jobs:
           echo "✅ Published ${PKG_NAME}@${PKG_VERSION}"
 
   publish-opencode-plugin-v2:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu-latest]
     permissions:
       contents: read
       id-token: write # npm provenance
